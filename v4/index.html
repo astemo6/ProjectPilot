@@ -285,6 +285,8 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <button id="btnAddMs" data-i18n="addMs">+ 里程碑</button>
   <button id="btnDelSel" data-i18n="delSel" title="" style="color:var(--danger)">🗑 删除</button>
   <span class="sep"></span>
+  <div class="viewbtns" id="modeBtns" title="任务模式"><button data-tm="manual" data-i18n="tmManual">📌 手动计划</button><button data-tm="auto" data-i18n="tmAuto">⚙ 自动计划</button></div>
+  <span class="sep"></span>
   <button id="btnOutdent" data-i18n="outdent" title="Alt+Shift+←">⇤ 升级</button>
   <button id="btnIndent" data-i18n="indent" title="Alt+Shift+→">降级 ⇥</button>
   <button id="btnUndo" data-i18n="undo" title="Ctrl+Z" disabled>↶ 撤销</button>
@@ -293,7 +295,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <button id="btnOemMs" class="primary" data-i18n="oemMsBtn">+ 客户里程碑</button>
   <button id="btnFromPlan" data-i18n="fromPlan" style="display:none">从计划导入</button>
   <button id="btnSyncBack" data-i18n="syncBack" style="display:none">回写里程碑计划</button>
-  <button id="btnImportSub" data-i18n="importSub">导入细项</button>
+  <button id="btnImportSub" data-i18n="importSub" style="display:none">导入细项</button>
   <button id="btnTPL" data-i18n="tplBtn" style="display:none">模板</button>
   <span class="sep"></span>
   <div class="viewbtns" id="paneBtns">
@@ -304,7 +306,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   </div>
   <span class="sep"></span>
   <button id="btnCols" data-i18n="colSettings">显示列 ▾</button>
-  <select id="oemSelect" title="OEM"></select>
+  <select id="oemSelect" title="OEM" style="display:none"></select>
   <label class="ck"><span data-i18n="barLbl">条形标注</span> <select id="selBarLbl" style="height:28px"><option value="name" data-i18n="blName">名称</option><option value="start" data-i18n="blStart">开始日期</option><option value="end" data-i18n="blEnd">完成日期</option><option value="none" data-i18n="blNone">不显示</option></select></label>
   <label class="ck"><input type="checkbox" id="ckPhase" checked><span data-i18n="showPhase">阶段</span></label>
   <label class="ck"><input type="checkbox" id="ckCrit"><span data-i18n="criticalPath">关键路径</span></label>
@@ -548,6 +550,8 @@ function buildOemOptions(){
 function syncOemSelect(){
   var sel = document.getElementById("oemSelect");
   if(sel) sel.value = state.planOem || "";
+  var b = document.getElementById("btnOemMs");
+  if(b && typeof tr === "function") b.textContent = state.planOem ? tr("oemMsBtnCur").replace("{0}", state.planOem) : tr("oemMsBtn");
 }
 
 /* 阶段体系名称（三语）：色带标注用。只含标准阶段键（ML0-7/APQP1-5/ANPQP1-5），
@@ -716,29 +720,29 @@ const TPL_ANPQP = [
 /* ============ 数据模型与状态 ============ */
 var LS_KEY = "gantt-exec-v4";
 var COLORS = ["#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#dc2626","#4f46e5","#0d9488"];
-var state = { tasks:[], seq:1, view:"day", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{} };
+var state = { tasks:[], seq:1, view:"day", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{}, colDefV4:true };
 /* 列模型：ID 与任务名称为冻结固定列（常显不可隐藏），其余列可显隐、可拖拽调宽 */
 var COLS = [
   {key:'id',    cls:'c-id',    defW:36, fixed:true},
   {key:'name',  cls:'c-name',  defW:0,  fixed:true, i18n:'cName'},
   {key:'wbs',   cls:'c-wbs',   defW:56, i18n:'cWbs', hide:true},
   {key:'mode',  cls:'c-mode',  defW:84, i18n:'cMode'},
-  {key:'owner', cls:'c-owner', defW:110, i18n:'cOwner'},
-  {key:'dur',   cls:'c-dur',   defW:52, i18n:'cDur'},
-  {key:'work',  cls:'c-work',  defW:60, i18n:'cWork'},
+  {key:'owner', cls:'c-owner', defW:110, i18n:'cOwner', hide:true},
+  {key:'dur',   cls:'c-dur',   defW:52, i18n:'cDur', hide:true},
+  {key:'work',  cls:'c-work',  defW:60, i18n:'cWork', hide:true},
   {key:'cost',  cls:'c-cost',  defW:84, i18n:'evCost', hide:true},
-  {key:'prog',  cls:'c-prog',  defW:56, i18n:'cProg'},
+  {key:'prog',  cls:'c-prog',  defW:56, i18n:'cProg', hide:true},
   {key:'start', cls:'c-start', defW:118, i18n:'cStart'},
   {key:'end',   cls:'c-end',   defW:118, i18n:'cEnd'},
   {key:'pred',  cls:'c-pred',  defW:84, i18n:'cPred'},
-  {key:'cons',  cls:'c-cons',  defW:220, i18n:'cCons'},
-  {key:'var',   cls:'c-var',   defW:52, i18n:'varianceCol'},
-  {key:'float', cls:'c-float', defW:64, i18n:'floatCol'},
-  {key:'output', cls:'c-output', defW:120, i18n:'fOutput'},
+  {key:'cons',  cls:'c-cons',  defW:220, i18n:'cCons', hide:true},
+  {key:'var',   cls:'c-var',   defW:52, i18n:'varianceCol', hide:true},
+  {key:'float', cls:'c-float', defW:64, i18n:'floatCol', hide:true},
+  {key:'output', cls:'c-output', defW:120, i18n:'fOutput', hide:true},
   {key:'remarks', cls:'c-remarks', defW:120, i18n:'fRemarks', hide:true}
 ];
 var COL_MIN_W = 24, COL_MAX_W = 600, NAME_MIN_W = 80;
-function colVis(key){ return !state.colVis || state.colVis[key] !== false; }
+function colVis(key){ var v = state.colVis && state.colVis[key]; if(typeof v === "boolean") return v; var c = null; COLS.forEach(function(x){ if(x.key === key) c = x; }); return c ? !c.hide : true; }
 function colWOf(key){ // 合法范围内的列宽；未设置返回 null（用默认宽）
   var w = state.colW ? state.colW[key] : null;
   if(typeof w !== 'number' || isNaN(w)) return null;
@@ -788,7 +792,7 @@ function undo(){ histApply(HIST.u, HIST.r); }
 function redo(){ histApply(HIST.r, HIST.u); }
 function save(){ histRecord(); try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} WORKCAL.save(cal); }
 function load(){
-  try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
+  try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; if(!state.colDefV4){ state.colVis = {}; state.colDefV4 = true; } COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
   seedSample();
 }
 function seedSample(){
@@ -3304,6 +3308,17 @@ function init(){
     b.addEventListener("click", function(){ lang = b.dataset.lang; applyLang(); buildOemOptions(); syncOemSelect(); closeTplMenu(); render(); });
   });
   document.getElementById("btnOemMs").addEventListener("click", function(){ openOemMs(); });
+  document.querySelectorAll("#modeBtns button").forEach(function(b){ b.addEventListener("click", function(){
+    var ts = modeTargets(); if(!ts.length){ toast(tr("modePick")); return; }
+    var man = b.dataset.tm === "manual";
+    ts.forEach(function(t){ t.manual = man; });
+    save(); render(); modeBtns(); toast(tr(man ? "modeSetM" : "modeSetA").replace("{0}", ts.length));
+  }); });
+  document.addEventListener("click", function(){ setTimeout(modeBtns, 0); }, true);
+  document.addEventListener("keyup", function(){ setTimeout(modeBtns, 0); }, true);
+  setTimeout(modeBtns, 0);
+  setTimeout(syncOemSelect, 0);
+  document.querySelectorAll(".langbtns button").forEach(function(b){ b.addEventListener("click", function(){ setTimeout(syncOemSelect, 0); }); });
   document.getElementById("btnCols").addEventListener("click", function(e){ e.stopPropagation(); toggleColMenu(); });
   document.addEventListener("click", function(e){ // 列/模板菜单点击外部自动关闭
     var m = document.getElementById("colMenu");
@@ -3935,10 +3950,37 @@ renderNet = function(){
   _renderNet0();
   var box = document.getElementById("netSheet"); if(!box || state.pane !== "net") return;
   var tb = box.querySelector(".rs-tb"); if(tb && !tb.querySelector(".nl-hint")){ var sp = document.createElement("span"); sp.className = "nl-hint"; sp.textContent = tr("netLinkHint"); tb.appendChild(sp); }
-  var from = null;
-  box.querySelectorAll(".net-box").forEach(function(b){
-    b.addEventListener("mousedown", function(e){ if(e.shiftKey){ from = b.dataset.id; e.preventDefault(); } });
-    b.addEventListener("mouseup", function(){ if(from && from !== b.dataset.id){ var t = byId(b.dataset.id); if(t && !normDeps(t.deps).some(function(d){ return d.id === from; })){ cellEdit(t, "pred", depsToText(normDeps(t.deps).concat([{ id:from, type:"FS", lag:0 }]))); toast(tr("netLinked")); } } from = null; });
+  var wrap = box.querySelector(".net-wrap"); if(!wrap) return;
+  if(!document.getElementById("nlCss")){ var st = document.createElement("style"); st.id = "nlCss";
+    st.textContent = ".nl-h{position:absolute;right:3px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 0 0 1px #2563eb;cursor:crosshair;opacity:0;transition:opacity .15s}.net-box:hover .nl-h,.net-wrap.linking .nl-h{opacity:1}.net-box.nl-tgt{box-shadow:0 0 0 3px #93c5fd}.net-wrap.linking,.net-wrap.linking .net-box{cursor:crosshair;user-select:none}";
+    document.head.appendChild(st); }
+  box.querySelectorAll(".net-box").forEach(function(b){ if(!b.querySelector(".nl-h")){ var hd = document.createElement("span"); hd.className = "nl-h"; hd.title = tr("netLinkHint"); b.appendChild(hd); } });
+  var NS = "http://www.w3.org/2000/svg", ov = document.createElementNS(NS, "svg");
+  ov.setAttribute("style", "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5");
+  var ln = document.createElementNS(NS, "line"); ln.setAttribute("stroke", "#2563eb"); ln.setAttribute("stroke-width", "2"); ln.setAttribute("stroke-dasharray", "5 4"); ln.style.display = "none"; ov.appendChild(ln); wrap.appendChild(ov);
+  var drag = null;
+  function pt(e){ var r = wrap.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; }
+  function boxAt(e){ var el = document.elementFromPoint ? document.elementFromPoint(e.clientX, e.clientY) : e.target; return el && el.closest ? el.closest(".net-box") : null; }
+  function clearTgt(){ wrap.querySelectorAll(".nl-tgt").forEach(function(x){ x.classList.remove("nl-tgt"); }); }
+  function move(e){ if(!drag) return; var p = pt(e); ln.setAttribute("x2", p.x); ln.setAttribute("y2", p.y); clearTgt(); var t = boxAt(e); if(t && t.dataset.id !== drag.from) t.classList.add("nl-tgt"); }
+  function up(e){
+    document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up);
+    if(!drag) return; var from = drag.from; drag = null; ln.style.display = "none"; wrap.classList.remove("linking"); clearTgt();
+    var tb_ = boxAt(e); if(!tb_ || tb_.dataset.id === from) return;
+    var t = byId(tb_.dataset.id); if(!t) return;
+    if(normDeps(t.deps).some(function(d){ return d.id === from; })){ toast(tr("netLinkDup")); return; }
+    cellEdit(t, "pred", depsToText(normDeps(t.deps).concat([{ id:from, type:"FS", lag:0 }])));
+    toast(tr("netLinked"));
+  }
+  wrap.addEventListener("mousedown", function(e){
+    var b = e.target.closest ? e.target.closest(".net-box") : null; if(!b || e.button !== 0) return;
+    if(!e.shiftKey && !e.target.closest(".nl-h")) return;
+    e.preventDefault(); e.stopPropagation();
+    drag = { from:b.dataset.id };
+    var x = b.offsetLeft + b.offsetWidth, y = b.offsetTop + b.offsetHeight / 2;
+    ln.setAttribute("x1", x); ln.setAttribute("y1", y); ln.setAttribute("x2", x); ln.setAttribute("y2", y); ln.style.display = "";
+    wrap.classList.add("linking");
+    document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
   });
 };
 I18N.zh.ignRC = "忽略资源日历"; I18N.en.ignRC = "Ignore resource calendars"; I18N.de.ignRC = "Ressourcenkalender ignorieren";
@@ -4205,9 +4247,9 @@ var CASCADE_GAPS = {
 
 /* ============ v4：客户里程碑按需插入（取代「客户节点」页与推荐任务） ============ */
 var V4T = {
- zh:{oemMsBtn:"+ 客户里程碑",oemMsT:"插入客户里程碑",oemMsOem:"主机厂",oemMsPick:"请选择主机厂",oemMsNode:"节点",oemMsDate:"日期",oemMsFill:"按标准间隔推算其余日期",oemMsAll:"全选",oemMsNone:"全不选",oemMsHint:"填任意一个节点日期（如 SOP）后点“推算”，其余自动前后补全。勾选并有日期的节点会作为“必须开始于”里程碑插入到「客户里程碑」分组；取消勾选的已插入节点会被移除。",oemMsOk:"已更新客户里程碑：{0} 个",oemMsNeedDate:"请至少给一个勾选的节点填写日期",oemMsGrp:"客户里程碑",oemMsFirst:"请先填写任意一个节点的日期（例如 SOP）,其余会自动前后推算",oemMsAuto:"已从今天起按标准间隔排好日期,请检查后再点确定"},
- en:{oemMsBtn:"+ Customer milestones",oemMsT:"Insert customer milestones",oemMsOem:"OEM",oemMsPick:"Select OEM",oemMsNode:"Milestone",oemMsDate:"Date",oemMsFill:"Fill blank dates by standard gaps",oemMsAll:"All",oemMsNone:"None",oemMsHint:"Ticked milestones with a date are inserted as Must Start On milestones in the Customer Milestones group; unticked ones already inserted are removed.",oemMsOk:"Customer milestones updated: {0}",oemMsNeedDate:"Enter a date for at least one ticked milestone",oemMsGrp:"Customer Milestones",oemMsFirst:"Enter any one milestone date (e.g. SOP); the rest are calculated both ways",oemMsAuto:"Dates proposed from today by standard gaps; review, then press OK"},
- de:{oemMsBtn:"+ Kundenmeilensteine",oemMsT:"Kundenmeilensteine einfügen",oemMsOem:"OEM",oemMsPick:"OEM wählen",oemMsNode:"Meilenstein",oemMsDate:"Datum",oemMsFill:"Leere Daten nach Standardabständen füllen",oemMsAll:"Alle",oemMsNone:"Keine",oemMsHint:"Angehakte Meilensteine mit Datum werden als „Muss anfangen am“ in die Gruppe Kundenmeilensteine eingefügt; abgewählte werden entfernt.",oemMsOk:"Kundenmeilensteine aktualisiert: {0}",oemMsNeedDate:"Bitte mindestens ein Datum eintragen",oemMsGrp:"Kundenmeilensteine",oemMsFirst:"Ein beliebiges Datum eintragen (z. B. SOP); der Rest wird berechnet",oemMsAuto:"Daten ab heute vorgeschlagen; bitte prüfen und OK drücken"}};
+ zh:{modePick:"请先选中一个任务（或分组）",modeSetM:"已设为手动计划：{0} 个任务",modeSetA:"已设为自动计划：{0} 个任务",tmManual:"📌 手动计划",tmAuto:"⚙ 自动计划",oemMsBtn:"+ 客户里程碑",oemMsBtnCur:"客户里程碑：{0} ▾",oemMsT:"插入客户里程碑",oemMsOem:"主机厂",oemMsPick:"请选择主机厂",oemMsNode:"节点",oemMsDate:"日期",oemMsFill:"按标准间隔推算其余日期",oemMsAll:"全选",oemMsNone:"全不选",oemMsHint:"填任意一个节点日期（如 SOP）后点“推算”，其余自动前后补全。勾选并有日期的节点会作为“必须开始于”里程碑插入到「客户里程碑」分组；取消勾选的已插入节点会被移除。",oemMsOk:"已更新客户里程碑：{0} 个",oemMsNeedDate:"请至少给一个勾选的节点填写日期",oemMsGrp:"客户里程碑",oemMsFirst:"请先填写任意一个节点的日期（例如 SOP）,其余会自动前后推算",oemMsAuto:"已从今天起按标准间隔排好日期,请检查后再点确定"},
+ en:{modePick:"Select a task (or group) first",modeSetM:"Set to manually scheduled: {0}",modeSetA:"Set to auto scheduled: {0}",tmManual:"📌 Manual",tmAuto:"⚙ Auto",oemMsBtn:"+ Customer milestones",oemMsBtnCur:"Customer milestones: {0} ▾",oemMsT:"Insert customer milestones",oemMsOem:"OEM",oemMsPick:"Select OEM",oemMsNode:"Milestone",oemMsDate:"Date",oemMsFill:"Fill blank dates by standard gaps",oemMsAll:"All",oemMsNone:"None",oemMsHint:"Ticked milestones with a date are inserted as Must Start On milestones in the Customer Milestones group; unticked ones already inserted are removed.",oemMsOk:"Customer milestones updated: {0}",oemMsNeedDate:"Enter a date for at least one ticked milestone",oemMsGrp:"Customer Milestones",oemMsFirst:"Enter any one milestone date (e.g. SOP); the rest are calculated both ways",oemMsAuto:"Dates proposed from today by standard gaps; review, then press OK"},
+ de:{modePick:"Zuerst einen Vorgang (oder eine Gruppe) wählen",modeSetM:"Manuell geplant: {0}",modeSetA:"Automatisch geplant: {0}",tmManual:"📌 Manuell",tmAuto:"⚙ Automatisch",oemMsBtn:"+ Kundenmeilensteine",oemMsBtnCur:"Kundenmeilensteine: {0} ▾",oemMsT:"Kundenmeilensteine einfügen",oemMsOem:"OEM",oemMsPick:"OEM wählen",oemMsNode:"Meilenstein",oemMsDate:"Datum",oemMsFill:"Leere Daten nach Standardabständen füllen",oemMsAll:"Alle",oemMsNone:"Keine",oemMsHint:"Angehakte Meilensteine mit Datum werden als „Muss anfangen am“ in die Gruppe Kundenmeilensteine eingefügt; abgewählte werden entfernt.",oemMsOk:"Kundenmeilensteine aktualisiert: {0}",oemMsNeedDate:"Bitte mindestens ein Datum eintragen",oemMsGrp:"Kundenmeilensteine",oemMsFirst:"Ein beliebiges Datum eintragen (z. B. SOP); der Rest wird berechnet",oemMsAuto:"Daten ab heute vorgeschlagen; bitte prüfen und OK drücken"}};
 Object.keys(V4T).forEach(function(l){ if(I18N[l]) Object.assign(I18N[l], V4T[l]); });
 function oemMsKey(oem, name){ return "oem:" + oem + "|" + name; }
 function oemMsTasks(oem){ return state.tasks.filter(function(t){ return t.type === "milestone" && String(t.source || "").indexOf("oem:" + oem + "|") === 0; }); }
@@ -4287,6 +4329,26 @@ function openOemMs(oem){
   };
 }
 
+
+/* v4：工具栏切换选中任务的任务模式（分组 = 其下全部任务） */
+function modeTargets(){
+  var t = selId && byId(selId); if(!t) return [];
+  if(t.type !== "group") return [t];
+  var out = [], ids = {}; ids[t.id] = 1; var changed = true;
+  while(changed){ changed = false; state.tasks.forEach(function(x){ if(!ids[x.id] && ids[x.group || ""]){ ids[x.id] = 1; changed = true; if(x.type !== "group") out.push(x); } }); }
+  return out;
+}
+function modeBtns(){
+  var box = document.getElementById("modeBtns"); if(!box) return;
+  var ts = modeTargets(), m = ts.length && ts.every(function(x){ return x.manual; }), a = ts.length && ts.every(function(x){ return !x.manual; });
+  box.querySelector('[data-tm="manual"]').classList.toggle("on", !!m);
+  box.querySelector('[data-tm="auto"]').classList.toggle("on", !!a);
+  box.style.opacity = ts.length ? "1" : ".55";
+}
+I18N.zh.netLinkHint = "拖动方框右侧的蓝色圆点（或按住 Shift 拖动方框）到另一个方框，即建立完成-开始链接。";
+I18N.en.netLinkHint = "Drag the blue dot on a box\u2019s right edge (or Shift+drag the box) onto another box to create a finish-to-start link.";
+I18N.de.netLinkHint = "Blauen Punkt am rechten Rand (oder Shift+Ziehen) auf einen anderen Kasten ziehen, um eine Ende-Anfang-Verknüpfung zu erstellen.";
+I18N.zh.netLinkDup = "这两个任务已经有链接了"; I18N.en.netLinkDup = "These tasks are already linked"; I18N.de.netLinkDup = "Bereits verknüpft";
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
 })();
