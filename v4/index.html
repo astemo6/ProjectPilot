@@ -457,7 +457,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.9</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.10</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -6218,6 +6218,13 @@ function v4ExpPlan(){
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4Gan = { importGanText:importGanText, importCsvText:importCsvText, exportGan:exportGan, toMspdi:toMspdi, csvToRows:csvToRows, parseCsv:parseCsv };
 })();
+/* v4.10：通用 Esc —— 任何对话框（焦点不在对话框内时）按 Esc 关闭最上层的那一个 */
+document.addEventListener("keydown", function(e){
+  if(e.key !== "Escape" || e.defaultPrevented) return;
+  var bgs = Array.prototype.filter.call(document.querySelectorAll(".modal-bg"), function(b){ return b.offsetParent !== null || getComputedStyle(b).display !== "none" && b.getClientRects().length; });
+  if(!bgs.length) return; var top = bgs[bgs.length - 1], x = top.querySelector(".modal-h button");
+  if(x) x.click(); else if(top.parentNode && !top.id) top.remove();
+});
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
 })();
