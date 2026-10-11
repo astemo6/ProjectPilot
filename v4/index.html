@@ -385,6 +385,7 @@ html[data-theme=dark] .omBtns button{background:#1a2638!important;color:var(--tx
 #v4Form .tf-nav{display:flex;flex-direction:column;gap:4px}#v4Form .tf-nav button{width:26px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--tx2);cursor:pointer}
 #v4Form .tf-empty{margin:auto;color:var(--tx3)}#v4Form>.tf-x{position:absolute;right:8px;top:6px;width:26px;height:24px;border:1px solid var(--line);border-radius:4px;background:var(--card);cursor:pointer}
 #taskList .trow[data-id^="gb:"] .row-del{display:none}#taskList .trow[data-id^="gb:"]{font-weight:600}
+.onum{color:var(--tx3);margin-right:6px;font-variant-numeric:tabular-nums;font-weight:400}
 label.v4gb{display:flex;align-items:center;gap:6px}label.v4gb select{height:24px;font-size:12px}
 /* 顶部栏控件统一高度 32px（与 v3 根页一致）（新建项目 / 项目名称 / OEM 链接 / 主题 / 语言） */
 header button,header input,header select,header a.btn,header #lnkOem,header #themeBtns{height:32px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;line-height:1;vertical-align:middle}
@@ -400,7 +401,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.1</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.2</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -5580,6 +5581,95 @@ function v4ExpPlan(){
   }
   var _al = applyLang; applyLang = function(){ var r = _al.apply(this, arguments); try { apply(); } catch(e){} return r; };
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", function(){ setTimeout(apply, 0); }); else setTimeout(apply, 0);
+})();
+/* ===== v4.2：对标 MS Project —— 大纲数字 / 项目摘要任务 / 自定义筛选器 ===== */
+(function(){
+  var TX = {
+    zh:{ onum:"大纲数字", psum:"项目摘要任务", proj:"项目", cf:"自定义筛选…", cfT:"自定义筛选器", fld:"域名", op:"条件", val:"值", and:"且", or:"或", ok:"应用", no:"取消", clr:"清除筛选",
+      f_name:"名称", f_owner:"资源", f_dur:"工期（天）", f_start:"开始", f_end:"完成", f_prog:"完成%", f_pred:"前置任务", f_remarks:"备注", f_type:"类型（任务/里程碑）", f_mode:"任务模式（手动/自动）", f_float:"总可宽延（天）",
+      o_eq:"等于", o_ne:"不等于", o_has:"包含", o_not:"不包含", o_gt:"大于", o_lt:"小于", o_ge:"大于或等于", o_le:"小于或等于", hint:"日期格式 2026-10-12；类型填 任务 / 里程碑；模式填 手动 / 自动。", res:function(n){ return "筛选结果：" + n + " 个任务"; } },
+    en:{ onum:"Outline number", psum:"Project summary task", proj:"Project", cf:"Custom filter…", cfT:"Custom filter", fld:"Field", op:"Test", val:"Value", and:"And", or:"Or", ok:"Apply", no:"Cancel", clr:"Clear filter",
+      f_name:"Name", f_owner:"Resources", f_dur:"Duration (days)", f_start:"Start", f_end:"Finish", f_prog:"% complete", f_pred:"Predecessors", f_remarks:"Notes", f_type:"Type (task/milestone)", f_mode:"Mode (manual/auto)", f_float:"Total slack (days)",
+      o_eq:"equals", o_ne:"does not equal", o_has:"contains", o_not:"does not contain", o_gt:"is greater than", o_lt:"is less than", o_ge:"is greater than or equal to", o_le:"is less than or equal to", hint:"Dates as 2026-10-12; type: task / milestone; mode: manual / auto.", res:function(n){ return n + " tasks match"; } },
+    de:{ onum:"Gliederungsnummer", psum:"Projektsammelvorgang", proj:"Projekt", cf:"Benutzerdef. Filter…", cfT:"Benutzerdefinierter Filter", fld:"Feld", op:"Bedingung", val:"Wert", and:"Und", or:"Oder", ok:"Anwenden", no:"Abbrechen", clr:"Filter löschen",
+      f_name:"Name", f_owner:"Ressourcen", f_dur:"Dauer (Tage)", f_start:"Anfang", f_end:"Ende", f_prog:"% Abgeschl.", f_pred:"Vorgänger", f_remarks:"Notizen", f_type:"Art (Vorgang/Meilenstein)", f_mode:"Modus (manuell/auto)", f_float:"Gesamtpuffer (Tage)",
+      o_eq:"gleich", o_ne:"ungleich", o_has:"enthält", o_not:"enthält nicht", o_gt:"größer als", o_lt:"kleiner als", o_ge:"größer oder gleich", o_le:"kleiner oder gleich", hint:"Datum als 2026-10-12; Art: Vorgang / Meilenstein; Modus: manuell / auto.", res:function(n){ return n + " Vorgänge gefunden"; } } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+
+  /* —— 自定义筛选器 —— */
+  var FIELDS = ["name","owner","dur","start","end","prog","pred","remarks","type","mode","float"], OPS = ["eq","ne","has","not","gt","lt","ge","le"];
+  function fv(t, f){
+    if(f === "name") return t.name || ""; if(f === "owner") return t.owner || ""; if(f === "dur") return t.type === "milestone" ? 0 : (+t.dur || 0);
+    if(f === "start") return t.start || ""; if(f === "end") return taskEnd(t) || ""; if(f === "prog") return +t.progress || 0; if(f === "pred") return depsToText(t.deps);
+    if(f === "remarks") return t.remarks || ""; if(f === "type") return t.type === "milestone" ? "milestone" : "task"; if(f === "mode") return t.manual ? "manual" : "auto";
+    if(f === "float") return floatMap[t.id] === undefined ? null : +floatMap[t.id]; return ""; }
+  function normVal(f, v){ v = String(v || "").trim();
+    if(f === "type") return /里程碑|milestone|meilenstein/i.test(v) ? "milestone" : "task";
+    if(f === "mode") return /手动|manual|manuell/i.test(v) ? "manual" : "auto"; return v; }
+  function test1(t, c){ var a = fv(t, c.f), b = normVal(c.f, c.v), num = ["dur","prog","float"].indexOf(c.f) >= 0;
+    if(a == null) return false;
+    if(c.o === "has" || c.o === "not"){ var hit = String(a).toLowerCase().indexOf(String(b).toLowerCase()) >= 0; return c.o === "has" ? hit : !hit; }
+    var x = a, y = b; if(num){ x = +a; y = parseFloat(b); if(isNaN(y)) return false; } else if(c.f === "start" || c.f === "end"){ y = b.length >= 8 ? fmtD(parseD(b)) : b; } else { x = String(a).toLowerCase(); y = String(b).toLowerCase(); }
+    switch(c.o){ case "eq": return x == y; case "ne": return x != y; case "gt": return x > y; case "lt": return x < y; case "ge": return x >= y; case "le": return x <= y; }
+    return true; }
+  function cfMatch(t){ var cs = (state.cflt && state.cflt.c || []).filter(function(c){ return c && c.f && c.o && String(c.v || "").trim() !== ""; }); if(!cs.length) return true;
+    var r = test1(t, cs[0]); for(var i = 1; i < cs.length; i++){ var x = test1(t, cs[i]); r = cs[i].j === "or" ? (r || x) : (r && x); } return r; }
+  var _tmf = taskMatchFilter; taskMatchFilter = function(t){ return state.flt === "custom" ? cfMatch(t) : _tmf(t); };
+  function cfDlg(){
+    var C = (state.cflt && state.cflt.c) || [], bg = document.createElement("div"); bg.className = "modal-bg show";
+    function row(i){ var c = C[i] || {};
+      return '<div class="cf-r" style="display:grid;grid-template-columns:62px 1.2fr 1.3fr 1fr;gap:6px;margin-bottom:6px;align-items:center">'
+        + (i ? '<select class="cf-j"><option value="and"' + (c.j === "or" ? "" : " selected") + ">" + L("and") + '</option><option value="or"' + (c.j === "or" ? " selected" : "") + ">" + L("or") + "</option></select>" : "<span></span>")
+        + '<select class="cf-f"><option value=""></option>' + FIELDS.map(function(f){ return '<option value="' + f + '"' + (c.f === f ? " selected" : "") + ">" + L("f_" + f) + "</option>"; }).join("") + "</select>"
+        + '<select class="cf-o">' + OPS.map(function(o){ return '<option value="' + o + '"' + ((c.o || "eq") === o ? " selected" : "") + ">" + L("o_" + o) + "</option>"; }).join("") + "</select>"
+        + '<input class="cf-v" value="' + esc(c.v || "") + '" style="height:28px;box-sizing:border-box"></div>'; }
+    bg.innerHTML = '<div class="modal" style="width:620px"><div class="modal-h"><span>' + L("cfT") + '</span><button class="cf-x">×</button></div><div class="modal-b">'
+      + '<div style="display:grid;grid-template-columns:62px 1.2fr 1.3fr 1fr;gap:6px;font-size:11px;color:var(--tx3);margin-bottom:4px"><span></span><span>' + L("fld") + "</span><span>" + L("op") + "</span><span>" + L("val") + "</span></div>"
+      + [0,1,2,3].map(row).join("") + '<div style="font-size:11px;color:var(--tx3);margin:6px 0 12px">' + L("hint") + "</div>"
+      + '<div style="display:flex;justify-content:space-between"><button class="cf-clr">' + L("clr") + '</button><span><button class="cf-no">' + L("no") + '</button> <button class="primary cf-ok">' + L("ok") + "</button></span></div></div></div>";
+    document.body.appendChild(bg);
+    var q = function(s){ return bg.querySelector(s); };
+    function close(){ bg.remove(); if(state.flt === "custom" && !(state.cflt && state.cflt.c && state.cflt.c.length)){ state.flt = "all"; render(); } else renderBaseSel(); }
+    q(".cf-x").onclick = close; q(".cf-no").onclick = close;
+    bg.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape") close(); if(e.key === "Enter" && e.target.tagName === "INPUT") q(".cf-ok").click(); });
+    q(".cf-clr").onclick = function(){ state.cflt = null; state.flt = "all"; bg.remove(); render(); };
+    q(".cf-ok").onclick = function(){ var cs = [];
+      bg.querySelectorAll(".cf-r").forEach(function(r){ var f = r.querySelector(".cf-f").value, v = r.querySelector(".cf-v").value.trim(); if(!f || v === "") return; var j = r.querySelector(".cf-j"); cs.push({ j:j ? j.value : "and", f:f, o:r.querySelector(".cf-o").value, v:v }); });
+      if(cs.length) cs[0].j = "and";
+      state.cflt = cs.length ? { c:cs } : null; state.flt = cs.length ? "custom" : "all"; bg.remove(); render();
+      if(cs.length) toast(L("res")(state.tasks.filter(function(t){ return t.type !== "group" && cfMatch(t); }).length)); };
+    setTimeout(function(){ var f = q(".cf-f"); if(f) f.focus(); }, 0);
+  }
+  var _rbs = renderBaseSel; renderBaseSel = function(){ var r = _rbs.apply(this, arguments);
+    var fs = document.getElementById("fltSel"); if(fs && !fs.querySelector('option[value="custom"]')){ var o = document.createElement("option"); o.value = "custom"; o.textContent = L("cf"); fs.appendChild(o); if(state.flt === "custom") fs.value = "custom"; }
+    return r; };
+
+  /* —— 项目摘要任务（第 0 行，跨度为整个项目） —— */
+  var projRow = null;
+  var _vt = visibleTasks; visibleTasks = function(){ var v = _vt(); if(!state.showProjSum) return v;
+    var s = null, e = null, kids = state.tasks.filter(function(t){ return t.type !== "group"; });
+    kids.forEach(function(t){ if(t.inactive || !t.start) return; var te = taskEnd(t); if(!s || t.start < s) s = t.start; if(!e || te > e) e = te; });
+    projRow = { id:"gb:proj", type:"group", name:(state.info && state.info.title) || L("proj"), _gb:true, _proj:true, _span:{ s:s || "", e:e || "" }, _kids:kids };
+    return state.collapsed["gb:proj"] ? [projRow] : [projRow].concat(v); };
+  var _bi = byId; byId = function(id){ return id === "gb:proj" ? projRow || undefined : _bi(id); };
+
+  /* —— 大纲数字：名称前显示 1 / 1.1 / 1.2.3 —— */
+  function decorate(){
+    if(!state.showOutlineNum) return; var m = wbsMap();
+    document.querySelectorAll("#taskList .trow[data-id]").forEach(function(r){ var id = r.dataset.id, n = id === "gb:proj" ? "0" : m[id]; if(n == null) return; var nm = r.querySelector(".c-name .nm-t"); if(!nm || r.querySelector(".onum")) return;
+      var sp = document.createElement("span"); sp.className = "onum"; sp.textContent = n; nm.parentNode.insertBefore(sp, nm); });
+  }
+  var _rd = render; render = function(){ var x = _rd.apply(this, arguments); try { decorate(); } catch(e){ console.error(e); } return x; };
+  var _rt = renderTable; renderTable = function(){ var x = _rt.apply(this, arguments); try { decorate(); } catch(e){} return x; };
+
+  function setup(){
+    var after = document.getElementById("ckProgLine"); after = after && after.closest("label"); if(!after || document.getElementById("ckOnum")) return;
+    [["showProjSum","psum","ckPsum"],["showOutlineNum","onum","ckOnum"]].forEach(function(o){ var lb = document.createElement("label"); lb.className = "ck"; lb.innerHTML = '<input type="checkbox" id="' + o[2] + '"' + (state[o[0]] ? " checked" : "") + "><span>" + L(o[1]) + "</span>"; after.after(lb);
+      lb.querySelector("input").onchange = function(){ state[o[0]] = this.checked; save(); render(); }; });
+    var fs = document.getElementById("fltSel"); if(fs) fs.addEventListener("change", function(){ if(this.value === "custom") cfDlg(); });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Msp4 = { cfDlg:cfDlg, cfMatch:cfMatch };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
