@@ -18,6 +18,36 @@ def allowed(ip):
         if len(q) >= RATE: hits[ip] = q; return False
         q.append(now); hits[ip] = q; return True
 
+def _d(v):
+    return str(v)[:19] if v is not None else ""
+
+def add_ext(proj, xml):
+    """追加两段注释（ProjectLibre/MS Project 会忽略）：展开后的日历例外（含周期性例外）和拆分任务的工作时段。"""
+    cals, splits = {}, {}
+    try:
+        for c in proj.getCalendars():
+            items = []
+            for ex in c.getCalendarExceptions():
+                try: lst = ex.getExpandedExceptions()
+                except Exception: lst = [ex]
+                for e in lst:
+                    items.append([_d(e.getFromDate())[:10], _d(e.getToDate())[:10], 1 if e.getWorking() else 0, str(ex.getName() or "")])
+                    if len(items) > 5000: break
+            cals[str(c.getUniqueID())] = items
+    except Exception: pass
+    try:
+        for t in proj.getTasks():
+            sp = t.getWorkSplits() if hasattr(t, "getWorkSplits") else t.getSplits()
+            if sp is not None and sp.size() > 1:
+                splits[str(t.getUniqueID())] = [[_d(r.getStart()), _d(r.getEnd())] for r in sp]
+    except Exception: pass
+    tail = ""
+    if cals: tail += "<!--HarkCalendars " + json.dumps(cals, ensure_ascii=False).replace("--", "- -") + "-->"
+    if splits: tail += "<!--HarkSplits " + json.dumps(splits).replace("--", "- -") + "-->"
+    if not tail: return xml
+    i = xml.rfind(b"</Project>")
+    return xml[:i] + tail.encode("utf-8") + xml[i:] if i >= 0 else xml + tail.encode("utf-8")
+
 class H(BaseHTTPRequestHandler):
     server_version = "mpp2xml/1.0"
     def cors(self):
@@ -54,6 +84,7 @@ class H(BaseHTTPRequestHandler):
             if proj is None: return self.reply(415, json.dumps({"error": "unsupported file"}))
             MSPDIWriter().write(proj, out)
             with open(out, "rb") as f: xml = f.read()
+            xml = add_ext(proj, xml)
             self.reply(200, xml, "application/xml; charset=utf-8")
         except Exception as e:
             self.reply(422, json.dumps({"error": "parse failed", "detail": str(e)[:300]}))
