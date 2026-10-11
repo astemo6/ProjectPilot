@@ -2891,7 +2891,7 @@ function drawMspExport(cb, plan, imgL){
       nameLbl(t.name, bx - 6, cy, lf, bx2 + 6);
     } else if(t.type === "milestone"){
       var mx = X(sp.s);
-      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = t.color || "#dc2626"; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore();
+      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = "#dc2626"; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); /* 与图例一致：里程碑统一红色 */
       var dt = fmtD(sp.s); ctx.font = expFont(10, true); var dw = ctx.measureText(dt).width;
       nameLbl(t.name, mx - 9, cy, lf, mx + 9 + dw + 8);
       txt(dt, mx + 9, cy, expFont(10, true), "#111", "left");
