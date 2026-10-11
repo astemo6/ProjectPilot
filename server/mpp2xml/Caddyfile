@@ -1,0 +1,11 @@
+{
+	https_port 8443
+	http_port 80
+}
+{$DOMAIN}:8443 {
+	encode gzip
+	request_body {
+		max_size 32MB
+	}
+	reverse_proxy mpp2xml:8080
+}
