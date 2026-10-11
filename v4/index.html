@@ -4344,6 +4344,16 @@ function openOemMs(oem){
       var d0 = bg.querySelectorAll(".omD")[0]; d0.value = fmtD(snapWorkday(new Date())); fillDates();
       toast(tr("oemMsAuto")); return;
     }
+    /* 先删除其他主机厂已插入的客户里程碑及其分组（只保留当前主机厂一套） */
+    var dropO = {}, dropG = {};
+    state.tasks.forEach(function(t){ var s = String(t.source || "");
+      if(s.indexOf("oem:") === 0 && s.indexOf("oem:" + oem + "|") !== 0) dropO[t.id] = 1;
+      if(t.type === "group" && s.indexOf("oemgrp:") === 0 && s !== "oemgrp:" + oem) dropG[t.id] = 1; });
+    if(Object.keys(dropO).length || Object.keys(dropG).length){
+      state.tasks.forEach(function(t){ if(dropG[t.group] && !dropO[t.id]) t.group = ""; }); /* 用户放进旧分组的任务移到顶层 */
+      state.tasks = state.tasks.filter(function(t){ return !dropO[t.id] && !dropG[t.id]; });
+      state.tasks.forEach(function(t){ t.deps = normDeps(t.deps).filter(function(d){ return !dropO[d.id] && !dropG[d.id]; }); });
+    }
     /* 分组 */
     var gsrc = "oemgrp:" + oem, grp = null;
     state.tasks.forEach(function(t){ if(t.type === "group" && t.source === gsrc) grp = t; });
