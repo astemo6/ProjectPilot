@@ -116,7 +116,7 @@ function applyLang(){
 function updateHint(){
   var h = $("hint"), txt = "";
   if(!curOem) txt = tr("hintOem");
-  else if(view === "plan") txt = tr("hintPlan");
+  else if(view === "plan") txt = ""; /* 2026-10-11：用户要求去掉本页提示条 */
   else if(!hasNodes()) txt = tr("hintExec");
   $("oemWrap").classList.toggle("need", !curOem);
   h.textContent = txt; h.classList.toggle("show", !!txt);
