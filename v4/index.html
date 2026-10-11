@@ -420,6 +420,17 @@ html[data-theme=dark] .ribbon .rb-tabs{background:rgba(0,0,0,.15)}
 html[data-theme=dark] .ribbon .rb-tabs .rb-tab,html[data-theme=dark] .ribbon .rb-tabs .rb-fold{background:transparent;border-color:transparent}
 html[data-theme=dark] .ribbon .rb-tabs .rb-tab.on{background:var(--card);border-color:var(--line)}
 html[data-theme=dark] .ribbon .rb-px.on{background:rgba(37,99,235,.2)}
+.ribbon .rb-qat .qat-x{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ribbon .rb-qat .qat-m{padding:2px 6px;border-color:transparent;background:transparent;color:var(--tx3)}
+.qat-ctx{position:fixed;z-index:9999;background:var(--card,#fff);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:4px;min-width:200px;display:flex;flex-direction:column;font-size:12px;color:var(--tx1)}
+.qat-ctx button,.qat-ctx label{display:flex;align-items:center;gap:6px;text-align:left;background:transparent;border:0;padding:6px 10px;border-radius:5px;cursor:pointer;color:inherit;font-size:12px}
+.qat-ctx button:hover:not(:disabled),.qat-ctx label:hover{background:rgba(37,99,235,.08)}
+.qat-ctx button:disabled{color:var(--tx3);cursor:default}
+.qat-ctx .qat-sep{height:1px;background:var(--line);margin:4px 2px}
+#taskList .trow.hl-row>div{background:#fef08a !important}
+html[data-theme=dark] #taskList .trow.hl-row>div{background:rgba(250,204,21,.28) !important}
+.kt{width:100%;border-collapse:collapse;font-size:12px}.kt th{text-align:left;padding:10px 4px 4px;color:var(--tx3);font-weight:600;border-bottom:1px solid var(--line)}.kt td{padding:5px 4px;border-bottom:1px solid var(--line)}.kt td:first-child{width:170px;white-space:nowrap}
+.kt kbd{font-family:inherit;font-size:11px;background:rgba(100,116,139,.12);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
 </style>
 <style id="embedCss">
 html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
@@ -429,7 +440,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.4</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.6</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -5765,10 +5776,154 @@ function v4ExpPlan(){
     document.addEventListener("keydown", function(e){ if(!e.altKey || e.ctrlKey || e.metaKey) return; var m = { f:"file", h:"task", r:"res", p:"proj", w:"view", o:"fmt", e:"rep" }[e.key.toLowerCase()]; if(!m) return;
       var a = document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; e.preventDefault(); if(st.fold) tb.classList.add("rb-peek"); show(m); });
     syncPx();
+    window.__v4Ribbon.show = function(k){ if(st.fold) tb.classList.add("rb-peek"); show(k); };
   }
   var _rd = render; render = function(){ var x = _rd.apply(this, arguments); try { syncPx(); } catch(e){} return x; };
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4Ribbon = { syncPx:syncPx };
+})();
+/* ===== v4.5：快速访问工具栏（QAT）—— 对标 MS Project：右键任意功能区按钮「添加到快速访问工具栏」，Alt+1~9 调用，▾ 自定义 ===== */
+(function(){
+  var TX = {
+    zh:{ add:"添加到快速访问工具栏", rm:"从快速访问工具栏删除", cust:"自定义快速访问工具栏", more:"其他命令：右键功能区里的任意按钮即可添加", up:"上移", down:"下移", reset:"重置", tip:function(n){ return "Alt+" + n; } },
+    en:{ add:"Add to Quick Access Toolbar", rm:"Remove from Quick Access Toolbar", cust:"Customize Quick Access Toolbar", more:"More commands: right-click any ribbon button to add it", up:"Move up", down:"Move down", reset:"Reset", tip:function(n){ return "Alt+" + n; } },
+    de:{ add:"Zu Symbolleiste für den Schnellzugriff hinzufügen", rm:"Aus Symbolleiste für den Schnellzugriff entfernen", cust:"Symbolleiste für den Schnellzugriff anpassen", more:"Weitere Befehle: Rechtsklick auf eine Menüband-Schaltfläche", up:"Nach oben", down:"Nach unten", reset:"Zurücksetzen", tip:function(n){ return "Alt+" + n; } } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+  var KEY = "gantt-qat-v4", DEF = ["#btnUndo", "#btnRedo"];
+  var COMMON = ["#btnUndo", "#btnRedo", "#btnAdd", "#btnAddGroup", "#btnAddMs", "#btnDelSel", "#btnOutdent", "#btnIndent", ".ms-link", "#btnPreview", "#btnCols", '[data-view="fit"]'];
+  function $(s){ try { return document.querySelector(s); } catch(e){ return null; } }
+  function load(){ try { var v = JSON.parse(localStorage.getItem(KEY)); return Array.isArray(v) ? v : DEF.slice(); } catch(e){ return DEF.slice(); } }
+  var list = load();
+  function persist(){ try { localStorage.setItem(KEY, JSON.stringify(list)); } catch(e){} }
+  /* 给功能区里的按钮生成稳定的定位键 */
+  function keyOf(el){
+    if(el.id) return "#" + el.id;
+    var dd = el.classList.contains("dd-b") && el.closest(".dd[id]"); if(dd) return "#" + dd.id + " .dd-b";
+    var a = ["pane","view","tm","px"]; for(var i = 0; i < a.length; i++) if(el.dataset[a[i]]) return a[i] === "px" ? '#paneBtns [data-pane="' + el.dataset.px + '"]' : "[data-" + a[i] + '="' + el.dataset[a[i]] + '"]';
+    for(var j = 0; j < el.classList.length; j++){ var c = "." + el.classList[j]; if(c !== ".on" && document.querySelectorAll(".rb-body " + c).length === 1) return c; }
+    return null; }
+  function labelOf(el){ var t = (el.textContent || "").replace(/\s+/g, " ").trim(), ti = el.getAttribute("title") || "";
+    if(t.replace(/[\u{1F000}-\u{1FFFF}\u2000-\u2BFF\uFE0F\u200D]/gu, "").trim().length < 2 && ti) t = (t ? t + " " : "") + ti.split(/[（(：:，,]/)[0].trim();
+    var dd = el.closest(".dd"); if(dd && el.classList.contains("dd-b")) t = t.replace(/\s*▾\s*$/, "");
+    return { t:t, title:ti || t }; }
+  function tabOf(el){ var p = el.closest(".rb-pane"); return p ? p.dataset.tab : null; }
+  function run(k){ var el = $(k); if(!el) return; if(el.disabled) return;
+    if(!el.offsetParent || el.classList.contains("dd-b")){ var tb = tabOf(el); if(tb && window.__v4Ribbon && window.__v4Ribbon.show) window.__v4Ribbon.show(tb); }
+    if(el.classList.contains("dd-b")) setTimeout(function(){ el.click(); }, 0); else el.click(); }
+  function build(){
+    var qat = document.querySelector(".rb-qat"); if(!qat) return;
+    qat.querySelectorAll(".qat-x").forEach(function(b){ b.remove(); });
+    /* 撤销/重做原按钮本身在 QAT 内：按列表决定显示与顺序 */
+    ["#btnUndo", "#btnRedo"].forEach(function(s){ var o = $(s); if(o && o.parentNode === qat) o.style.display = list.indexOf(s) >= 0 ? "" : "none"; });
+    var cm = qat.querySelector(".qat-m");
+    list.forEach(function(k, i){
+      var el = $(k); if(!el) return; var tip = L("tip")(i + 1);
+      if((k === "#btnUndo" || k === "#btnRedo") && el.parentNode === qat){ qat.insertBefore(el, cm); el.title = (el.dataset.t0 || (el.dataset.t0 = el.title || el.textContent.trim())) + (i < 9 ? "  (" + tip + ")" : ""); return; }
+      var lb = labelOf(el), b = document.createElement("button"); b.type = "button"; b.className = "qat-x"; b.dataset.k = k;
+      b.textContent = lb.t.length > 10 ? lb.t.slice(0, 10) + "…" : (lb.t || "•"); b.title = lb.title + (i < 9 ? "  (" + tip + ")" : "");
+      b.onclick = function(){ run(k); }; qat.insertBefore(b, cm); });
+  }
+  function ctxMenu(x, y, items){
+    closeCtx(); var m = document.createElement("div"); m.className = "qat-ctx"; m.style.left = x + "px"; m.style.top = y + "px";
+    items.forEach(function(it){ if(it === "-"){ var s = document.createElement("div"); s.className = "qat-sep"; m.appendChild(s); return; }
+      var b = document.createElement(it.ck != null ? "label" : "button"); if(it.ck != null){ b.innerHTML = '<input type="checkbox"' + (it.ck ? " checked" : "") + "> <span></span>"; b.querySelector("span").textContent = it.t; b.querySelector("input").onchange = function(){ it.fn(this.checked); }; }
+      else { b.type = "button"; b.textContent = it.t; if(it.dis){ b.disabled = true; } else b.onclick = function(){ closeCtx(); it.fn(); }; }
+      m.appendChild(b); });
+    document.body.appendChild(m); var r = m.getBoundingClientRect(); if(r.right > innerWidth - 4) m.style.left = Math.max(4, innerWidth - r.width - 4) + "px"; if(r.bottom > innerHeight - 4) m.style.top = Math.max(4, y - r.height) + "px";
+  }
+  function closeCtx(){ document.querySelectorAll(".qat-ctx").forEach(function(m){ m.remove(); }); }
+  function add(k){ if(k && list.indexOf(k) < 0){ list.push(k); persist(); build(); } }
+  function rm(k){ var i = list.indexOf(k); if(i >= 0){ list.splice(i, 1); persist(); build(); } }
+  function custMenu(btn){ var r = btn.getBoundingClientRect(), its = [];
+    COMMON.forEach(function(k){ var el = $(k); if(!el) return; var lb = labelOf(el); its.push({ t:lb.t || lb.title, ck:list.indexOf(k) >= 0, fn:function(on){ on ? add(k) : rm(k); } }); });
+    list.forEach(function(k){ if(COMMON.indexOf(k) >= 0) return; var el = $(k); if(!el) return; its.push({ t:labelOf(el).t, ck:true, fn:function(on){ on ? add(k) : rm(k); } }); });
+    its.push("-", { t:L("more"), dis:true }, { t:L("reset"), fn:function(){ list = DEF.slice(); persist(); build(); } });
+    ctxMenu(r.left, r.bottom + 2, its); }
+  function setup(){
+    var qat = document.querySelector(".rb-qat"); if(!qat || qat.querySelector(".qat-m")) return;
+    var cm = document.createElement("button"); cm.type = "button"; cm.className = "qat-m"; cm.textContent = "▾"; cm.title = L("cust"); qat.appendChild(cm);
+    cm.onclick = function(e){ e.stopPropagation(); custMenu(cm); };
+    build();
+    /* 右键：功能区按钮 → 添加；QAT 按钮 → 删除/移动 */
+    document.addEventListener("contextmenu", function(e){
+      var q = e.target.closest(".rb-qat button"); if(q && !q.classList.contains("qat-m")){ e.preventDefault(); var k = q.dataset.k || keyOf(q), i = list.indexOf(k);
+        ctxMenu(e.clientX, e.clientY, [{ t:L("rm"), fn:function(){ rm(k); } }, { t:L("up"), dis:i <= 0, fn:function(){ list.splice(i - 1, 0, list.splice(i, 1)[0]); persist(); build(); } }, { t:L("down"), dis:i < 0 || i >= list.length - 1, fn:function(){ list.splice(i + 1, 0, list.splice(i, 1)[0]); persist(); build(); } }, "-", { t:L("cust"), fn:function(){ custMenu(q); } }]); return; }
+      var b = e.target.closest(".rb-body button, .rb-body .dd-b"); if(!b || b.closest(".dd-m")) return; var k = keyOf(b); if(!k) return; e.preventDefault();
+      ctxMenu(e.clientX, e.clientY, list.indexOf(k) >= 0 ? [{ t:L("rm"), fn:function(){ rm(k); } }] : [{ t:L("add"), fn:function(){ add(k); } }]); });
+    document.addEventListener("mousedown", function(e){ if(!e.target.closest(".qat-ctx")) closeCtx(); });
+    document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeCtx();
+      if(!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return; var n = parseInt(e.key, 10); if(!(n >= 1 && n <= 9)) return; var k = list[n - 1]; if(!k) return; e.preventDefault(); run(k); });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Qat = { list:function(){ return list.slice(); }, add:add, rm:rm, run:run, keyOf:keyOf };
+})();
+/* ===== v4.6：对标 MS Project —— 突出显示筛选 / 大纲快捷键 Alt+Shift+-/+/* / F3 清除筛选 / 键盘快捷方式列表（F1） ===== */
+(function(){
+  var TX = {
+    zh:{ hl:"突出显示", none:"不突出显示", gHelp:"帮助", keys:"⌨ 快捷键", keysT:"键盘快捷方式", cleared:"已显示全部任务", custom:"自定义筛选条件",
+      K:[["编辑",""],["Insert","在选中任务下方插入新任务"],["Delete","删除选中任务"],["F2","编辑名称"],["Ctrl+C / X / V","复制 / 剪切 / 粘贴行"],["Ctrl+D","向下填充"],["Ctrl+Z / Ctrl+Y","撤销 / 重做"],["Ctrl+A","全选任务"],
+         ["大纲",""],["Alt+Shift+→ / ←","降级 / 升级"],["Alt+Shift+-","折叠选中摘要任务"],["Alt+Shift++","展开选中摘要任务"],["Alt+Shift+*","展开全部"],
+         ["日程",""],["Ctrl+F2","链接选中任务"],["Shift+F2","任务信息"],["Ctrl+Shift+F5","滚动到任务"],
+         ["格式",""],["Ctrl+B / I / 5","粗体 / 斜体 / 删除线"],
+         ["视图",""],["Ctrl+F","查找"],["F3","清除筛选，显示全部任务"],["Ctrl+滚轮","缩放时间刻度"],["Alt+F/H/R/E/P/W/O","切换功能区页签"],["Alt+1 ~ 9","快速访问工具栏第 1~9 个命令"],["F1","本列表"]] },
+    en:{ hl:"Highlight", none:"No highlight", gHelp:"Help", keys:"⌨ Shortcuts", keysT:"Keyboard shortcuts", cleared:"Showing all tasks", custom:"Custom filter criteria",
+      K:[["Edit",""],["Insert","Insert new task below"],["Delete","Delete selected task"],["F2","Edit name"],["Ctrl+C / X / V","Copy / cut / paste rows"],["Ctrl+D","Fill down"],["Ctrl+Z / Ctrl+Y","Undo / redo"],["Ctrl+A","Select all tasks"],
+         ["Outline",""],["Alt+Shift+→ / ←","Indent / outdent"],["Alt+Shift+-","Collapse selected summary"],["Alt+Shift++","Expand selected summary"],["Alt+Shift+*","Expand all"],
+         ["Schedule",""],["Ctrl+F2","Link selected tasks"],["Shift+F2","Task information"],["Ctrl+Shift+F5","Scroll to task"],
+         ["Format",""],["Ctrl+B / I / 5","Bold / italic / strikethrough"],
+         ["View",""],["Ctrl+F","Find"],["F3","Clear filter, show all tasks"],["Ctrl+wheel","Zoom timescale"],["Alt+F/H/R/E/P/W/O","Switch ribbon tab"],["Alt+1 ~ 9","Quick Access Toolbar command 1–9"],["F1","This list"]] },
+    de:{ hl:"Hervorheben", none:"Keine Hervorhebung", gHelp:"Hilfe", keys:"⌨ Tastenkürzel", keysT:"Tastenkombinationen", cleared:"Alle Vorgänge angezeigt", custom:"Benutzerdef. Filterkriterien",
+      K:[["Bearbeiten",""],["Einfg","Neuen Vorgang darunter einfügen"],["Entf","Vorgang löschen"],["F2","Name bearbeiten"],["Strg+C / X / V","Zeilen kopieren / ausschneiden / einfügen"],["Strg+D","Nach unten ausfüllen"],["Strg+Z / Strg+Y","Rückgängig / Wiederholen"],["Strg+A","Alle Vorgänge"],
+         ["Gliederung",""],["Alt+Umschalt+→ / ←","Tiefer / höher stufen"],["Alt+Umschalt+-","Sammelvorgang reduzieren"],["Alt+Umschalt++","Sammelvorgang erweitern"],["Alt+Umschalt+*","Alle erweitern"],
+         ["Terminplan",""],["Strg+F2","Vorgänge verknüpfen"],["Umschalt+F2","Vorgangsinformationen"],["Strg+Umschalt+F5","Zu Vorgang blättern"],
+         ["Format",""],["Strg+B / I / 5","Fett / kursiv / durchgestrichen"],
+         ["Ansicht",""],["Strg+F","Suchen"],["F3","Filter löschen"],["Strg+Mausrad","Zeitskala zoomen"],["Alt+F/H/R/E/P/W/O","Menüband-Register wechseln"],["Alt+1 ~ 9","Schnellzugriff Befehl 1–9"],["F1","Diese Liste"]] } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+  var HL = ["crit","ms","inc","done","pro","late","un","over"];
+
+  /* —— 突出显示筛选：不隐藏任务，只把符合条件的行标黄（MS Project「突出显示」） —— */
+  function hlMatch(t){ var h = state.hlt; if(!h || t.type === "group" || String(t.id).indexOf("gb:") === 0) return false;
+    var keep = state.flt; state.flt = h; try { return !!taskMatchFilter(t); } catch(e){ return false; } finally { state.flt = keep; } }
+  function decorate(){ var on = !!state.hlt;
+    document.querySelectorAll("#taskList .trow[data-id]").forEach(function(r){ var t = on && byId(r.dataset.id); r.classList.toggle("hl-row", !!(t && hlMatch(t))); }); }
+  var _rt = renderTable; renderTable = function(){ var x = _rt.apply(this, arguments); try { decorate(); } catch(e){} return x; };
+  function hlOpts(){ var s = '<option value="">' + esc(L("none")) + "</option>" + HL.map(function(k){ return '<option value="' + k + '">' + esc(tr("flt" + k.charAt(0).toUpperCase() + k.slice(1))) + "</option>"; }).join("");
+    if(state.cflt && state.cflt.c && state.cflt.c.length) s += '<option value="custom">' + esc(L("custom")) + "</option>"; return s; }
+
+  /* —— 大纲快捷键 / F3 / F1 —— */
+  function keysDlg(){
+    var bg = document.createElement("div"); bg.className = "modal-bg show";
+    bg.innerHTML = '<div class="modal" style="width:520px"><div class="modal-h"><span>' + esc(L("keysT")) + '</span><button class="kx">×</button></div><div class="modal-b" style="max-height:70vh;overflow:auto"><table class="kt">'
+      + L("K").map(function(r){ return r[1] ? "<tr><td><kbd>" + esc(r[0]) + "</kbd></td><td>" + esc(r[1]) + "</td></tr>" : '<tr><th colspan="2">' + esc(r[0]) + "</th></tr>"; }).join("") + "</table></div></div>";
+    document.body.appendChild(bg);
+    function close(){ bg.remove(); } bg.querySelector(".kx").onclick = close; bg.addEventListener("mousedown", function(e){ if(e.target === bg) close(); });
+    bg.tabIndex = -1; bg.addEventListener("keydown", function(e){ if(e.key === "Escape"){ e.stopPropagation(); close(); } }); bg.focus(); }
+  function selGroup(){ var t = selId && byId(selId); if(!t) return null; return t.type === "group" ? t : (t.group ? byId(t.group) : null); }
+  document.addEventListener("keydown", function(e){
+    var tg = e.target, tn = tg && tg.tagName; if(tn === "INPUT" || tn === "TEXTAREA" || tn === "SELECT" || (tg && tg.isContentEditable)) return;
+    if(document.querySelector(".modal-bg.show")) return;
+    if(e.key === "F1" && !e.ctrlKey && !e.altKey){ e.preventDefault(); keysDlg(); return; }
+    if(e.key === "F3" && !e.ctrlKey && !e.altKey && !e.shiftKey){ e.preventDefault(); state.flt = "all"; state.fltTxt = ""; var ft = document.getElementById("fltTxt"); if(ft) ft.value = ""; render(); toast(L("cleared")); return; }
+    if(e.ctrlKey && e.shiftKey && e.key === "F5"){ e.preventDefault(); var sc = document.querySelector("#mspView .ms-scroll"); if(sc) sc.click(); return; }
+    if(!(e.altKey && e.shiftKey) || e.ctrlKey || e.metaKey) return;
+    var c = e.code;
+    if(e.key === "-" || e.key === "_" || c === "Minus" || c === "NumpadSubtract"){ var g = selGroup(); if(g){ e.preventDefault(); state.collapsed[g.id] = true; if(selId !== g.id) selId = g.id; render(); } }
+    else if(e.key === "+" || e.key === "=" || c === "Equal" || c === "NumpadAdd"){ var g2 = selGroup(); if(g2){ e.preventDefault(); delete state.collapsed[g2.id]; render(); } }
+    else if(e.key === "*" || c === "NumpadMultiply" || c === "Digit8"){ e.preventDefault(); Object.keys(state.collapsed).forEach(function(k){ delete state.collapsed[k]; }); render(); }
+  });
+
+  function setup(){
+    /* 视图 → 数据组：突出显示 */
+    var flt = document.getElementById("ddFlt"); if(flt && !document.getElementById("hlSel")){ var s = document.createElement("select"); s.id = "hlSel"; s.title = L("hl"); s.style.height = "28px"; s.innerHTML = hlOpts();
+      var lb = document.createElement("span"); lb.className = "tb-lab"; lb.textContent = L("hl"); flt.after(lb); lb.after(s); s.onfocus = function(){ var v = state.hlt || ""; s.innerHTML = hlOpts(); s.value = v; };
+      s.onchange = function(){ state.hlt = s.value || ""; save(); renderTable(); }; }
+    /* 文件 → 帮助组：快捷键列表 */
+    var pane = document.querySelector('.rb-pane[data-tab="file"]'); if(pane && !document.getElementById("btnKeys")){ var g = document.createElement("div"); g.className = "rb-grp"; g.innerHTML = '<div class="rb-box"><button type="button" id="btnKeys"></button></div><div class="rb-lab"></div>';
+      g.querySelector("button").textContent = L("keys"); g.querySelector("button").title = "F1"; g.querySelector(".rb-lab").textContent = L("gHelp"); g.querySelector("button").onclick = keysDlg; pane.appendChild(g); }
+  }
+  var _rd = render; render = function(){ var x = _rd.apply(this, arguments); var s = document.getElementById("hlSel"); if(s && document.activeElement !== s){ s.innerHTML = hlOpts(); s.value = state.hlt || ""; } return x; };
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Msp6 = { keysDlg:keysDlg, hlMatch:hlMatch };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
