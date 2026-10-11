@@ -445,6 +445,9 @@ html[data-theme=dark] #taskList .trow.hl-row>div{background:rgba(250,204,21,.28)
 .tctx-pct{display:flex;align-items:center;gap:3px;padding:5px 10px 3px;border-top:1px solid var(--line);margin-top:3px}.tctx-pct span{color:var(--tx3);margin-right:4px}
 .tctx-pct button{flex:1;height:24px;border:1px solid var(--line);border-radius:4px;background:transparent;cursor:pointer;color:inherit;font-size:11px;padding:0}
 .tctx-pct button.on,.tctx-pct button:hover{border-color:var(--accent);color:var(--accent)}
+.trow .c-name .nm-t{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.trow:hover .c-name .tind,.trow.sel .c-name .tind{margin-right:22px}
+.trow .c-name .tind{margin-left:auto;padding-left:6px;display:inline-flex;gap:3px;font-size:11px;flex-shrink:0;color:var(--tx3)}.trow .c-name .tind span{cursor:default}.trow .c-name .tind span[data-k=l],.trow .c-name .tind span[data-k=n]{cursor:pointer}
 </style>
 <style id="embedCss">
 html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
@@ -454,7 +457,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.7</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.8</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -5943,11 +5946,11 @@ function v4ExpPlan(){
 (function(){
   var TX = {
     zh:{ cut:"剪切", copy:"复制", paste:"粘贴", ins:"插入任务", del:"删除任务", edit:"编辑名称", info:"任务信息…", ind:"降级", outd:"升级", link:"链接任务", unlink:"取消链接",
-      inact:"停用 / 启用任务", man:"手动计划", auto:"自动计划", fill:"向下填充", tl:"添加到日程表", txt:"文本样式…", font:"字体…", pct:"完成", ot:"按日程标记", scroll:"滚动到任务" },
+      inact:"停用 / 启用任务", man:"手动计划", auto:"自动计划", fill:"向下填充", tl:"添加到日程表", txt:"文本样式…", note:"备注…", hlink:"超链接…", font:"字体…", pct:"完成", ot:"按日程标记", scroll:"滚动到任务" },
     en:{ cut:"Cut", copy:"Copy", paste:"Paste", ins:"Insert Task", del:"Delete Task", edit:"Edit name", info:"Information…", ind:"Indent", outd:"Outdent", link:"Link Tasks", unlink:"Unlink Tasks",
-      inact:"Inactivate / activate", man:"Manually Schedule", auto:"Auto Schedule", fill:"Fill Down", tl:"Add to Timeline", txt:"Text Styles…", font:"Font…", pct:"Complete", ot:"Mark on Track", scroll:"Scroll to Task" },
+      inact:"Inactivate / activate", man:"Manually Schedule", auto:"Auto Schedule", fill:"Fill Down", tl:"Add to Timeline", txt:"Text Styles…", note:"Notes…", hlink:"Hyperlink…", font:"Font…", pct:"Complete", ot:"Mark on Track", scroll:"Scroll to Task" },
     de:{ cut:"Ausschneiden", copy:"Kopieren", paste:"Einfügen", ins:"Vorgang einfügen", del:"Vorgang löschen", edit:"Name bearbeiten", info:"Informationen…", ind:"Tiefer stufen", outd:"Höher stufen", link:"Vorgänge verknüpfen", unlink:"Verknüpfung lösen",
-      inact:"Deaktivieren / aktivieren", man:"Manuell planen", auto:"Automatisch planen", fill:"Nach unten ausfüllen", tl:"Zur Zeitachse hinzufügen", txt:"Textarten…", font:"Schriftart…", pct:"Abgeschlossen", ot:"Als planmäßig markieren", scroll:"Zu Vorgang blättern" } };
+      inact:"Deaktivieren / aktivieren", man:"Manuell planen", auto:"Automatisch planen", fill:"Nach unten ausfüllen", tl:"Zur Zeitachse hinzufügen", txt:"Textarten…", note:"Notizen…", hlink:"Hyperlink…", font:"Schriftart…", pct:"Abgeschlossen", ot:"Als planmäßig markieren", scroll:"Zu Vorgang blättern" } };
   function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
   var CTRL = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl";
   function key(k, o){ o = o || {}; var ev = new KeyboardEvent("keydown", { key:k, code:o.code || "", ctrlKey:!!o.ctrl, shiftKey:!!o.shift, altKey:!!o.alt, bubbles:true, cancelable:true }); document.body.dispatchEvent(ev); }
@@ -5983,7 +5986,7 @@ function v4ExpPlan(){
     var items = [
       ["cut", CTRL + "+X", function(){ key("x", { ctrl:1 }); }, pseudo], ["copy", CTRL + "+C", function(){ key("c", { ctrl:1 }); }, pseudo], ["paste", CTRL + "+V", function(){ key("v", { ctrl:1 }); }],
       "-", ["ins", "Insert", function(){ key("Insert"); }], ["del", "Delete", function(){ key("Delete"); }, pseudo],
-      "-", ["edit", "F2", function(){ key("F2"); }, pseudo], ["info", "Shift+F2", function(){ key("F2", { shift:1 }); }, pseudo], ["txt", "", function(){ clk("#btnTxtStyle"); }],
+      "-", ["edit", "F2", function(){ key("F2"); }, pseudo], ["info", "Shift+F2", function(){ key("F2", { shift:1 }); }, pseudo], ["txt", "", function(){ clk("#btnTxtStyle"); }], ["note", "", function(){ window.__v4Note && __v4Note.note(); }, pseudo], ["hlink", "", function(){ window.__v4Note && __v4Note.link(); }, pseudo],
       "-", ["outd", "Alt+Shift+←", function(){ key("ArrowLeft", { alt:1, shift:1 }); }, pseudo], ["ind", "Alt+Shift+→", function(){ key("ArrowRight", { alt:1, shift:1 }); }, pseudo],
       ["link", CTRL + "+F2", function(){ key("F2", { ctrl:1 }); }, pseudo], ["unlink", "", function(){ clk(".ms-unlink"); }, pseudo],
       "-", ["man", "", function(){ clk('#modeBtns [data-tm="manual"]'); }, pseudo], ["auto", "", function(){ clk('#modeBtns [data-tm="auto"]'); }, pseudo],
@@ -6013,6 +6016,64 @@ function v4ExpPlan(){
   document.addEventListener("keydown", function(e){ if(e.key === "Escape") close(); });
   window.addEventListener("scroll", close, true); window.addEventListener("resize", close);
   window.__v4Ctx = { open:open, close:close };
+})();
+/* ===== v4.8：对标 MS Project —— 任务备注（多行） / 超链接 / 名称后指示器（备注、超链接、限制、期限、停用） ===== */
+(function(){
+  var TX = {
+    zh:{ note:"📝 备注", noteT:"任务备注", link:"🔗 超链接", linkT:"超链接", gProp:"属性", txt:"显示文字", url:"地址", ok:"确定", no:"取消", rm:"删除超链接", need:"请先选中一个任务",
+      cons:"限制", dl:"期限", inact:"已停用", open:"打开超链接", badUrl:"请输入有效地址（http/https/mailto/文件路径）" },
+    en:{ note:"📝 Notes", noteT:"Task notes", link:"🔗 Hyperlink", linkT:"Hyperlink", gProp:"Properties", txt:"Text to display", url:"Address", ok:"OK", no:"Cancel", rm:"Remove link", need:"Select a task first",
+      cons:"Constraint", dl:"Deadline", inact:"Inactive", open:"Open hyperlink", badUrl:"Enter a valid address (http/https/mailto/file path)" },
+    de:{ note:"📝 Notizen", noteT:"Vorgangsnotizen", link:"🔗 Hyperlink", linkT:"Hyperlink", gProp:"Eigenschaften", txt:"Anzeigetext", url:"Adresse", ok:"OK", no:"Abbrechen", rm:"Link entfernen", need:"Bitte zuerst einen Vorgang wählen",
+      cons:"Einschränkung", dl:"Stichtag", inact:"Inaktiv", open:"Hyperlink öffnen", badUrl:"Gültige Adresse eingeben (http/https/mailto/Dateipfad)" } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+  function cur(){ var ids = window.__v4SelList ? window.__v4SelList() : (selId ? [selId] : []); var t = ids.length && byId(ids[0]); return t && !t._gb && String(t.id).indexOf("gb:") !== 0 ? t : null; }
+  function normUrl(u){ u = String(u || "").trim(); if(!u) return ""; if(/^(https?:|mailto:|file:|\\\\|[a-z]:\\)/i.test(u)) return u; if(/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(u)) return "https://" + u; return /^javascript:/i.test(u) ? "" : u; }
+  function dlg(title, inner, onOk, extra){
+    var bg = document.createElement("div"); bg.className = "modal-bg show";
+    bg.innerHTML = '<div class="modal" style="width:480px"><div class="modal-h"><span></span><button class="nx">×</button></div><div class="modal-b">' + inner
+      + '<div style="display:flex;justify-content:space-between;margin-top:12px"><span>' + (extra || "") + '</span><span><button class="nno">' + L("no") + '</button> <button class="primary nok">' + L("ok") + "</button></span></div></div></div>";
+    bg.querySelector(".modal-h span").textContent = title; document.body.appendChild(bg);
+    function close(){ bg.remove(); } bg.querySelector(".nx").onclick = close; bg.querySelector(".nno").onclick = close;
+    bg.querySelector(".nok").onclick = function(){ if(onOk(bg) !== false) close(); };
+    bg.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape") close(); if(e.key === "Enter" && (e.ctrlKey || e.target.tagName === "INPUT")) bg.querySelector(".nok").click(); });
+    setTimeout(function(){ var f = bg.querySelector("textarea,input"); if(f){ f.focus(); if(f.select) f.select(); } }, 0); return bg; }
+  function noteDlg(){ var t = cur(); if(!t){ toast(L("need")); return; }
+    var bg = dlg(L("noteT") + " — " + (t.name || ""), '<textarea class="nt" rows="9" style="width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:8px"></textarea><div style="font-size:11px;color:var(--tx3);margin-top:4px">Ctrl+Enter</div>',
+      function(b){ var v = b.querySelector(".nt").value.replace(/\s+$/, ""); if(v !== (t.remarks || "")){ t.remarks = v; save(); render(); } });
+    bg.querySelector(".nt").value = t.remarks || ""; }
+  function linkDlg(){ var t = cur(); if(!t){ toast(L("need")); return; } var lk = t.link || {};
+    var bg = dlg(L("linkT") + " — " + (t.name || ""), '<div class="frow"><label>' + L("txt") + '</label><input class="lt"></div><div class="frow"><label>' + L("url") + '</label><input class="lu" placeholder="https://"></div><div class="lw" style="font-size:11px;color:#dc2626;min-height:14px"></div>',
+      function(b){ var u = normUrl(b.querySelector(".lu").value), x = b.querySelector(".lt").value.trim();
+        if(!u){ if(b.querySelector(".lu").value.trim()){ b.querySelector(".lw").textContent = L("badUrl"); return false; } delete t.link; } else t.link = { url:u, text:x };
+        save(); render(); }, t.link ? '<button class="lrm">' + L("rm") + "</button>" : "");
+    bg.querySelector(".lt").value = lk.text || ""; bg.querySelector(".lu").value = lk.url || "";
+    var rm = bg.querySelector(".lrm"); if(rm) rm.onclick = function(){ delete t.link; save(); render(); bg.remove(); }; }
+  function openLink(t){ if(!t || !t.link || !t.link.url) return; var u = t.link.url; if(/^javascript:/i.test(u)) return; window.open(u, "_blank", "noopener"); }
+  /* —— 指示器 —— */
+  function decorate(){
+    document.querySelectorAll("#taskList .trow[data-id]").forEach(function(r){ var t = byId(r.dataset.id), nm = r.querySelector(".c-name"); if(!t || !nm || t._gb) return;
+      var old = nm.querySelector(".tind"); if(old) old.remove(); var ic = [];
+      if(t.remarks) ic.push(["📝", t.remarks, "n"]);
+      if(t.link && t.link.url) ic.push(["🔗", (t.link.text ? t.link.text + "\n" : "") + t.link.url, "l"]);
+      if(t.cons && t.cons !== "ASAP" && t.type !== "group") ic.push(["📅", L("cons") + ": " + t.cons + (t.consDate ? " " + t.consDate : ""), "c"]);
+      if(t.deadline && t.type !== "group") ic.push(["⇩", L("dl") + ": " + t.deadline, "d"]);
+      if(t.inactive) ic.push(["⊘", L("inact"), "i"]);
+      if(!ic.length) return; var sp = document.createElement("span"); sp.className = "tind";
+      ic.forEach(function(x){ var s = document.createElement("span"); s.textContent = x[0]; s.title = x[1]; s.dataset.k = x[2]; sp.appendChild(s); }); nm.appendChild(sp); });
+  }
+  var _rt = renderTable; renderTable = function(){ var x = _rt.apply(this, arguments); try { decorate(); } catch(e){ console.error(e); } return x; };
+  document.addEventListener("click", function(e){ var s = e.target.closest(".tind span"); if(!s) return; var r = s.closest(".trow[data-id]"), t = r && byId(r.dataset.id); if(!t) return;
+    e.stopPropagation(); e.preventDefault(); if(s.dataset.k === "l") openLink(t); else if(s.dataset.k === "n"){ if(window.__v4SelList && window.__v4SelList().indexOf(t.id) < 0){ selId = t.id; render(); } noteDlg(); } }, true);
+  function setup(){
+    var pane = document.querySelector('.rb-pane[data-tab="task"]'); if(!pane || document.getElementById("btnNote")) return;
+    var g = document.createElement("div"); g.className = "rb-grp"; g.innerHTML = '<div class="rb-box"><button type="button" id="btnNote"></button><button type="button" id="btnLink"></button></div><div class="rb-lab"></div>';
+    g.querySelector("#btnNote").textContent = L("note"); g.querySelector("#btnLink").textContent = L("link"); g.querySelector(".rb-lab").textContent = L("gProp");
+    g.querySelector("#btnNote").onclick = noteDlg; g.querySelector("#btnLink").onclick = linkDlg;
+    var font = document.getElementById("fmtBar"); font = font && font.closest(".rb-grp"); if(font) pane.insertBefore(g, font); else pane.appendChild(g);
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Note = { note:noteDlg, link:linkDlg, openLink:openLink };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
