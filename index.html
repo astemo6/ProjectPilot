@@ -40,6 +40,9 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
   #stage{height:calc(100% - 108px)}
   #hint.show + #stage{height:calc(100% - 135px)}
 }
+/* 2026-10-11：根目录只保留 OEM 客户节点页，开发任务页移除（开发任务改用 v4） */
+#top .arrow,#top .tabs:not(.lang){display:none!important}
+#fExec{display:none!important}
 </style>
 </head>
 <body>
@@ -71,16 +74,16 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
    两个视图实时联动：改客户节点 → 项目甘特图里的里程碑和推荐任务自动更新；在项目甘特图里拖动客户里程碑 → 节点日期自动回写。 */
 var KEYS = ["gantt-tool-v1", "gantt-exec-v1", "gantt-workcal-v1"];
 var T = {
-  zh:{title:"汽车零部件项目甘特图", stepOem:"① 客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期，最后排开发任务。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
-      hintPlan:"在这里填客户节点日期，项目甘特图里的里程碑和推荐任务会自动跟着变。这一页的导出就是给主机厂的节点报告。",
+  zh:{title:"汽车零部件项目甘特图", stepOem:"① 客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
+      hintPlan:"在这里选择客户（主机厂）并填写客户节点日期；本页导出即给主机厂的节点报告。",
       hintExec:"还没有客户节点日期：先到「② 客户节点」填日期，或者直接在这里加任务、载入模板。",
       clrAsk:"清空整个项目（客户节点、任务、工作日历）？", impOk:"项目已导入", impBad:"不是有效的项目文件", expOk:"项目已导出"},
   en:{title:"Auto Parts Project Gantt", stepOem:"① Customer", tabExec:"③ Development Tasks", tabPlan:"② Customer Milestones", hintOem:"Step 1: pick the customer (OEM) at top left, then enter customer milestone dates, then plan development tasks.", oemAsk:"Switching customer clears the milestone dates entered (your own tasks are kept). Continue?", exp:"Export project", imp:"Import project", clr:"Clear",
-      hintPlan:"Fill in customer milestone dates here; milestones and recommended tasks in the Project Gantt update automatically. Export from this view is the OEM milestone report.",
+      hintPlan:"Pick the customer (OEM) and enter customer milestone dates; this page exports the milestone report for the OEM.",
       hintExec:"No customer milestone dates yet: fill them in under ② Customer Milestones, or add tasks / load a template here.",
       clrAsk:"Clear the whole project (milestones, tasks, calendar)?", impOk:"Project imported", impBad:"Not a valid project file", expOk:"Project exported"},
   de:{title:"Projekt-Gantt Automobilzulieferer", stepOem:"① Kunde", tabExec:"③ Entwicklungsaufgaben", tabPlan:"② Kundenmeilensteine", hintOem:"Schritt 1: oben links den Kunden (OEM) wählen, dann Kundenmeilensteine eintragen, dann Entwicklungsaufgaben planen.", oemAsk:"Kundenwechsel löscht die eingetragenen Meilensteindaten (eigene Aufgaben bleiben). Fortfahren?", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
-      hintPlan:"Hier Kundenmeilensteine eintragen; Meilensteine und empfohlene Aufgaben im Projekt-Gantt folgen automatisch. Der Export dieser Ansicht ist der Meilensteinbericht für den OEM.",
+      hintPlan:"Kunden (OEM) wählen und Meilensteintermine eintragen; dieser Export ist der Meilensteinbericht für den OEM.",
       hintExec:"Noch keine Meilensteindaten: unter ② Kundenmeilensteine eintragen oder hier Aufgaben anlegen / Vorlage laden.",
       clrAsk:"Gesamtes Projekt leeren (Meilensteine, Aufgaben, Kalender)?", impOk:"Projekt importiert", impBad:"Keine gültige Projektdatei", expOk:"Projekt exportiert"}
 };
@@ -93,7 +96,7 @@ function getK(k){ if(PREVIEW) return Object.prototype.hasOwnProperty.call(mem, k
 function setK(k, v){ if(PREVIEW){ if(v === null) delete mem[k]; else mem[k] = v; return; } try{ if(v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} }
 
 var lang = getK("gantt-shell-lang") || "zh";
-var view = "exec", curOem = "", oemList = null;
+var view = "plan", curOem = "", oemList = null;
 function curOemFromStore(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return (p && p.oem) || ""; }catch(e){ return ""; } }
 curOem = curOemFromStore();
 var fExec = document.getElementById("fExec"), fPlan = document.getElementById("fPlan");
@@ -119,7 +122,7 @@ function updateHint(){
   h.textContent = txt; h.classList.toggle("show", !!txt);
 }
 function show(v){
-  view = v;
+  v = "plan"; view = v;
   fExec.classList.toggle("off", v !== "exec");
   fPlan.classList.toggle("off", v !== "plan");
   document.querySelectorAll("#top .tabs:not(.lang) button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-view") === v); });
@@ -136,8 +139,8 @@ function srcdocFor(app){
   return i >= 0 ? html.slice(0, i + 6) + pre + html.slice(i + 6) : pre + html;
 }
 function loadFrames(){
-  if(INLINE){ fExec.srcdoc = srcdocFor("exec"); fPlan.srcdoc = srcdocFor("plan"); }
-  else { var q = "?lang=" + lang + "&v=" + Date.now(); fExec.src = "exec.html" + q; fPlan.src = "plan.html" + q; }
+  if(INLINE){ fPlan.srcdoc = srcdocFor("plan"); }
+  else { var q = "?lang=" + lang + "&v=" + Date.now(); fPlan.src = "plan.html" + q; }
 }
 [fExec, fPlan].forEach(function(f){ f.addEventListener("load", function(){ post(f, { t:"lang", v:lang }); if(f === fPlan) post(f, { t:"hello" }); updateHint(); }); });
 
