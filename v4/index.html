@@ -331,6 +331,7 @@ body.fp-on #taskList .trow,body.fp-on .g-bar,body.fp-on .g-ms{cursor:copy!import
 #v4Timeline .tl-t{position:absolute;height:13px;border-radius:3px;color:#fff;font-size:10px;line-height:13px;overflow:hidden;white-space:nowrap}#v4Timeline .tl-t span{padding:0 4px}
 #v4Timeline .tl-ms{position:absolute;top:19px;width:12px;height:12px;transform:rotate(45deg)}
 #v4Timeline .tl-msl{position:absolute;top:2px;font-size:10px;color:var(--tx1);white-space:nowrap;transform:translateX(-50%)}
+#v4Timeline .tl-x{position:absolute;right:4px;top:46px;width:20px;height:18px;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--tx2);cursor:pointer;line-height:14px;padding:0;font-size:14px}#v4Timeline .tl-x:hover{color:#dc2626}
 #v4Timeline .tl-empty{position:absolute;left:50%;top:36px;transform:translateX(-50%);color:var(--tx3)}
 .main[data-pane=cal]>#calSheet{display:block;flex:1;overflow:auto;padding:12px 16px;background:var(--bg)}
 .cal-tb{display:flex;align-items:center;gap:10px;margin-bottom:8px}.cal-tb b{font-size:15px;min-width:120px;text-align:center}.cal-tb button{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 12px;cursor:pointer;color:var(--tx1)}
@@ -5174,9 +5175,9 @@ function v4ExpPlan(){
 /* ===== v4：MS Project 对标第二轮 —— 停用任务、延迟任务/可宽延时间显示、按日程标记、移动任务、日程表、日历视图、Ctrl+F / Shift+F2 / Ctrl+滚轮 ===== */
 (function(){
   var TX = {
-    zh:{ inact:"停用 / 启用任务：停用的任务保留在计划中，但不再影响后续任务和摘要", onTrack:"按日程标记：把完成百分比更新到状态日期（未设置则今天）应完成的进度", move:"移动", mv:{ "1":"推后 1 天", "5":"推后 1 周", "20":"推后 4 周", "-1":"提前 1 天", "-5":"提前 1 周", "-20":"提前 4 周" }, tlAdd:"添加到日程表 / 从日程表移除", late:"延迟任务", slack:"可宽延时间", tl:"日程表", cal:"日历", need:"请先选中任务", today:"今天", more:"另有 {0} 项", wk:["一","二","三","四","五","六","日"], tlEmpty:"日程表：选中任务后点 📅 加入", start:"开始", finish:"完成", inactOn:"已停用 {0} 个任务", inactOff:"已启用 {0} 个任务", moved:"已移动 {0} 个任务", tracked:"已按日程更新 {0} 个任务" },
-    en:{ inact:"Inactivate / activate: inactive tasks stay in the plan but no longer drive successors or summaries", onTrack:"Mark on track: set % complete to what should be done by the status date (or today)", move:"Move", mv:{ "1":"1 day later", "5":"1 week later", "20":"4 weeks later", "-1":"1 day earlier", "-5":"1 week earlier", "-20":"4 weeks earlier" }, tlAdd:"Add to / remove from timeline", late:"Late tasks", slack:"Slack", tl:"Timeline", cal:"Calendar", need:"Select a task first", today:"Today", more:"+{0} more", wk:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], tlEmpty:"Timeline: select tasks and click 📅 to add them", start:"Start", finish:"Finish", inactOn:"Inactivated {0} tasks", inactOff:"Activated {0} tasks", moved:"Moved {0} tasks", tracked:"Marked {0} tasks on track" },
-    de:{ inact:"Deaktivieren / aktivieren", onTrack:"Als im Plan markieren", move:"Verschieben", mv:{ "1":"1 Tag später", "5":"1 Woche später", "20":"4 Wochen später", "-1":"1 Tag früher", "-5":"1 Woche früher", "-20":"4 Wochen früher" }, tlAdd:"Zur Zeitachse hinzufügen / entfernen", late:"Verspätete Vorgänge", slack:"Pufferzeit", tl:"Zeitachse", cal:"Kalender", need:"Bitte zuerst einen Vorgang wählen", today:"Heute", more:"+{0} weitere", wk:["Mo","Di","Mi","Do","Fr","Sa","So"], tlEmpty:"Zeitachse: Vorgänge wählen und 📅 klicken", start:"Anfang", finish:"Ende", inactOn:"{0} Vorgänge deaktiviert", inactOff:"{0} Vorgänge aktiviert", moved:"{0} Vorgänge verschoben", tracked:"{0} Vorgänge im Plan markiert" }
+    zh:{ tlClose:"关闭日程表（显示 ▾ → 日程表 可再打开）", inact:"停用 / 启用任务：停用的任务保留在计划中，但不再影响后续任务和摘要", onTrack:"按日程标记：把完成百分比更新到状态日期（未设置则今天）应完成的进度", move:"移动", mv:{ "1":"推后 1 天", "5":"推后 1 周", "20":"推后 4 周", "-1":"提前 1 天", "-5":"提前 1 周", "-20":"提前 4 周" }, tlAdd:"添加到日程表 / 从日程表移除", late:"延迟任务", slack:"可宽延时间", tl:"日程表", cal:"日历", need:"请先选中任务", today:"今天", more:"另有 {0} 项", wk:["一","二","三","四","五","六","日"], tlEmpty:"日程表：选中任务后点 📅 加入", start:"开始", finish:"完成", inactOn:"已停用 {0} 个任务", inactOff:"已启用 {0} 个任务", moved:"已移动 {0} 个任务", tracked:"已按日程更新 {0} 个任务" },
+    en:{ tlClose:"Hide timeline", inact:"Inactivate / activate: inactive tasks stay in the plan but no longer drive successors or summaries", onTrack:"Mark on track: set % complete to what should be done by the status date (or today)", move:"Move", mv:{ "1":"1 day later", "5":"1 week later", "20":"4 weeks later", "-1":"1 day earlier", "-5":"1 week earlier", "-20":"4 weeks earlier" }, tlAdd:"Add to / remove from timeline", late:"Late tasks", slack:"Slack", tl:"Timeline", cal:"Calendar", need:"Select a task first", today:"Today", more:"+{0} more", wk:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], tlEmpty:"Timeline: select tasks and click 📅 to add them", start:"Start", finish:"Finish", inactOn:"Inactivated {0} tasks", inactOff:"Activated {0} tasks", moved:"Moved {0} tasks", tracked:"Marked {0} tasks on track" },
+    de:{ tlClose:"Zeitachse ausblenden", inact:"Deaktivieren / aktivieren", onTrack:"Als im Plan markieren", move:"Verschieben", mv:{ "1":"1 Tag später", "5":"1 Woche später", "20":"4 Wochen später", "-1":"1 Tag früher", "-5":"1 Woche früher", "-20":"4 Wochen früher" }, tlAdd:"Zur Zeitachse hinzufügen / entfernen", late:"Verspätete Vorgänge", slack:"Pufferzeit", tl:"Zeitachse", cal:"Kalender", need:"Bitte zuerst einen Vorgang wählen", today:"Heute", more:"+{0} weitere", wk:["Mo","Di","Mi","Do","Fr","Sa","So"], tlEmpty:"Zeitachse: Vorgänge wählen und 📅 klicken", start:"Anfang", finish:"Ende", inactOn:"{0} Vorgänge deaktiviert", inactOff:"{0} Vorgänge aktiviert", moved:"{0} Vorgänge verschoben", tracked:"{0} Vorgänge im Plan markiert" }
   };
   function L(k, a){ var s = (TX[lang] || TX.zh)[k]; return a != null && typeof s === "string" ? s.replace("{0}", a) : s; }
   function sel(){ return window.__v4SelList ? window.__v4SelList() : (selId ? [selId] : []); }
@@ -5201,7 +5202,7 @@ function v4ExpPlan(){
       t.start = ns; if(!t.manual){ t.cons = "SNET"; t.consDate = ns; } c++; });
     render(); toast(L("moved", c)); }
   /* —— 日程表 —— */
-  function toggleTl(){ var ids = sel(); if(!ids.length){ toast(L("need")); return; } var ts = ids.map(byId).filter(Boolean), on = !ts.every(function(t){ return t.tl; });
+  function toggleTl(){ var ids = sel(); if(!ids.length){ state.showTL = !state.showTL; render(); return; } /* 未选任务：开/关日程表 */ var ts = ids.map(byId).filter(Boolean), on = !ts.every(function(t){ return t.tl; });
     ts.forEach(function(t){ if(on) t.tl = true; else delete t.tl; }); if(on) state.showTL = true; render(); }
   function drawTimeline(){
     var box = document.getElementById("v4Timeline"); if(!box) return;
@@ -5212,8 +5213,9 @@ function v4ExpPlan(){
     var tl = state.tasks.filter(function(t){ return t.tl && t.start; });
     var h = '<div class="tl-bar" style="left:80px;width:' + W + 'px"></div>'
       + '<div class="tl-end" style="left:4px">' + L("start") + '<b>' + fmtD(mn) + '</b></div><div class="tl-end r" style="right:4px">' + L("finish") + '<b>' + fmtD(mx) + '</b></div>';
-    for(var d = new Date(mn.getFullYear(), mn.getMonth(), 1); d <= mx; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)){ if(d < mn) continue; var x = X(d);
-      h += '<div class="tl-tick" style="left:' + x + 'px">' + (d.getMonth() === 0 || x < 120 ? d.getFullYear() + "/" : "") + (d.getMonth() + 1) + "</div>"; }
+    var pxM = W / Math.max(days / 30.4, 1), stepM = [1,2,3,6,12].filter(function(s){ return s * pxM >= 34; })[0] || 12, first = true; /* 刻度过密时按 2/3/6/12 个月一格 */
+    for(var d = new Date(mn.getFullYear(), mn.getMonth(), 1); d <= mx; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)){ if(d < mn || d.getMonth() % stepM) continue; var x = X(d);
+      h += '<div class="tl-tick" style="left:' + x + 'px">' + (stepM === 12 ? d.getFullYear() : (d.getMonth() === 0 || first ? d.getFullYear() + "/" : "") + (d.getMonth() + 1)) + "</div>"; first = false; }
     var td = stDate(); if(td >= mn && td <= mx) h += '<div class="tl-today" style="left:' + X(td) + 'px"></div>';
     var lane = 0;
     tl.forEach(function(t){ var a = parseD(t.start), b = parseD(taskEnd(t));
@@ -5221,7 +5223,9 @@ function v4ExpPlan(){
       else { var x1 = X(a), x2 = X(addDays(b, 1)); h += '<div class="tl-t" style="left:' + x1 + 'px;width:' + Math.max(x2 - x1, 3) + 'px;top:' + (30 + (lane++ % 2) * 15) + 'px;background:' + tColor(t) + '" title="' + esc(t.name) + '"><span>' + esc(t.name) + "</span></div>"; }
     });
     if(!tl.length) h += '<div class="tl-empty">' + L("tlEmpty") + "</div>";
+    h += '<button type="button" class="tl-x" title="' + L("tlClose") + '">×</button>';
     box.innerHTML = h;
+    box.querySelector(".tl-x").onclick = function(){ state.showTL = false; render(); };
   }
   /* —— 延迟任务 / 可宽延时间 / 停用样式 —— */
   function decorate(){
