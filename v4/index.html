@@ -372,6 +372,11 @@ html[data-theme=dark] .omBtns button{background:#1a2638!important;color:var(--tx
 #themeBtns{display:flex;border:1px solid #4b6a85;border-radius:6px;overflow:hidden}
 #themeBtns button{border:0;border-radius:0;padding:5px 8px;background:transparent;font-size:12px}
 #themeBtns button.on{background:var(--accent)}
+/* 顶部栏控件统一高度 32px（与 v3 根页一致）（新建项目 / 项目名称 / OEM 链接 / 主题 / 语言） */
+header button,header input,header select,header a.btn,header #lnkOem,header #themeBtns{height:32px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;line-height:1;vertical-align:middle}
+header input{display:inline-block}
+.toolbar #fltTxt{height:28px;box-sizing:border-box}.toolbar .ms-pct{height:28px;box-sizing:border-box}
+header #themeBtns{display:flex}header #themeBtns button{height:100%;padding:0 9px}
 </style>
 <style id="embedCss">
 html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
