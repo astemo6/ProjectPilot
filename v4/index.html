@@ -203,7 +203,7 @@ body.resizing .col-resize{display:block}
 .pane-split:hover,.pane-split.drag{background:rgba(37,99,235,.35)}
 .gantt-pane{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .gantt-head{height:44px;background:var(--card);border-bottom:1px solid var(--line);position:relative;overflow:hidden;flex-shrink:0}
-.gantt-body{flex:1;overflow:auto;position:relative}
+.gantt-body{flex:1;overflow:auto;position:relative;background:var(--cc-bg,transparent)}
 .gantt-inner{position:relative;min-height:100%}
 .g-row{position:relative;border-bottom:1px solid var(--line2)}
 .g-row.group{background:#e8eef555}
@@ -224,11 +224,11 @@ body.resizing .col-resize{display:block}
 .g-base{position:absolute;height:5px;border-radius:2px;background:#9ca3af;opacity:.85;z-index:2;pointer-events:none}
 .g-base-ms{position:absolute;width:8px;height:8px;transform:rotate(45deg);background:#9ca3af;opacity:.85;z-index:2;pointer-events:none}
 .g-today{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:5}
-.g-weekend{position:absolute;top:0;bottom:0;background:#f3f4f6;z-index:0}
+.g-weekend{position:absolute;top:0;bottom:0;background:var(--cc-wk,#f3f4f6);z-index:0}
 .g-holiday{position:absolute;top:0;bottom:0;background:#fef2f2;z-index:0}
 .g-dep{position:absolute;z-index:4;pointer-events:none}
-.gh-y{position:absolute;top:0;height:22px;line-height:22px;background:#7BA7BC;color:#fff;font-weight:700;font-size:12px;text-align:center;border-right:1.5px solid #fff;box-sizing:border-box;white-space:nowrap;overflow:hidden}
-.gh-m{position:absolute;top:22px;height:22px;line-height:22px;background:#BDD5E5;color:#1f2937;font-size:11px;text-align:center;border-right:1px solid #fff;box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.gh-y{position:absolute;top:0;height:22px;line-height:22px;background:var(--cc-hy,#7BA7BC);color:var(--cc-hyt,#fff);font-weight:700;font-size:12px;text-align:center;border-right:1.5px solid #fff;box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.gh-m{position:absolute;top:22px;height:22px;line-height:22px;background:var(--cc-hm,#BDD5E5);color:var(--cc-hmt,#1f2937);font-size:11px;text-align:center;border-right:1px solid #fff;box-sizing:border-box;white-space:nowrap;overflow:hidden}
 .gh-m.off{background:#d6e3ec;color:#6b7280}
 .day-cell{position:absolute;top:0;bottom:0;border-right:1px dashed #e5e7eb}
 .gh-day{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden}
@@ -760,7 +760,7 @@ const TPL_ANPQP = [
 ];
 /* ============ 数据模型与状态 ============ */
 var LS_KEY = "gantt-exec-v4";
-var CHART_COL_DEF = { task:"#2563eb", ms:"#dc2626", sum:"#111111", prog:"#1e3a8a" };
+var CHART_COL_DEF = { task:"#2563eb", ms:"#dc2626", sum:"#111111", prog:"#1e3a8a", hy:"#7ba7bc", hm:"#bdd5e5", bg:"#eef1f5", wk:"#f3f4f6" };
 function CC(){ var c = state.chartColors || {}, r = {}; for(var k in CHART_COL_DEF) r[k] = /^#[0-9a-f]{6}$/i.test(c[k] || "") ? c[k] : CHART_COL_DEF[k]; return r; }
 function tColor(t){ return t.color || CC()[t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task"]; }
 var COLORS = ["#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#dc2626","#4f46e5","#0d9488"];
@@ -2136,7 +2136,7 @@ function renderGantt(){
   var bands = phaseAnchors();
   var BAND_H = bands.length ? 30 : 0;
   // 周末/节假日底纹
-  for(var j = 0; j < days; j++){
+  for(var j = 0; PX_DAY >= 3 && j < days; j++){ /* 缩得很小时（全局/季度）不画周末底纹，避免一片灰 */
     var dd = addDays(min, j), ss = fmtD(dd), xx = j * PX_DAY;
     if(holName(ss)) html += '<div class="g-holiday" style="left:' + xx + 'px;width:' + PX_DAY + 'px"></div>';
     else if(dd.getDay() === 0 || dd.getDay() === 6) html += '<div class="g-weekend" style="left:' + xx + 'px;width:' + PX_DAY + 'px"></div>';
@@ -4591,9 +4591,9 @@ I18N.zh.ddImp = "导入"; I18N.en.ddImp = "Import"; I18N.de.ddImp = "Import";
 I18N.zh.chartColors = "颜色"; I18N.en.chartColors = "Colors"; I18N.de.chartColors = "Farben";
 /* ===== v4：甘特图颜色（任务条 / 里程碑 / 摘要 / 进度），state.chartColors；单个任务可在编辑框单独设色（t.color），导出跟随 ===== */
 (function(){
-  var TXT = { zh:{ t:"甘特图颜色", task:"任务条", ms:"里程碑", sum:"摘要", prog:"进度", def:"恢复默认", clr:"同时清除各任务单独设置的颜色", sel:"把选中任务设为对应颜色", hint:"单个任务的颜色：双击任务，在编辑框「颜色」里设置。导出 PDF/JPG 跟随这里的颜色。", ok:"确定", no:"取消", done:"已更新颜色" },
-    en:{ t:"Chart colors", task:"Task bar", ms:"Milestone", sum:"Summary", prog:"Progress", def:"Reset", clr:"Also clear per-task colors", sel:"Apply to selected tasks", hint:"Per-task color: double-click a task and use Color. PDF/JPG export follows these colors.", ok:"OK", no:"Cancel", done:"Colors updated" },
-    de:{ t:"Diagrammfarben", task:"Balken", ms:"Meilenstein", sum:"Sammelvorgang", prog:"Fortschritt", def:"Standard", clr:"Einzelfarben der Vorgänge entfernen", sel:"Auf ausgewählte Vorgänge anwenden", hint:"Einzelfarbe: Vorgang doppelklicken → Farbe. PDF/JPG-Export übernimmt diese Farben.", ok:"OK", no:"Abbrechen", done:"Farben aktualisiert" } };
+  var TXT = { zh:{ t:"甘特图颜色", hy:"时间刻度（年）", hm:"时间刻度（月）", bg:"图表底色", wk:"周末底纹", task:"任务条", ms:"里程碑", sum:"摘要", prog:"进度", def:"恢复默认", clr:"同时清除各任务单独设置的颜色", sel:"把选中任务设为对应颜色", hint:"单个任务的颜色：双击任务，在编辑框「颜色」里设置。导出 PDF/JPG 跟随这里的颜色。", ok:"确定", no:"取消", done:"已更新颜色" },
+    en:{ t:"Chart colors", hy:"Timescale (year)", hm:"Timescale (month)", bg:"Chart background", wk:"Weekends", task:"Task bar", ms:"Milestone", sum:"Summary", prog:"Progress", def:"Reset", clr:"Also clear per-task colors", sel:"Apply to selected tasks", hint:"Per-task color: double-click a task and use Color. PDF/JPG export follows these colors.", ok:"OK", no:"Cancel", done:"Colors updated" },
+    de:{ t:"Diagrammfarben", hy:"Zeitskala (Jahr)", hm:"Zeitskala (Monat)", bg:"Diagrammhintergrund", wk:"Wochenenden", task:"Balken", ms:"Meilenstein", sum:"Sammelvorgang", prog:"Fortschritt", def:"Standard", clr:"Einzelfarben der Vorgänge entfernen", sel:"Auf ausgewählte Vorgänge anwenden", hint:"Einzelfarbe: Vorgang doppelklicken → Farbe. PDF/JPG-Export übernimmt diese Farben.", ok:"OK", no:"Abbrechen", done:"Farben aktualisiert" } };
   function T(k){ return (TXT[lang] || TXT.zh)[k]; }
   function migrate(){ /* 旧数据：默认蓝色写死在每个任务上 → 改为跟随默认；旧导出颜色迁移 */
     if(state._colMig) return; state._colMig = 1;
@@ -4601,14 +4601,18 @@ I18N.zh.chartColors = "颜色"; I18N.en.chartColors = "Colors"; I18N.de.chartCol
     var ec = state.info && state.info.expColors; if(ec && !state.chartColors){ state.chartColors = { ms:ec.ms, sum:ec.sum }; } if(state.info) delete state.info.expColors;
     save();
   }
-  var _r = render; render = function(){ migrate(); return _r.apply(this, arguments); };
+  function applyVars(){ var c = CC(), s = document.documentElement.style;
+    function txc(hex){ var n = parseInt(hex.slice(1), 16), L = (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)); return L > 150 ? "#1f2937" : "#ffffff"; }
+    s.setProperty("--cc-hy", c.hy); s.setProperty("--cc-hyt", txc(c.hy)); s.setProperty("--cc-hm", c.hm); s.setProperty("--cc-hmt", txc(c.hm));
+    s.setProperty("--cc-bg", c.bg); s.setProperty("--cc-wk", c.wk); }
+  var _r = render; render = function(){ migrate(); applyVars(); return _r.apply(this, arguments); };
   function selIds(){ return (selId && byId(selId)) ? [selId] : []; }
   function open(){
     var c = CC(), bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "chartColBg";
     var sel = selIds();
     bg.innerHTML = '<div class="modal" style="width:420px"><div class="modal-h"><span>' + T("t") + '</span><button class="cc-x">×</button></div><div class="modal-b">'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-bottom:12px">'
-      + ["task","ms","sum","prog"].map(function(k){ return '<label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="color" class="cc-c" data-k="' + k + '" value="' + c[k] + '" style="width:40px;height:28px;padding:0;border:1px solid #d1d5db">' + T(k) + '</label>'; }).join("")
+      + ["task","ms","sum","prog","hy","hm","bg","wk"].map(function(k){ return '<label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="color" class="cc-c" data-k="' + k + '" value="' + c[k] + '" style="width:40px;height:28px;padding:0;border:1px solid #d1d5db">' + T(k) + '</label>'; }).join("")
       + '</div><label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px"><input type="checkbox" class="cc-clr" style="width:auto">' + T("clr") + '</label>'
       + (sel.length ? '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px"><input type="checkbox" class="cc-sel" style="width:auto">' + T("sel") + ' (' + sel.length + ')</label>' : '')
       + '<div style="font-size:11px;color:#6b7280;margin:8px 0 12px">' + T("hint") + '</div>'
