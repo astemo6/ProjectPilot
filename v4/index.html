@@ -138,7 +138,7 @@ table.rs .del{cursor:pointer;color:var(--danger,#dc2626);text-align:center;width
 .table-head .c-work{width:60px;flex-shrink:0;text-align:center}
 .ow-warn{margin-left:2px;font-size:11px}
 .trow .c-dur{width:52px;justify-content:center;flex-shrink:0}
-.trow .c-prog{width:56px;justify-content:center;flex-shrink:0}
+.trow .c-prog{width:72px;justify-content:center;flex-shrink:0}
 .trow .c-start{width:86px;justify-content:center;flex-shrink:0;color:var(--tx2)}
 .trow .c-end{width:86px;justify-content:center;flex-shrink:0;color:var(--tx2)}
 .trow .c-float{width:64px;justify-content:center;flex-shrink:0;color:var(--tx2)}
@@ -169,7 +169,7 @@ table.rs .del{cursor:pointer;color:var(--danger,#dc2626);text-align:center;width
 .table-head .c-name{flex:1}
 .table-head .c-owner{width:110px;flex-shrink:0}
 .table-head .c-dur{width:52px;text-align:center;flex-shrink:0}
-.table-head .c-prog{width:56px;text-align:center;flex-shrink:0}
+.table-head .c-prog{width:72px;text-align:center;flex-shrink:0}
 .table-head .c-start{width:86px;text-align:center;flex-shrink:0}
 .table-head .c-end{width:86px;text-align:center;flex-shrink:0}
 .table-head .c-float{width:64px;text-align:center;flex-shrink:0}
@@ -209,6 +209,11 @@ body.resizing .col-resize{display:block}
 .tpl-n{color:var(--tx3);font-size:11px;flex-shrink:0}
 .progbar{width:44px;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}
 .progbar>i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.trow .c-prog{gap:4px}.trow .c-prog .progbar{width:30px;height:6px;flex-shrink:0}.progbar.done>i{background:#16a34a}
+.pgn{font-size:11px;min-width:24px;text-align:right}.pgn.done{color:#16a34a;font-weight:700}
+.trow.pdone .c-id{color:#16a34a;font-weight:700}.trow.pdone .c-id:after{content:"✓";margin-left:2px;font-size:10px}
+body.fp-on #taskList .trow,body.fp-on .g-bar,body.fp-on .g-ms{cursor:copy!important}
+#fmtBar button.fm-p.on{background:#fef3c7;border-color:#f59e0b}
 .ms-diamond{color:var(--danger);font-size:14px}
 .dl-warn{color:var(--danger);margin-left:4px;cursor:help;font-weight:700}
 .ow-warn{margin-left:2px;cursor:help}
@@ -312,6 +317,32 @@ body.resizing .col-resize{display:block}
   .gh-wd{font-size:7px}
   .toast{max-width:90vw}
 }
+#msp2Bar{display:inline-flex;align-items:center;gap:4px;margin-left:4px}#msp2Bar button{padding:5px 8px}#msp2Bar select{padding:5px 4px;width:78px}
+.trow.inact>div{color:#9ca3af!important;text-decoration:line-through}
+.g-bar.inact{background:repeating-linear-gradient(135deg,#cbd5e1,#cbd5e1 4px,#e5e7eb 4px,#e5e7eb 8px)!important;color:#64748b}.g-ms.inact{background:#cbd5e1!important}
+.g-bar.late,.g-ms.late{box-shadow:0 0 0 2px #dc2626}
+.g-slack{position:absolute;height:2px;background:#0d9488;z-index:2;pointer-events:none}
+.g-slack:after{content:"";position:absolute;right:0;top:-3px;height:8px;border-right:2px solid #0d9488}
+#v4Timeline{display:none;position:relative;height:66px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0;overflow:hidden;font-size:11px}
+#v4Timeline .tl-bar{position:absolute;top:22px;height:6px;background:#cbd5e1;border-radius:3px}
+#v4Timeline .tl-end{position:absolute;top:8px;color:var(--tx2);line-height:14px}#v4Timeline .tl-end b{display:block;font-weight:600;color:var(--tx1)}#v4Timeline .tl-end.r{text-align:right}
+#v4Timeline .tl-tick{position:absolute;top:4px;color:var(--tx3);font-size:10px;border-left:1px solid var(--line);padding-left:2px;height:18px}
+#v4Timeline .tl-today{position:absolute;top:16px;bottom:4px;width:2px;background:#ef4444}
+#v4Timeline .tl-t{position:absolute;height:13px;border-radius:3px;color:#fff;font-size:10px;line-height:13px;overflow:hidden;white-space:nowrap}#v4Timeline .tl-t span{padding:0 4px}
+#v4Timeline .tl-ms{position:absolute;top:19px;width:12px;height:12px;transform:rotate(45deg)}
+#v4Timeline .tl-msl{position:absolute;top:2px;font-size:10px;color:var(--tx1);white-space:nowrap;transform:translateX(-50%)}
+#v4Timeline .tl-empty{position:absolute;left:50%;top:36px;transform:translateX(-50%);color:var(--tx3)}
+.main[data-pane=cal]>#calSheet{display:block;flex:1;overflow:auto;padding:12px 16px;background:var(--bg)}
+.cal-tb{display:flex;align-items:center;gap:10px;margin-bottom:8px}.cal-tb b{font-size:15px;min-width:120px;text-align:center}.cal-tb button{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 12px;cursor:pointer;color:var(--tx1)}
+.cal-g{background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.cal-hd{display:grid;grid-template-columns:repeat(7,1fr);background:var(--steel);color:#fff;font-size:12px;font-weight:600}.cal-hd div{padding:6px;text-align:center}
+.cal-w{position:relative;border-top:1px solid var(--line)}
+.cal-d{position:absolute;top:0;bottom:0;width:14.2857%;border-right:1px solid var(--line2);box-sizing:border-box}
+.cal-d.off{background:rgba(148,163,184,.10)}.cal-d.out .cal-n{opacity:.4}.cal-d.tdy{background:rgba(37,99,235,.08)}
+.cal-n{position:absolute;left:6px;top:4px;font-size:12px;color:var(--tx2)}.cal-n i{font-style:normal;color:#dc2626;font-size:10px}
+.cal-more{position:absolute;right:6px;bottom:2px;font-size:10px;color:var(--tx3)}
+.cal-it{position:absolute;height:17px;line-height:17px;border-radius:4px;color:#fff;font-size:11px;padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;z-index:1}
+.cal-it.ms{background:transparent;font-weight:600;padding:0 2px}.cal-it.inact{opacity:.45;text-decoration:line-through}
 /* ===== v4 暗色主题（html[data-theme=dark]） ===== */
 html[data-theme=dark]{--tx1:#e5e7eb;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--side:#111a29;--card:#141e2e;--line:#2b3a50;--line2:#223047;--steel:#0f2236;--steel2:#1f3b57;--steel3:#2c5070;color-scheme:dark}
 html[data-theme=dark] .toolbar button,html[data-theme=dark] .toolbar select,html[data-theme=dark] .rs-tb button,html[data-theme=dark] .modal-f button,html[data-theme=dark] .modal-b button,
@@ -328,6 +359,7 @@ html[data-theme=dark] .trow.sel,html[data-theme=dark] .trow.sel .c-id,html[data-
 html[data-theme=dark] .trow.group,html[data-theme=dark] .trow.group .c-id,html[data-theme=dark] .trow.group .c-name{background:#17233a}
 html[data-theme=dark] .g-row.group{background:#17233a66}
 html[data-theme=dark] .g-side{color:#cbd5e1}
+html[data-theme=dark] #v4Timeline .tl-bar{background:#334155}html[data-theme=dark] .g-bar.inact{background:repeating-linear-gradient(135deg,#334155,#334155 4px,#1e293b 4px,#1e293b 8px)!important}
 html[data-theme=dark] .g-holiday{background:#3a1d24}
 html[data-theme=dark] .net-box.done{background:repeating-linear-gradient(135deg,#141e2e,#141e2e 6px,#1b2638 6px,#1b2638 8px)}
 html[data-theme=dark] .net-box.crit .nb-h{background:#4c1d1d}
@@ -827,7 +859,7 @@ var COLS = [
   {key:'dur',   cls:'c-dur',   defW:52, i18n:'cDur', hide:true},
   {key:'work',  cls:'c-work',  defW:60, i18n:'cWork', hide:true},
   {key:'cost',  cls:'c-cost',  defW:84, i18n:'evCost', hide:true},
-  {key:'prog',  cls:'c-prog',  defW:56, i18n:'cProg', hide:true},
+  {key:'prog',  cls:'c-prog',  defW:72, i18n:'cProg', hide:true},
   {key:'start', cls:'c-start', defW:118, i18n:'cStart'},
   {key:'end',   cls:'c-end',   defW:118, i18n:'cEnd'},
   {key:'pred',  cls:'c-pred',  defW:84, i18n:'cPred'},
@@ -1035,7 +1067,7 @@ function scheduleAll(){
     if(t.manual){ t.end = taskEnd(t); return; } // 手动排程：不重排日期，但其日期仍作为后续任务的前置约束
     var latest = null;
     normDeps(t.deps).forEach(function(d){
-      var p = byId[d.id]; if(!p || d.id === t.id) return;
+      var p = byId[d.id]; if(!p || d.id === t.id || p.inactive) return; /* 停用任务不再驱动后续任务 */
       var c = depCand(t, p, d);
       if(c && (!latest || c > latest)) latest = c;
     });
@@ -1844,9 +1876,12 @@ function deleteTask(id, ask){
   if(gone[selId]) selId = null;
   return true;
 }
+function grpProg(g){ var w = 0, d = 0;
+  (function walk(gid){ state.tasks.forEach(function(x){ if(x.group !== gid || x.inactive) return; if(x.type === "group"){ walk(x.id); return; } var k = x.type === "milestone" ? 0 : Math.max(+x.dur || 0, 0); if(!k && x.type !== "milestone") k = 1; w += k; d += k * (+x.progress || 0); }); })(g.id);
+  return w ? Math.round(d / w) : null; }
 function grpSpan(g){
   var s = null, e = null;
-  (function walk(gid){ state.tasks.forEach(function(x){ if(x.group !== gid) return; if(x.type === "group"){ walk(x.id); return; }
+  (function walk(gid){ state.tasks.forEach(function(x){ if(x.group !== gid || x.inactive) return; if(x.type === "group"){ walk(x.id); return; }
     var a = parseD(x.start), b = parseD(taskEnd(x)); if(a && (!s || a < s)) s = a; if(b && (!e || b > e)) e = b; }); })(g.id);
   return { s:s ? fmtD(s) : "", e:e ? fmtD(e) : "" };
 }
@@ -1905,7 +1940,8 @@ function renderTable(){
     if(t.type !== "group" && resWarnMap[t.id]) ow += '<span class="ow-warn" title="' + esc(tr("resWarnTip")) + '">⚠️</span>';
     var vv = "—";
     if(t.type !== "group"){ var v = varianceOf(t, bmap); if(v !== null) vv = fmtVar(v); }
-    var prog = t.type === "group" ? "" : '<div class="progbar"><i style="width:' + t.progress + '%"></i></div>';
+    var _pv = t.type === "group" ? grpProg(t) : Math.round(+t.progress || 0); /* 完成%：小进度条 + 数字；100% 显示 ✓；分组按工期加权汇总 */
+    var prog = _pv == null ? "" : '<div class="progbar' + (_pv >= 100 ? " done" : "") + '"><i style="width:' + _pv + '%"></i></div><span class="pgn' + (_pv >= 100 ? " done" : "") + '">' + (_pv >= 100 ? "✓" : _pv + "%") + "</span>";
     var fv = t.type === "group" ? "" : (floatMap[t.id] === undefined ? "—" : floatMap[t.id]);
     var locked = t.type !== "group" && (t.manual && isManaged(t.source));
     html += '<div class="' + cls + '" data-id="' + t.id + '">'
@@ -5134,6 +5170,178 @@ function v4ExpPlan(){
     apply(false);
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+})();
+/* ===== v4：MS Project 对标第二轮 —— 停用任务、延迟任务/可宽延时间显示、按日程标记、移动任务、日程表、日历视图、Ctrl+F / Shift+F2 / Ctrl+滚轮 ===== */
+(function(){
+  var TX = {
+    zh:{ inact:"停用 / 启用任务：停用的任务保留在计划中，但不再影响后续任务和摘要", onTrack:"按日程标记：把完成百分比更新到状态日期（未设置则今天）应完成的进度", move:"移动", mv:{ "1":"推后 1 天", "5":"推后 1 周", "20":"推后 4 周", "-1":"提前 1 天", "-5":"提前 1 周", "-20":"提前 4 周" }, tlAdd:"添加到日程表 / 从日程表移除", late:"延迟任务", slack:"可宽延时间", tl:"日程表", cal:"日历", need:"请先选中任务", today:"今天", more:"另有 {0} 项", wk:["一","二","三","四","五","六","日"], tlEmpty:"日程表：选中任务后点 📅 加入", start:"开始", finish:"完成", inactOn:"已停用 {0} 个任务", inactOff:"已启用 {0} 个任务", moved:"已移动 {0} 个任务", tracked:"已按日程更新 {0} 个任务" },
+    en:{ inact:"Inactivate / activate: inactive tasks stay in the plan but no longer drive successors or summaries", onTrack:"Mark on track: set % complete to what should be done by the status date (or today)", move:"Move", mv:{ "1":"1 day later", "5":"1 week later", "20":"4 weeks later", "-1":"1 day earlier", "-5":"1 week earlier", "-20":"4 weeks earlier" }, tlAdd:"Add to / remove from timeline", late:"Late tasks", slack:"Slack", tl:"Timeline", cal:"Calendar", need:"Select a task first", today:"Today", more:"+{0} more", wk:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], tlEmpty:"Timeline: select tasks and click 📅 to add them", start:"Start", finish:"Finish", inactOn:"Inactivated {0} tasks", inactOff:"Activated {0} tasks", moved:"Moved {0} tasks", tracked:"Marked {0} tasks on track" },
+    de:{ inact:"Deaktivieren / aktivieren", onTrack:"Als im Plan markieren", move:"Verschieben", mv:{ "1":"1 Tag später", "5":"1 Woche später", "20":"4 Wochen später", "-1":"1 Tag früher", "-5":"1 Woche früher", "-20":"4 Wochen früher" }, tlAdd:"Zur Zeitachse hinzufügen / entfernen", late:"Verspätete Vorgänge", slack:"Pufferzeit", tl:"Zeitachse", cal:"Kalender", need:"Bitte zuerst einen Vorgang wählen", today:"Heute", more:"+{0} weitere", wk:["Mo","Di","Mi","Do","Fr","Sa","So"], tlEmpty:"Zeitachse: Vorgänge wählen und 📅 klicken", start:"Anfang", finish:"Ende", inactOn:"{0} Vorgänge deaktiviert", inactOff:"{0} Vorgänge aktiviert", moved:"{0} Vorgänge verschoben", tracked:"{0} Vorgänge im Plan markiert" }
+  };
+  function L(k, a){ var s = (TX[lang] || TX.zh)[k]; return a != null && typeof s === "string" ? s.replace("{0}", a) : s; }
+  function sel(){ return window.__v4SelList ? window.__v4SelList() : (selId ? [selId] : []); }
+  function leaves(ids){ var out = {}; (function add(list){ list.forEach(function(id){ var t = byId(id); if(!t) return; if(t.type === "group") add(state.tasks.filter(function(x){ return x.group === id; }).map(function(x){ return x.id; })); else out[id] = t; }); })(ids); return Object.keys(out).map(function(k){ return out[k]; }); }
+  function stDate(){ return parseD(state.statusDate) || (function(){ var d = new Date(); d.setHours(0, 0, 0, 0); return d; })(); }
+  /* —— 停用 —— */
+  function toggleInactive(){ var ids = sel(); if(!ids.length){ toast(L("need")); return; }
+    var ts = ids.map(byId).filter(Boolean), on = !ts.every(function(t){ return t.inactive; }), all = leaves(ids).concat(ts.filter(function(t){ return t.type === "group"; }));
+    all.forEach(function(t){ if(on) t.inactive = true; else delete t.inactive; }); render(); toast(L(on ? "inactOn" : "inactOff", all.length)); }
+  /* —— 按日程标记 —— */
+  function markOnTrack(){ var ids = sel(); if(!ids.length){ toast(L("need")); return; }
+    var sd = stDate(), n = 0;
+    leaves(ids).forEach(function(t){ var s = parseD(t.start), e = parseD(taskEnd(t)); if(!s) return;
+      var p; if(t.type === "milestone") p = sd >= s ? 100 : 0; else if(sd < s) p = 0; else if(sd >= e) p = 100;
+      else { var tot = Math.max(1, +t.dur || 1), done = withCal(t, function(){ return workdaysBetween(s, sd) + (isWorkday(s) ? 1 : 0); }); p = Math.max(0, Math.min(100, Math.round(done / tot * 100))); }
+      t.progress = p; n++; });
+    render(); toast(L("tracked", n)); }
+  /* —— 移动任务 —— */
+  function moveTasks(n){ var ids = sel(); if(!ids.length){ toast(L("need")); return; } var c = 0;
+    leaves(ids).forEach(function(t){ if(isManaged(t.source) || !t.start) return; var s = parseD(t.start);
+      var ns = withCal(t, function(){ return fmtD(n > 0 ? addWorkdays(snapWorkday(s), n) : snapWorkday(addWorkdays(s, n))); });
+      t.start = ns; if(!t.manual){ t.cons = "SNET"; t.consDate = ns; } c++; });
+    render(); toast(L("moved", c)); }
+  /* —— 日程表 —— */
+  function toggleTl(){ var ids = sel(); if(!ids.length){ toast(L("need")); return; } var ts = ids.map(byId).filter(Boolean), on = !ts.every(function(t){ return t.tl; });
+    ts.forEach(function(t){ if(on) t.tl = true; else delete t.tl; }); if(on) state.showTL = true; render(); }
+  function drawTimeline(){
+    var box = document.getElementById("v4Timeline"); if(!box) return;
+    var show = state.showTL && (state.pane || "gantt") === "gantt"; box.style.display = show ? "block" : "none"; if(!show) return;
+    var all = state.tasks.filter(function(t){ return t.type !== "group" && t.start && !t.inactive; }); if(!all.length){ box.innerHTML = ""; return; }
+    var mn = null, mx = null; all.forEach(function(t){ var a = parseD(t.start), b = parseD(taskEnd(t)); if(!mn || a < mn) mn = a; if(!mx || b > mx) mx = b; });
+    var W = box.clientWidth - 160, days = diffDays(mn, mx) + 1, X = function(d){ return 80 + diffDays(mn, d) / days * W; };
+    var tl = state.tasks.filter(function(t){ return t.tl && t.start; });
+    var h = '<div class="tl-bar" style="left:80px;width:' + W + 'px"></div>'
+      + '<div class="tl-end" style="left:4px">' + L("start") + '<b>' + fmtD(mn) + '</b></div><div class="tl-end r" style="right:4px">' + L("finish") + '<b>' + fmtD(mx) + '</b></div>';
+    for(var d = new Date(mn.getFullYear(), mn.getMonth(), 1); d <= mx; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)){ if(d < mn) continue; var x = X(d);
+      h += '<div class="tl-tick" style="left:' + x + 'px">' + (d.getMonth() === 0 || x < 120 ? d.getFullYear() + "/" : "") + (d.getMonth() + 1) + "</div>"; }
+    var td = stDate(); if(td >= mn && td <= mx) h += '<div class="tl-today" style="left:' + X(td) + 'px"></div>';
+    var lane = 0;
+    tl.forEach(function(t){ var a = parseD(t.start), b = parseD(taskEnd(t));
+      if(t.type === "milestone"){ h += '<div class="tl-ms" style="left:' + (X(a) - 6) + 'px;background:' + tColor(t) + '" title="' + esc(t.name) + '"></div><div class="tl-msl" style="left:' + X(a) + 'px">' + esc(t.name) + " " + fmtD(a).slice(5) + "</div>"; }
+      else { var x1 = X(a), x2 = X(addDays(b, 1)); h += '<div class="tl-t" style="left:' + x1 + 'px;width:' + Math.max(x2 - x1, 3) + 'px;top:' + (30 + (lane++ % 2) * 15) + 'px;background:' + tColor(t) + '" title="' + esc(t.name) + '"><span>' + esc(t.name) + "</span></div>"; }
+    });
+    if(!tl.length) h += '<div class="tl-empty">' + L("tlEmpty") + "</div>";
+    box.innerHTML = h;
+  }
+  /* —— 延迟任务 / 可宽延时间 / 停用样式 —— */
+  function decorate(){
+    var sd = stDate();
+    document.querySelectorAll("#taskList .trow[data-id]").forEach(function(r){ var t = byId(r.dataset.id); r.classList.toggle("inact", !!(t && t.inactive)); r.classList.toggle("pdone", !!(t && t.type !== "group" && +t.progress >= 100)); });
+    document.querySelectorAll(".g-bar[data-id],.g-ms[data-id]").forEach(function(b){ var t = byId(b.dataset.id); if(!t) return;
+      b.classList.toggle("inact", !!t.inactive);
+      var late = false; if(state.showLate && !t.inactive){ var s = parseD(t.start), e = parseD(taskEnd(t)), p = +t.progress || 0;
+        if(e && e < sd && p < 100) late = true; else if(s && e && s <= sd && t.type !== "milestone"){ var tot = diffDays(s, e) + 1, should = Math.min(100, (diffDays(s, sd) + 1) / tot * 100); if(p + 1e-6 < should - 100 / tot) late = true; } }
+      b.classList.toggle("late", late);
+    });
+    document.querySelectorAll(".g-slack").forEach(function(x){ x.remove(); });
+    if(state.showSlack) document.querySelectorAll(".g-bar[data-id]").forEach(function(b){ var t = byId(b.dataset.id), f = t && floatMap[t.id]; if(!t || !(f > 0) || t.inactive) return;
+      var s = parseD(t.start), e = parseD(taskEnd(t)); if(!s || !e) return; var pxd = b.offsetWidth / (diffDays(s, e) + 1), e2 = withCal(t, function(){ return addWorkdays(e, f); });
+      var w = diffDays(e, e2) * pxd; if(w < 2) return; var sl = document.createElement("div"); sl.className = "g-slack"; sl.title = L("slack") + ": " + f;
+      sl.style.left = (b.offsetLeft + b.offsetWidth) + "px"; sl.style.top = (b.offsetTop + b.offsetHeight / 2 - 1) + "px"; sl.style.width = w + "px"; b.parentNode.appendChild(sl); });
+  }
+  /* —— 日历视图 —— */
+  var calMonth = null;
+  function drawCal(){
+    var box = document.getElementById("calSheet"); if(!box || state.pane !== "cal") return;
+    if(!calMonth){ var f = state.tasks.filter(function(t){ return t.type !== "group" && t.start; }).map(function(t){ return t.start; }).sort()[0]; var b0 = f ? parseD(f) : new Date(); calMonth = new Date(b0.getFullYear(), b0.getMonth(), 1); }
+    var y = calMonth.getFullYear(), m = calMonth.getMonth(), first = new Date(y, m, 1), off = (first.getDay() + 6) % 7, gs = addDays(first, -off);
+    var ts = state.tasks.filter(function(t){ return t.type !== "group" && t.start; }), td = new Date(); td.setHours(0, 0, 0, 0);
+    var h = '<div class="cal-tb"><button class="cv-p">◀</button><b>' + (lang === "zh" ? y + " 年 " + (m + 1) + " 月" : first.toLocaleDateString(lang === "de" ? "de-DE" : "en-US", { year:"numeric", month:"long" })) + '</b><button class="cv-n">▶</button><button class="cv-t">' + L("today") + '</button></div>'
+      + '<div class="cal-g"><div class="cal-hd">' + L("wk").map(function(w){ return "<div>" + w + "</div>"; }).join("") + "</div>";
+    for(var w = 0; w < 6; w++){
+      var ws = addDays(gs, w * 7), we = addDays(ws, 6); if(w > 3 && ws.getMonth() !== m) break;
+      var items = ts.filter(function(t){ var a = parseD(t.start), b = parseD(taskEnd(t)); return a <= we && b >= ws; }).sort(function(a, b){ return a.start < b.start ? -1 : a.start > b.start ? 1 : 0; });
+      var lanes = [], placed = [];
+      items.forEach(function(t){ var a = parseD(t.start), b = parseD(taskEnd(t)), c1 = Math.max(0, diffDays(ws, a)), c2 = Math.min(6, diffDays(ws, b));
+        for(var li = 0; li < 8; li++){ lanes[li] = lanes[li] || []; if(lanes[li].every(function(x){ return c1 > x[1] || c2 < x[0]; })){ lanes[li].push([c1, c2]); placed.push({ t:t, c1:c1, c2:c2, l:li, cs:a < ws, ce:b > we }); return; } }
+        placed.push({ t:t, c1:c1, c2:c2, l:-1 }); });
+      var nl = Math.min(lanes.length, 5);
+      h += '<div class="cal-w" style="height:' + (26 + nl * 20 + 6) + 'px">';
+      for(var dd = 0; dd < 7; dd++){ var dt = addDays(ws, dd), cls = (dt.getMonth() !== m ? " out" : "") + (!isWorkday(dt) ? " off" : "") + (+dt === +td ? " tdy" : "");
+        var hid = placed.filter(function(p){ return (p.l < 0 || p.l >= 5) && p.c1 <= dd && p.c2 >= dd; }).length;
+        h += '<div class="cal-d' + cls + '" style="left:' + (dd / 7 * 100) + '%"><span class="cal-n">' + dt.getDate() + (holName(fmtD(dt)) ? ' <i>' + esc(holName(fmtD(dt))) + '</i>' : "") + "</span>" + (hid ? '<span class="cal-more">' + L("more", hid) + "</span>" : "") + "</div>"; }
+      placed.forEach(function(p){ if(p.l < 0 || p.l >= 5) return; var t = p.t, ms = t.type === "milestone";
+        h += '<div class="cal-it' + (ms ? " ms" : "") + (t.inactive ? " inact" : "") + '" data-id="' + t.id + '" title="' + esc(t.name + "  " + t.start + " → " + taskEnd(t)) + '" style="left:calc(' + (p.c1 / 7 * 100) + '% + 2px);width:calc(' + ((p.c2 - p.c1 + 1) / 7 * 100) + '% - 4px);top:' + (24 + p.l * 20) + 'px;' + (ms ? "color:" + tColor(t) : "background:" + tColor(t)) + '">' + (ms ? "◆ " : "") + esc(t.name) + (ms ? "" : " " + (+t.progress || 0) + "%") + "</div>"; });
+      h += "</div>";
+    }
+    box.innerHTML = h + "</div>";
+    box.querySelector(".cv-p").onclick = function(){ calMonth = new Date(y, m - 1, 1); drawCal(); };
+    box.querySelector(".cv-n").onclick = function(){ calMonth = new Date(y, m + 1, 1); drawCal(); };
+    box.querySelector(".cv-t").onclick = function(){ calMonth = new Date(td.getFullYear(), td.getMonth(), 1); drawCal(); };
+    box.querySelectorAll(".cal-it[data-id]").forEach(function(el){ el.addEventListener("dblclick", function(){ selId = el.dataset.id; openModal(el.dataset.id); }); el.addEventListener("click", function(){ selId = el.dataset.id; }); });
+  }
+  var _r = render; render = function(){ var x = _r.apply(this, arguments); try{ decorate(); drawTimeline(); drawCal(); }catch(e){ console.error(e); } return x; };
+  /* —— 快捷键 —— */
+  document.addEventListener("keydown", function(e){
+    var tg = e.target, tn = tg && tg.tagName; if(tn === "INPUT" || tn === "TEXTAREA" || tn === "SELECT" || (tg && tg.isContentEditable)) return;
+    if(document.querySelector(".modal-bg.show")) return;
+    if((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key || "").toLowerCase() === "f"){ var f = document.getElementById("fltTxt"); if(f){ e.preventDefault(); f.focus(); f.select(); } return; }
+    if(e.key === "F2" && e.shiftKey && selId){ e.preventDefault(); e.stopPropagation(); openModal(selId); }
+  }, true);
+  function setup(){
+    if(document.getElementById("msp2Bar")) return;
+    var host = document.getElementById("mspBar"); if(!host) return;
+    var bar = document.createElement("span"); bar.id = "msp2Bar";
+    bar.innerHTML = '<button type="button" class="m2-ot" title="' + L("onTrack") + '">✓</button>'
+      + '<select class="m2-mv" title="' + L("move") + '"><option value="">' + L("move") + ' ▾</option>' + ["1","5","20","-1","-5","-20"].map(function(k){ return '<option value="' + k + '">' + L("mv")[k] + "</option>"; }).join("") + '</select>'
+      + '<button type="button" class="m2-in" title="' + L("inact") + '">⊘</button><button type="button" class="m2-tl" title="' + L("tlAdd") + '">📅</button>';
+    host.appendChild(bar);
+    bar.querySelector(".m2-ot").onclick = markOnTrack; bar.querySelector(".m2-in").onclick = toggleInactive; bar.querySelector(".m2-tl").onclick = toggleTl;
+    bar.querySelector(".m2-mv").onchange = function(){ if(this.value) moveTasks(+this.value); this.value = ""; };
+    /* 显示 ▾：延迟任务 / 可宽延时间 / 日程表 */
+    var after = document.getElementById("ckProgLine"); after = after && after.closest("label");
+    if(after){ [["showLate","late"],["showSlack","slack"],["showTL","tl"]].reverse().forEach(function(o){ var lb = document.createElement("label"); lb.className = "ck";
+      lb.innerHTML = '<input type="checkbox"' + (state[o[0]] ? " checked" : "") + '><span>' + L(o[1]) + "</span>"; after.after(lb);
+      lb.querySelector("input").onchange = function(){ state[o[0]] = this.checked; save(); render(); }; }); }
+    /* 日程表条 */
+    var main = document.querySelector(".main"); if(main && !document.getElementById("v4Timeline")){ var tlb = document.createElement("div"); tlb.id = "v4Timeline"; main.parentNode.insertBefore(tlb, main); }
+    /* 日历视图 */
+    var pb = document.getElementById("paneBtns"); if(pb && !pb.querySelector('[data-pane="cal"]')){ var b = document.createElement("button"); b.dataset.pane = "cal"; b.textContent = L("cal");
+      var g = pb.querySelector('[data-pane="gantt"]'); g.after(b); b.addEventListener("click", function(){ state.pane = "cal"; render(); }); }
+    if(main && !document.getElementById("calSheet")){ var cs = document.createElement("div"); cs.className = "res-sheet"; cs.id = "calSheet"; main.appendChild(cs); }
+    /* Ctrl+滚轮缩放甘特图 */
+    var gb = document.getElementById("ganttBody"); if(gb) gb.addEventListener("wheel", function(e){ if(!(e.ctrlKey || e.metaKey) || !window.__v4Msp) return; e.preventDefault(); window.__v4Msp.zoom(e.deltaY < 0 ? -1 : 1); }, { passive:false });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Msp2 = { toggleInactive:toggleInactive, markOnTrack:markOnTrack, moveTasks:moveTasks, toggleTl:toggleTl };
+})();
+/* ===== v4：格式刷（与 Office / MS Project 一致：单击刷一次，双击连续刷，Esc 退出）——复制任务的文本样式和条形颜色 ===== */
+(function(){
+  var TX = { zh:{ tip:"格式刷：单击刷一次，双击可连续刷（Esc 退出）", need:"请先选中要复制格式的任务", on:"格式刷：点击要套用格式的任务行或条形", sticky:"格式刷（连续）：依次点击任务，Esc 退出", off:"已退出格式刷" },
+    en:{ tip:"Format Painter: click to paint once, double-click to keep painting (Esc to stop)", need:"Select the task to copy formatting from", on:"Format Painter: click a task row or bar", sticky:"Format Painter (sticky): click tasks, Esc to stop", off:"Format Painter off" },
+    de:{ tip:"Format übertragen: Klick = einmal, Doppelklick = mehrfach (Esc beendet)", need:"Bitte zuerst Quellvorgang wählen", on:"Format übertragen: Vorgang anklicken", sticky:"Format übertragen (mehrfach): Esc beendet", off:"Format übertragen beendet" } };
+  function L(k){ return (TX[lang] || TX.zh)[k]; }
+  var fp = null; /* { ts, color, sticky } */
+  function btn(){ return document.querySelector("#fmtBar .fm-p"); }
+  function stop(msg){ fp = null; document.body.classList.remove("fp-on"); var b = btn(); if(b) b.classList.remove("on"); if(msg) toast(L("off")); }
+  function start(sticky){ var t = selId ? byId(selId) : null; if(!t){ toast(L("need")); return; }
+    fp = { ts:t.ts ? JSON.parse(JSON.stringify(t.ts)) : null, color:t.color || "", type:t.type, sticky:!!sticky };
+    document.body.classList.add("fp-on"); var b = btn(); if(b) b.classList.add("on"); toast(L(sticky ? "sticky" : "on")); }
+  function paint(id){ var t = byId(id); if(!t || !fp) return;
+    if(fp.ts) t.ts = JSON.parse(JSON.stringify(fp.ts)); else delete t.ts;
+    if((fp.type === "group") === (t.type === "group") && (fp.type === "milestone") === (t.type === "milestone")) t.color = fp.color; /* 颜色只在同类之间套用（任务条/里程碑/摘要） */
+    selId = id; if(!fp.sticky) stop(false); save(); render(); }
+  document.addEventListener("click", function(e){
+    if(!fp || fp._skipClick) return; var SEL = "#taskList .trow[data-id], .g-bar[data-id], .g-ms[data-id], .cal-it[data-id]", el = e.target.closest && e.target.closest(SEL);
+    if(!el && document.elementsFromPoint) el = document.elementsFromPoint(e.clientX, e.clientY).map(function(x){ return x.closest && x.closest(SEL); }).filter(Boolean)[0] || null;
+    if(!el){ if(!(e.target.closest && e.target.closest("#fmtBar"))) stop(true); return; }
+    e.stopPropagation(); e.preventDefault(); paint(el.dataset.id);
+  }, true);
+  /* 甘特条有拖动处理（按下即重绘），在 pointerdown 阶段直接套用，避免拖动 */
+  ["pointerdown","mousedown"].forEach(function(ev){ document.addEventListener(ev, function(e){ if(!fp) return; var el = e.target.closest && e.target.closest(".g-bar[data-id], .g-ms[data-id]"); if(!el) return;
+    e.stopPropagation(); e.preventDefault(); if(ev === "pointerdown"){ fp._skipClick = 1; paint(el.dataset.id); } }, true); });
+  document.addEventListener("click", function(e){ if(fp && fp._skipClick){ fp._skipClick = 0; e.stopPropagation(); } }, true);
+  document.addEventListener("keydown", function(e){ if(fp && e.key === "Escape"){ e.stopPropagation(); stop(true); } }, true);
+  function setup(){
+    var bar = document.getElementById("fmtBar"); if(!bar || bar.querySelector(".fm-p")) return;
+    var b = document.createElement("button"); b.type = "button"; b.className = "fm-p"; b.title = L("tip"); b.textContent = "🖌";
+    bar.insertBefore(b, bar.firstChild);
+    var clk = null;
+    b.addEventListener("click", function(){ if(fp){ stop(true); return; } clearTimeout(clk); clk = setTimeout(function(){ start(false); }, 220); });
+    b.addEventListener("dblclick", function(){ clearTimeout(clk); if(fp) stop(false); start(true); });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4FP = { start:start, stop:stop };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
