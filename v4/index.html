@@ -2802,6 +2802,7 @@ function renderExportCanvas(cb){
 }
 /* ===== v4：MS Project 打印样式导出（A3 横向一页：左表格 + 右时间轴甘特 + 页脚图例）===== */
 function drawMspExport(cb, plan, imgL){
+  var COL = plan.colors || (typeof expColors === "function" ? expColors() : { task:"#8fb4e3", ms:"#dc2626", sum:"#111", prog:"#1f4e8c" });
   var vis = visibleTasks(), rn = rowNoMap(), zh = lang === "zh";
   var L = { id:"ID", name:tr("cName"), dur:tr("cDur"), start:tr("cStart"), fin:zh ? "完成" : (lang === "de" ? "Ende" : "Finish"),
     upd:zh ? "更新日期" : (lang === "de" ? "Aktualisiert" : "Update"), cr:tr("expCreator"),
@@ -2885,20 +2886,20 @@ function drawMspExport(cb, plan, imgL){
     if(!sp.s) return;
     var bx = X(sp.s), bx2 = X(addDays(sp.e, 1)), lf = expFont(10, true);
     if(grp){ /* 摘要：黑色细条 + 两端下勾 */
-      ctx.fillStyle = "#111"; ctx.fillRect(bx, cy - 3, Math.max(bx2 - bx, 2), 3);
+      ctx.fillStyle = COL.sum; ctx.fillRect(bx, cy - 3, Math.max(bx2 - bx, 2), 3);
       ctx.beginPath(); ctx.moveTo(bx, cy - 3); ctx.lineTo(bx + 4, cy - 3); ctx.lineTo(bx, cy + 4); ctx.closePath(); ctx.fill();
       ctx.beginPath(); ctx.moveTo(bx2, cy - 3); ctx.lineTo(bx2 - 4, cy - 3); ctx.lineTo(bx2, cy + 4); ctx.closePath(); ctx.fill();
       nameLbl(t.name, bx - 6, cy, lf, bx2 + 6);
     } else if(t.type === "milestone"){
       var mx = X(sp.s);
-      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = "#dc2626"; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); /* 与图例一致：里程碑统一红色 */
+      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = COL.ms; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); /* 与图例一致：里程碑统一红色 */
       var dt = fmtD(sp.s); ctx.font = expFont(10, true); var dw = ctx.measureText(dt).width;
       nameLbl(t.name, mx - 9, cy, lf, mx + 9 + dw + 8);
       txt(dt, mx + 9, cy, expFont(10, true), "#111", "left");
     } else {
       var bh = Math.max(6, Math.min(10, ROW - 8)), bw = Math.max(bx2 - bx, 2);
-      ctx.fillStyle = "#8fb4e3"; ctx.fillRect(bx, cy - bh / 2, bw, bh);
-      if(+t.progress > 0){ ctx.fillStyle = "#1f4e8c"; ctx.fillRect(bx, cy - 1.5, bw * Math.min(100, +t.progress) / 100, 3); }
+      ctx.fillStyle = COL.task; ctx.fillRect(bx, cy - bh / 2, bw, bh);
+      if(+t.progress > 0){ ctx.fillStyle = COL.prog; ctx.fillRect(bx, cy - 1.5, bw * Math.min(100, +t.progress) / 100, 3); }
       var de = fmtD(sp.e); ctx.font = expFont(10, true); var dw2 = ctx.measureText(de).width;
       nameLbl(t.name, bx - 6, cy, lf, bx2 + 5 + dw2 + 8);
       txt(de, bx2 + 5, cy, expFont(10, true), "#111", "left");
@@ -2917,10 +2918,10 @@ function drawMspExport(cb, plan, imgL){
   txt(L.upd + ": " + fmtD(new Date()), X0 + 10, fy + 14, expFont(11, false), "#111");
   if(creator) txt(L.cr + ": " + creator, X0 + 10, fy + 34, expFont(11, false), "#111");
   var lx = X0 + 260; line(lx, FY, lx, FY + FOOT, "#9ca3af");
-  var lg = [ ["task", function(x, y){ ctx.fillStyle = "#8fb4e3"; ctx.fillRect(x, y - 4, 40, 8); }],
-    ["sum", function(x, y){ ctx.fillStyle = "#111"; ctx.fillRect(x, y - 2, 40, 3); ctx.fillRect(x, y - 2, 2, 7); ctx.fillRect(x + 38, y - 2, 2, 7); }],
-    ["ms", function(x, y){ ctx.save(); ctx.translate(x + 20, y); ctx.rotate(Math.PI / 4); ctx.fillStyle = "#dc2626"; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); }],
-    ["prog", function(x, y){ ctx.fillStyle = "#1f4e8c"; ctx.fillRect(x, y - 1.5, 40, 3); }],
+  var lg = [ ["task", function(x, y){ ctx.fillStyle = COL.task; ctx.fillRect(x, y - 4, 40, 8); }],
+    ["sum", function(x, y){ ctx.fillStyle = COL.sum; ctx.fillRect(x, y - 2, 40, 3); ctx.fillRect(x, y - 2, 2, 7); ctx.fillRect(x + 38, y - 2, 2, 7); }],
+    ["ms", function(x, y){ ctx.save(); ctx.translate(x + 20, y); ctx.rotate(Math.PI / 4); ctx.fillStyle = COL.ms; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); }],
+    ["prog", function(x, y){ ctx.fillStyle = COL.prog; ctx.fillRect(x, y - 1.5, 40, 3); }],
     ["today", function(x, y){ ctx.setLineDash([4, 3]); line(x + 20, y - 8, x + 20, y + 8, "#16a34a", 1.2); ctx.setLineDash([]); }] ];
   lg.forEach(function(it, k){ var col = k % 3, row = Math.floor(k / 3), x = lx + 20 + col * 200, y = fy + 14 + row * 22; txt(L[it[0]], x, y, expFont(11, false), "#111"); it[1](x + 90, y); });
   ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
@@ -4553,8 +4554,10 @@ I18N.zh.ddImp = "导入"; I18N.en.ddImp = "Import"; I18N.de.ddImp = "Import";
 /* ===== v4：项目名称 + 导出信息（制作者 / Logo），存于 state.info（title / author / logo） ===== */
 function v4ExpPlan(){
   var I = state.info || {};
-  return { projectName:I.title || '', creatorName:I.author || '', ckShowCreator:true, ckShowDate:true, logoLeft:I.logo || '' };
+  return { projectName:I.title || '', creatorName:I.author || '', ckShowCreator:true, ckShowDate:true, logoLeft:I.logo || '', colors:expColors() };
 }
+var EXP_COL_DEF = { task:"#8fb4e3", ms:"#dc2626", sum:"#111111", prog:"#1f4e8c" };
+function expColors(){ var c = (state.info && state.info.expColors) || {}, r = {}; for(var k in EXP_COL_DEF) r[k] = /^#[0-9a-f]{6}$/i.test(c[k] || "") ? c[k] : EXP_COL_DEF[k]; return r; }
 (function(){
   function syncName(){ var el = document.getElementById("projName"); if(el && document.activeElement !== el) el.value = (state.info && state.info.title) || ""; }
   function migOemNames(){ var mig = 0;
@@ -4576,8 +4579,11 @@ function v4ExpPlan(){
     var bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "expInfoBg";
     bg.innerHTML = '<div class="modal" style="width:440px"><div class="modal-h"><span>导出信息</span><button class="ei-x">×</button></div><div class="modal-b">'
       + '<label class="ei-row">项目名称（导出标题 / 文件名）<input type="text" class="ei-name"></label>'
-      + '<label class="ei-row">制作者（导出图右下角）<input type="text" class="ei-cr" placeholder="如：张三"></label>'
+      + '<label class="ei-row">制作者（导出图左下角）<input type="text" class="ei-cr" placeholder="如：张三"></label>'
       + '<div class="ei-row">Logo（导出图左上角）<div class="ei-logo"><img class="ei-img"><button class="ei-up">上传图片</button><button class="ei-clr">清除</button><input type="file" accept="image/*" class="ei-file" style="display:none"></div></div>'
+      + '<div class="ei-row">导出颜色<div class="ei-cols" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:4px">'
+      + [["task","任务条"],["ms","里程碑"],["sum","摘要"],["prog","进度"]].map(function(p){ return '<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="color" class="ei-c" data-k="' + p[0] + '" style="width:30px;height:22px;padding:0;border:1px solid #d1d5db">' + p[1] + '</label>'; }).join("")
+      + '<button class="ei-cdef" style="font-size:11px">恢复默认</button></div></div>'
       + '<div style="font-size:11px;color:#6b7280;margin-bottom:12px">日期自动取导出当天；文件名默认为「项目名称_日期」。</div>'
       + '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="ei-cancel">取消</button><button class="primary ei-ok">确定</button></div></div></div>';
     document.body.appendChild(bg);
@@ -4585,6 +4591,9 @@ function v4ExpPlan(){
     q(".ei-name").value = I.title || ""; q(".ei-cr").value = I.author || "";
     function showLogo(){ var im = q(".ei-img"); if(logo){ im.src = logo; im.style.display = ""; q(".ei-clr").style.display = ""; } else { im.removeAttribute("src"); im.style.display = "none"; q(".ei-clr").style.display = "none"; } }
     showLogo();
+    var cols = expColors();
+    bg.querySelectorAll(".ei-c").forEach(function(inp){ inp.value = cols[inp.dataset.k]; });
+    q(".ei-cdef").onclick = function(){ bg.querySelectorAll(".ei-c").forEach(function(inp){ inp.value = EXP_COL_DEF[inp.dataset.k]; }); };
     q(".ei-up").onclick = function(){ q(".ei-file").click(); };
     q(".ei-clr").onclick = function(){ logo = ""; showLogo(); };
     q(".ei-file").onchange = function(){
@@ -4608,6 +4617,7 @@ function v4ExpPlan(){
     q(".ei-ok").onclick = function(){
       I.title = q(".ei-name").value.trim(); I.author = q(".ei-cr").value.trim();
       if(logo) I.logo = logo; else delete I.logo;
+      var ec = {}; bg.querySelectorAll(".ei-c").forEach(function(inp){ ec[inp.dataset.k] = inp.value; }); I.expColors = ec;
       save(); syncName(); close(); toast("已保存导出信息");
     };
     setTimeout(function(){ q(".ei-cr").focus(); }, 0);
