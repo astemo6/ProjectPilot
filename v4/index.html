@@ -35,7 +35,6 @@ header button:hover{background:var(--steel3)}
 .toolbar .dd.open>.dd-b{border-color:var(--accent);color:var(--accent);background:#eff6ff}
 .toolbar .dd-m{display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.14);padding:6px;z-index:300;min-width:190px;flex-direction:column;gap:4px}
 .toolbar .dd.open>.dd-m{display:flex}
-.toolbar #ddExp>.dd-m,.toolbar #ddImp>.dd-m{left:auto;right:0}
 .toolbar .dd-m>button{text-align:left;width:100%;border-color:transparent}
 .toolbar .dd-m>button:hover{background:#f1f5f9;border-color:transparent}
 .toolbar .dd-m .ck{padding:4px 6px}
@@ -4387,7 +4386,10 @@ I18N.zh.netLinkDup = "这两个任务已经有链接了"; I18N.en.netLinkDup = "
   function closeAll(except){ document.querySelectorAll(".toolbar .dd.open").forEach(function(d){ if(d !== except) d.classList.remove("open"); }); }
   document.addEventListener("click", function(e){
     var b = e.target.closest && e.target.closest(".toolbar .dd-b");
-    if(b){ var d = b.parentNode; closeAll(d); d.classList.toggle("open"); e.preventDefault(); return; }
+    if(b){ var d = b.parentNode; closeAll(d); d.classList.toggle("open");
+      var m = d.querySelector(".dd-m"); if(m){ m.style.left = ""; m.style.right = ""; /* 菜单靠左展开，超出右边缘时改为右对齐，避免被裁 */
+        if(d.classList.contains("open")){ var r = m.getBoundingClientRect(); if(r.right > window.innerWidth - 4){ m.style.left = "auto"; m.style.right = "0"; } if(m.getBoundingClientRect().left < 4){ m.style.left = "0"; m.style.right = "auto"; } } }
+      e.preventDefault(); return; }
     var m = e.target.closest && e.target.closest(".toolbar .dd-m");
     if(m){ if(e.target.closest("button")) setTimeout(function(){ closeAll(); }, 0); return; }
     closeAll();
