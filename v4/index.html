@@ -2798,7 +2798,133 @@ function renderExportCanvas(cb){
   plan = v4ExpPlan();
   plan = plan || {};
   function loadImg(src, done){ if(!src){ done(null); return; } var im = new Image(); im.onload = function(){ done(im); }; im.onerror = function(){ done(null); }; im.src = src; }
-  loadImg(plan.logoLeft, function(imgL){ loadImg(plan.logoRight, function(imgR){ drawPlanStyleExport(cb, plan, imgL, imgR); }); });
+  loadImg(plan.logoLeft, function(imgL){ drawMspExport(cb, plan, imgL); }); /* v4：MS Project 打印样式 */
+}
+/* ===== v4：MS Project 打印样式导出（A3 横向一页：左表格 + 右时间轴甘特 + 页脚图例）===== */
+function drawMspExport(cb, plan, imgL){
+  var vis = visibleTasks(), rn = rowNoMap(), zh = lang === "zh";
+  var L = { id:"ID", name:tr("cName"), dur:tr("cDur"), start:tr("cStart"), fin:zh ? "完成" : (lang === "de" ? "Ende" : "Finish"),
+    upd:zh ? "更新日期" : (lang === "de" ? "Aktualisiert" : "Update"), cr:tr("expCreator"),
+    task:tr("legendTask"), ms:zh ? "里程碑" : (lang === "de" ? "Meilenstein" : "Milestone"), sum:zh ? "摘要" : (lang === "de" ? "Sammelvorgang" : "Summary"),
+    prog:zh ? "进度" : (lang === "de" ? "Fortschritt" : "Progress"), today:zh ? "今天" : (lang === "de" ? "Heute" : "Today"),
+    day:zh ? "天" : (lang === "de" ? " T" : " days"), q:zh ? "季度" : "Q" };
+  function span(t){ if(t.type === "group"){ var g = grpSpan(t); return { s:parseD(g.s), e:parseD(g.e) }; } return { s:parseD(t.start), e:parseD(taskEnd(t)) }; }
+  function durTxt(t){ var sp = span(t); if(!sp.s) return ""; if(t.type === "milestone") return "0" + L.day;
+    if(t.type === "group"){ var n = 0, d = new Date(sp.s); while(d <= sp.e && n < 5000){ if(isWorkday(d)) n++; d = addDays(d, 1); } return n + L.day; }
+    return fmtDur(t) + (HM() ? "" : L.day); }
+  var R0 = dateRange(), min = new Date(R0.min.getFullYear(), R0.min.getMonth(), 1), max = new Date(R0.max.getFullYear(), R0.max.getMonth() + 1, 1);
+  if(diffDays(min, max) < 90) max = new Date(min.getFullYear(), min.getMonth() + 3, 1);
+  /* 右侧给末尾标注留白（约 12%） */
+  var _ex = Math.ceil(diffDays(min, max) * 0.12 / 30); max = new Date(max.getFullYear(), max.getMonth() + Math.max(1, _ex), 1);
+  var mc = document.createElement("canvas").getContext("2d");
+  function tw(t, f){ mc.font = f; return mc.measureText(String(t)).width; }
+  var FS = 11, FONT = expFont(FS, false), FONTB = expFont(FS, true);
+  /* 页面：A3 横向比例；行多时加高 */
+  var W = 1684, PAD = 18, HEAD = 64, THEAD = 34, FOOT = 62;
+  var nameW = 160; vis.forEach(function(t){ nameW = Math.max(nameW, tw(t.name, t.type === "group" ? FONTB : FONT) + 14 + depthOf(t) * 12); }); nameW = Math.min(nameW, 340);
+  var cols = [ ["id", 34, "center"], ["name", nameW, "left"], ["dur", 66, "left"], ["start", 84, "left"], ["fin", 84, "left"] ];
+  var TBW = cols.reduce(function(a, c){ return a + c[1]; }, 0);
+  var H0 = Math.round(W / 1.414), bodyAvail = H0 - PAD * 2 - HEAD - THEAD - FOOT;
+  var ROW = Math.max(16, Math.min(24, Math.floor(bodyAvail / Math.max(vis.length, 1))));
+  var H = Math.max(H0, PAD * 2 + HEAD + THEAD + FOOT + ROW * vis.length);
+  var X0 = PAD, Y0 = PAD, IW = W - PAD * 2;
+  var CX = X0 + TBW, CW = X0 + IW - CX, TY = Y0 + HEAD, BY = TY + THEAD, FY = BY + ROW * vis.length;
+  if(FY < H - PAD - FOOT) FY = H - PAD - FOOT;
+  var days = Math.max(diffDays(min, max), 1), pxDay = CW / days;
+  function X(d){ return CX + diffDays(min, d) * pxDay; }
+  var scale = exportScale(W, H), c = document.createElement("canvas");
+  c.width = Math.round(W * scale); c.height = Math.round(H * scale);
+  var ctx = c.getContext("2d"); ctx.scale(scale, scale);
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
+  function line(x1, y1, x2, y2, col, w){ ctx.strokeStyle = col; ctx.lineWidth = w || 1; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+  function txt(s, x, y, f, col, al){ ctx.font = f; ctx.fillStyle = col || "#111"; ctx.textAlign = al || "left"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y); }
+  function nameLbl(s, x, cy, f, xr){ ctx.font = f; var w = ctx.measureText(s).width; if(x - w > CX + 4) txt(s, x, cy, f, "#111", "right"); else txt(s, xr, cy, f, "#111", "left"); }
+  function clip(s, w, f){ s = String(s); ctx.font = f; if(ctx.measureText(s).width <= w) return s; while(s.length > 1 && ctx.measureText(s + "…").width > w) s = s.slice(0, -1); return s + "…"; }
+  /* ---- 页眉：左 Logo，中间项目名称 ---- */
+  if(imgL && imgL.naturalWidth){ var s1 = Math.min(44 / imgL.naturalHeight, 200 / imgL.naturalWidth); ctx.drawImage(imgL, X0 + 8, Y0 + (HEAD - imgL.naturalHeight * s1) / 2, imgL.naturalWidth * s1, imgL.naturalHeight * s1); }
+  var title = (plan.projectName || "").trim() || tr("appTitle");
+  txt(title, X0 + IW / 2, Y0 + HEAD / 2, expFont(20, true), "#111", "center");
+  /* ---- 表头 ---- */
+  ctx.fillStyle = "#f3f4f6"; ctx.fillRect(X0, TY, IW, THEAD);
+  var cx = X0;
+  cols.forEach(function(cl){ txt(L[cl[0]], cl[2] === "center" ? cx + cl[1] / 2 : cx + 5, TY + THEAD / 2, FONTB, "#111", cl[2]); cx += cl[1]; });
+  /* 时间刻度：上层 季度/年，下层 月/季度 */
+  var pxMonth = pxDay * 30.4, monthTier = pxMonth >= 20;
+  var mid = TY + THEAD / 2;
+  line(CX, mid, X0 + IW, mid, "#9ca3af");
+  for(var d = new Date(min); d < max; ){
+    var nx = monthTier ? new Date(d.getFullYear(), d.getMonth() + 1, 1) : new Date(d.getFullYear(), d.getMonth() + 3 - d.getMonth() % 3, 1);
+    if(nx > max) nx = max;
+    var x1 = X(d), x2 = X(nx);
+    var lb = monthTier ? (zh ? (d.getMonth() + 1) + "月" : ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]) : "Q" + (Math.floor(d.getMonth() / 3) + 1);
+    if(x2 - x1 > tw(lb, expFont(10, false)) + 4) txt(lb, (x1 + x2) / 2, mid + THEAD / 4, expFont(10, false), "#374151", "center");
+    line(x1, mid, x1, mid + THEAD / 2, "#d1d5db");
+    line(x1, BY, x1, FY, "#eef0f3");
+    d = nx;
+  }
+  for(var d2 = new Date(min); d2 < max; ){
+    var nx2 = monthTier ? new Date(d2.getFullYear(), d2.getMonth() + 3 - d2.getMonth() % 3, 1) : new Date(d2.getFullYear() + 1, 0, 1);
+    if(nx2 > max) nx2 = max;
+    var a1 = X(d2), a2 = X(nx2);
+    var lb2 = monthTier ? d2.getFullYear() + " Q" + (Math.floor(d2.getMonth() / 3) + 1) : String(d2.getFullYear());
+    ctx.save(); ctx.beginPath(); ctx.rect(a1, TY, a2 - a1, THEAD / 2); ctx.clip(); txt(lb2, a1 + 4, TY + THEAD / 4, expFont(10, true), "#111"); ctx.restore();
+    line(a1, TY, a1, TY + THEAD / 2, "#9ca3af"); line(a1, BY, a1, FY, "#d1d5db");
+    d2 = nx2;
+  }
+  /* ---- 表体 ---- */
+  vis.forEach(function(t, i){
+    var y = BY + i * ROW, cy = y + ROW / 2, grp = t.type === "group", f = grp ? FONTB : FONT, sp = span(t);
+    var vals = { id:grp ? "" : (rn[t.id] || ""), name:t.name, dur:durTxt(t), start:sp.s ? fmtD(sp.s) : "", fin:sp.e ? fmtD(sp.e) : "" };
+    var x = X0;
+    cols.forEach(function(cl){
+      var pad = cl[0] === "name" ? 5 + depthOf(t) * 12 : 5;
+      txt(clip(vals[cl[0]], cl[1] - pad - 4, f), cl[2] === "center" ? x + cl[1] / 2 : x + pad, cy, f, grp ? "#111" : "#1f2937", cl[2]);
+      x += cl[1];
+    });
+    line(X0, y + ROW, CX, y + ROW, "#e5e7eb");
+    if(!sp.s) return;
+    var bx = X(sp.s), bx2 = X(addDays(sp.e, 1)), lf = expFont(10, true);
+    if(grp){ /* 摘要：黑色细条 + 两端下勾 */
+      ctx.fillStyle = "#111"; ctx.fillRect(bx, cy - 3, Math.max(bx2 - bx, 2), 3);
+      ctx.beginPath(); ctx.moveTo(bx, cy - 3); ctx.lineTo(bx + 4, cy - 3); ctx.lineTo(bx, cy + 4); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(bx2, cy - 3); ctx.lineTo(bx2 - 4, cy - 3); ctx.lineTo(bx2, cy + 4); ctx.closePath(); ctx.fill();
+      nameLbl(t.name, bx - 6, cy, lf, bx2 + 6);
+    } else if(t.type === "milestone"){
+      var mx = X(sp.s);
+      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = t.color || "#dc2626"; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore();
+      var dt = fmtD(sp.s); ctx.font = expFont(10, true); var dw = ctx.measureText(dt).width;
+      nameLbl(t.name, mx - 9, cy, lf, mx + 9 + dw + 8);
+      txt(dt, mx + 9, cy, expFont(10, true), "#111", "left");
+    } else {
+      var bh = Math.max(6, Math.min(10, ROW - 8)), bw = Math.max(bx2 - bx, 2);
+      ctx.fillStyle = "#8fb4e3"; ctx.fillRect(bx, cy - bh / 2, bw, bh);
+      if(+t.progress > 0){ ctx.fillStyle = "#1f4e8c"; ctx.fillRect(bx, cy - 1.5, bw * Math.min(100, +t.progress) / 100, 3); }
+      var de = fmtD(sp.e); ctx.font = expFont(10, true); var dw2 = ctx.measureText(de).width;
+      nameLbl(t.name, bx - 6, cy, lf, bx2 + 5 + dw2 + 8);
+      txt(de, bx2 + 5, cy, expFont(10, true), "#111", "left");
+    }
+  });
+  /* 今天线 */
+  var td = new Date(); td.setHours(0, 0, 0, 0);
+  if(td >= min && td <= max){ ctx.setLineDash([4, 3]); line(X(td), BY, X(td), FY, "#16a34a", 1.2); ctx.setLineDash([]); }
+  /* ---- 网格外框 ---- */
+  ctx.strokeStyle = "#111"; ctx.lineWidth = 1.2; ctx.strokeRect(X0, Y0, IW, FY - Y0 + FOOT);
+  line(X0, TY, X0 + IW, TY, "#111", 1); line(X0, BY, X0 + IW, BY, "#111", 1); line(X0, FY, X0 + IW, FY, "#111", 1);
+  cx = X0; cols.forEach(function(cl, k){ if(k) line(cx, TY, cx, FY, "#9ca3af"); cx += cl[1]; });
+  line(CX, TY, CX, FY, "#111", 1);
+  /* ---- 页脚：左 更新日期 / 制作者；右 图例 ---- */
+  var fy = FY + 6, creator = String(plan.creatorName || "").trim();
+  txt(L.upd + ": " + fmtD(new Date()), X0 + 10, fy + 14, expFont(11, false), "#111");
+  if(creator) txt(L.cr + ": " + creator, X0 + 10, fy + 34, expFont(11, false), "#111");
+  var lx = X0 + 260; line(lx, FY, lx, FY + FOOT, "#9ca3af");
+  var lg = [ ["task", function(x, y){ ctx.fillStyle = "#8fb4e3"; ctx.fillRect(x, y - 4, 40, 8); }],
+    ["sum", function(x, y){ ctx.fillStyle = "#111"; ctx.fillRect(x, y - 2, 40, 3); ctx.fillRect(x, y - 2, 2, 7); ctx.fillRect(x + 38, y - 2, 2, 7); }],
+    ["ms", function(x, y){ ctx.save(); ctx.translate(x + 20, y); ctx.rotate(Math.PI / 4); ctx.fillStyle = "#dc2626"; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); }],
+    ["prog", function(x, y){ ctx.fillStyle = "#1f4e8c"; ctx.fillRect(x, y - 1.5, 40, 3); }],
+    ["today", function(x, y){ ctx.setLineDash([4, 3]); line(x + 20, y - 8, x + 20, y + 8, "#16a34a", 1.2); ctx.setLineDash([]); }] ];
+  lg.forEach(function(it, k){ var col = k % 3, row = Math.floor(k / 3), x = lx + 20 + col * 200, y = fy + 14 + row * 22; txt(L[it[0]], x, y, expFont(11, false), "#111"); it[1](x + 90, y); });
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  cb(c, W, H);
 }
 function drawPlanStyleExport(cb, plan, imgL, imgR){
   var vis = visibleTasks();
