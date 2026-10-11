@@ -297,7 +297,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <button id="btnTPL" data-i18n="tplBtn" style="display:none">模板</button>
   <span class="sep"></span>
   <div class="viewbtns" id="paneBtns">
-    <button data-pane="gantt" class="on" data-i18n="paneGantt">甘特图</button><button data-pane="res" data-i18n="paneRes">资源工作表</button><button data-pane="evm" data-i18n="paneEvm">跟踪 / 挣值</button><button data-pane="net" data-i18n="paneNet">网络图</button><button data-pane="use" data-i18n="paneUse">资源使用</button>
+    <button data-pane="gantt" class="on" data-i18n="paneGantt">甘特图</button><button data-pane="res" data-i18n="paneRes">资源工作表</button><button data-pane="evm" data-i18n="paneEvm">跟踪 / 挣值</button><button data-pane="net" data-i18n="paneNet">网络图</button><button data-pane="use" data-i18n="paneUse">资源使用</button><button data-pane="tuse" data-i18n="paneTuse">任务分配状况</button><button data-pane="hist" data-i18n="paneHist">资源图表</button><button data-pane="wbs" data-i18n="paneWbs">WBS 图</button><button data-pane="rep" data-i18n="paneRep">报表</button>
   </div>
   <div class="viewbtns">
     <button data-view="day" class="on" data-i18n="vDay">日</button><button data-view="week" data-i18n="vWeek">周</button><button data-view="month" data-i18n="vMonth">月</button>
@@ -311,6 +311,9 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <select id="baseSel" title="基线" style="height:28px"></select><button id="btnBaseline" data-i18n="saveBaseline">保存基线</button><button id="btnClearBase" data-i18n="clearBase">清除</button>
   <label class="ck"><input type="checkbox" id="ckBaseline"><span data-i18n="showBaseline">基线对比</span></label>
   <label class="ck"><input type="checkbox" id="ckResWarn" checked><span data-i18n="resWarn">资源预警</span></label>
+  <label class="ck"><input type="checkbox" id="ckProgLine"><span data-i18n="progLine">进度线</span></label>
+  <span class="sep"></span>
+  <select id="fltSel" style="height:28px"></select><select id="sortSel" style="height:28px"></select><input id="fltTxt" data-i18n-ph="fltSearch" placeholder="搜索名称/资源" style="height:26px;width:120px">
   <span class="sep"></span>
   <label class="ck"><span data-i18n="unitLbl">排程单位</span> <select id="unitSel" style="height:28px"><option value="day" data-i18n="unitDay">按天</option><option value="hour" data-i18n="unitHour">按小时</option></select></label>
   <button id="btnCal" data-i18n="workCal">工作日历</button>
@@ -331,6 +334,10 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <button id="btnExpXML" data-i18n="expXml">导出 XML</button>
   <button id="btnImpXML" data-i18n="impXml">导入 XML</button>
   <input type="file" id="fileXML" accept=".xml" style="display:none">
+  <button id="btnMPP" data-i18n="mppBtn">导入 MPP</button>
+  <input type="file" id="fileMPP" accept=".mpp,.mpt,.mpx,.pod,.planner,.gan,.xer,.pmxml" style="display:none">
+  <button id="btnSubProj" data-i18n="subBtn">插入子项目</button>
+  <input type="file" id="fileSub" accept=".json,.xml,.mpp,.mpt,.mpx" style="display:none">
 </div>
 <div class="cal-panel" id="calPanel" style="display:none">
   <h3 data-i18n="calTitle">工作日历 · 自然语言导入</h3>
@@ -353,6 +360,10 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <div class="res-sheet evm-sheet" id="evmSheet"></div>
   <div class="res-sheet" id="netSheet"></div>
   <div class="res-sheet" id="useSheet"></div>
+  <div class="res-sheet" id="tuseSheet"></div>
+  <div class="res-sheet" id="histSheet"></div>
+  <div class="res-sheet" id="wbsSheet"></div>
+  <div class="res-sheet" id="repSheet"></div>
   <datalist id="resDL"></datalist>
   <div class="table-pane">
     <div class="table-scroll">
@@ -1171,7 +1182,7 @@ function renderEVM(){
   var box = document.getElementById("evmSheet"); if(!box) return;
   if(state.pane !== "evm") return;
   var bmap = baselineMap(), sd = statusDate(), tot = { bac:0, pv:0, ev:0, ac:0, cost:0 };
-  var cols = ["evTask","cStartA","cFinishA","cProg","evFixed","evCost","evBAC","evPV","evEV","evAC","evSV","evCV","evSPI","evCPI"];
+  var cols = ["evTask","cStartA","cFinishA","cProg","actWork","remWork","actCost","evFixed","evCost","evBAC","evPV","evEV","evAC","evSV","evCV","evSPI","evCPI"];
   var h = '<div class="rs-tb"><label>' + esc(tr("statusDate")) + ' <input type="date" id="evStatus" value="' + fmtD(sd) + '"></label>'
     + (curBaseline() ? "" : '<span style="color:#b45309">' + esc(tr("evNoBase")) + "</span>") + '<span>' + esc(tr("evHint")) + '</span></div>'
     + '<table class="rs ev"><thead><tr><th>ID</th>' + cols.map(function(c){ return "<th>" + esc(tr(c)) + "</th>"; }).join("") + "</tr></thead><tbody>";
@@ -1184,12 +1195,13 @@ function renderEVM(){
     function num(x, neg){ return '<td class="ro"' + (neg && x < -0.005 ? ' style="color:#dc2626"' : "") + ">" + fmtMoney(x) + "</td>"; }
     function idx(x){ return '<td class="ro"' + (x != null && x < 0.995 ? ' style="color:#dc2626"' : "") + ">" + (x == null ? "—" : x.toFixed(2)) + "</td>"; }
     h += '<tr data-id="' + t.id + '"' + (isG ? ' class="grp"' : "") + '><td class="n">' + (isG ? "" : (rn[t.id] || "")) + '</td><td style="padding-left:' + pad + 'px">' + (isG ? "<b>" + esc(t.name) + "</b>" : esc(t.name)) + "</td>"
-      + (isG ? "<td></td><td></td><td></td>" : '<td><input type="date" data-f="actStart" value="' + (t.actStart || "") + '"></td><td><input type="date" data-f="actFinish" value="' + (t.actFinish || "") + '"></td><td><input class="num" data-f="progress" value="' + (+t.progress || 0) + '%"></td>')
+      + (isG ? "<td></td><td></td><td></td><td></td><td></td><td></td>" : '<td><input type="date" data-f="actStart" value="' + (t.actStart || "") + '"></td><td><input type="date" data-f="actFinish" value="' + (t.actFinish || "") + '"></td><td><input class="num" data-f="progress" value="' + (+t.progress || 0) + '%"></td>'
+        + (function(){ var w = taskWork(t), aw = t.actWork !== undefined && t.actWork !== "" ? +t.actWork : w * (+t.progress || 0) / 100; return '<td><input class="num" data-f="actWork" value="' + fmtWork(aw) + '"></td><td class="ro">' + fmtWork(Math.max(0, w - aw)) + '</td><td><input class="num" data-f="actCost" value="' + fmtMoney(v.ac) + '"></td>'; })())
       + '<td><input class="num" data-f="fixedCost" value="' + fmtMoney(t.fixedCost || 0) + '"></td>'
       + num(v.cost) + num(v.bac) + num(v.pv) + num(v.ev) + num(v.ac) + num(v.sv, 1) + num(v.cv, 1) + idx(v.spi) + idx(v.cpi) + "</tr>";
   });
   evmRatios(tot);
-  h += '<tr class="tot"><td></td><td><b>' + esc(tr("evTotal")) + "</b></td><td></td><td></td><td></td><td></td>"
+  h += '<tr class="tot"><td></td><td><b>' + esc(tr("evTotal")) + "</b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>"
     + [tot.cost, tot.bac, tot.pv, tot.ev, tot.ac, tot.sv, tot.cv].map(function(x){ return '<td class="ro"><b>' + fmtMoney(x) + "</b></td>"; }).join("")
     + '<td class="ro"><b>' + (tot.spi == null ? "—" : tot.spi.toFixed(2)) + '</b></td><td class="ro"><b>' + (tot.cpi == null ? "—" : tot.cpi.toFixed(2)) + "</b></td></tr></tbody></table>";
   box.innerHTML = h;
@@ -1202,10 +1214,14 @@ function renderEVM(){
 var RS_COLS = [
   { k:"name", i18n:"rsName", w:140 }, { k:"type", i18n:"rsType", w:70 }, { k:"matLabel", i18n:"rsMat", w:70 }, { k:"initials", i18n:"rsIni", w:60 },
   { k:"group", i18n:"rsGroup", w:90 }, { k:"maxUnits", i18n:"rsMax", w:70, num:1 }, { k:"rate", i18n:"rsRate", w:80, num:1 },
-  { k:"otRate", i18n:"rsOt", w:80, num:1 }, { k:"perUse", i18n:"rsPerUse", w:80, num:1 }
+  { k:"otRate", i18n:"rsOt", w:80, num:1 }, { k:"perUse", i18n:"rsPerUse", w:80, num:1 },
+  { k:"accrue", i18n:"rsAccrue", w:80 }, { k:"cal", i18n:"rsCal", w:90 }, { k:"vac", i18n:"rsVac", w:170 }, { k:"rates", i18n:"rsRates", w:140 }
 ];
 function renderBaseSel(){
   var us = document.getElementById("unitSel"); if(us) us.value = HM() ? "hour" : "day";
+  var fs = document.getElementById("fltSel"); if(fs) fs.innerHTML = ["all","crit","ms","inc","done","pro","late","un","over"].map(function(k){ return '<option value="' + k + '"' + ((state.flt || "all") === k ? " selected" : "") + ">" + esc(tr("flt" + k.charAt(0).toUpperCase() + k.slice(1))) + "</option>"; }).join("");
+  var so = document.getElementById("sortSel"); if(so) so.innerHTML = ["outline","start","end","dur","name","pri","cost"].map(function(k){ return '<option value="' + k + '"' + ((state.sortBy || "outline") === k ? " selected" : "") + ">" + esc(tr("sort" + k.charAt(0).toUpperCase() + k.slice(1))) + "</option>"; }).join("");
+  var pl = document.getElementById("ckProgLine"); if(pl) pl.checked = !!state.progLine;
   var sel = document.getElementById("baseSel"); if(!sel) return;
   var bi = +state.baseIdx || 0, h = "";
   for(var i = 0; i <= 10; i++){ var has = i ? !!(state.baselines || {})[i] : !!state.baseline; h += '<option value="' + i + '"' + (i === bi ? " selected" : "") + ">" + esc(tr("baseN").replace("{0}", i)) + (has ? " ✓" + ((state.baseDates || {})[i] ? " " + state.baseDates[i] : "") : "") + "</option>"; }
@@ -1234,6 +1250,9 @@ function renderResSheet(){
       else if(c.k === "maxUnits") h += '<td><input class="num" data-k="maxUnits" value="' + (r.type === "material" ? "" : (v == null ? 100 : v) + "%") + '"' + (r.type === "material" ? " disabled" : "") + "></td>";
       else if(c.k === "otRate" || c.k === "rate") h += '<td><input class="num" data-k="' + c.k + '" value="' + (+v || 0).toFixed(2) + (r.type === "material" ? "" : "/h") + '"></td>';
       else if(c.k === "perUse") h += '<td><input class="num" data-k="perUse" value="' + (+v || 0).toFixed(2) + '"></td>';
+      else if(c.k === "accrue") h += '<td><select data-k="accrue">' + [["pro","acPro"],["start","acStart"],["end","acEnd"]].map(function(x){ return '<option value="' + x[0] + '"' + ((v || "pro") === x[0] ? " selected" : "") + ">" + esc(tr(x[1])) + "</option>"; }).join("") + "</select></td>";
+      else if(c.k === "cal") h += r.type === "material" ? "<td></td>" : '<td><select data-k="cal">' + ["", "CN", "WE", "OFF"].map(function(x){ return '<option value="' + x + '"' + ((v || "") === x ? " selected" : "") + ">" + esc(x ? WORKCAL.LABEL[lang === "en" || lang === "de" ? lang : "zh"][x] : tr("projCal")) + "</option>"; }).join("") + "</select></td>";
+      else if(c.k === "vac" || c.k === "rates") h += '<td><input data-k="' + c.k + '" value="' + esc(v || "") + '" placeholder="' + esc(tr(c.k === "vac" ? "rsVacPh" : "rsRatesPh")) + '"' + (c.k === "vac" && r.type === "material" ? " disabled" : "") + "></td>";
       else if(c.k === "matLabel") h += '<td><input data-k="matLabel" value="' + esc(v || "") + '"' + (r.type === "material" ? "" : " disabled") + "></td>";
       else h += '<td' + (c.k === "name" ? ' class="nm"' : "") + '><input data-k="' + c.k + '" value="' + esc(v || "") + '"></td>';
     });
@@ -1355,7 +1374,7 @@ function levelResources(){
   var load = {}, done = {}, moved = 0, rn = rowNoMap();
   function cand(){
     return flatTasks().filter(function(t){ return !done[t.id] && t.type !== "milestone" && !t.manual && !parseD(t.actStart) && parseD(t.start); })
-      .sort(function(a, b){ return a.start < b.start ? -1 : a.start > b.start ? 1 : ((floatMap[a.id] || 0) - (floatMap[b.id] || 0)) || (rn[a.id] - rn[b.id]); });
+      .sort(function(a, b){ var pa = a.priority == null ? 500 : +a.priority, pb = b.priority == null ? 500 : +b.priority; if(pa !== pb) return pb - pa; return a.start < b.start ? -1 : a.start > b.start ? 1 : ((floatMap[a.id] || 0) - (floatMap[b.id] || 0)) || (rn[a.id] - rn[b.id]); });
   }
   function addLoad(t){ var days = taskDays(t); parseAsg(t.owner).forEach(function(a){ var r = resByName(a.name); if(r && r.type === "material") return; var L = load[a.name] = load[a.name] || {}; days.forEach(function(k){ L[k] = (L[k] || 0) + a.units; }); }); }
   /* 固定任务（手动/已开始/里程碑）先占用 */
@@ -1807,6 +1826,7 @@ function renderTable(){
       + (colVis("float") ? '<div class="c-float' + (crit ? " crit" : "") + '">' + fv + "</div>" : "")
       + (colVis("output") ? '<div class="c-output" title="' + esc(t.output || "") + '">' + (t.type === "group" ? "" : esc(t.output || "")) + "</div>" : "")
       + (colVis("remarks") ? '<div class="c-remarks" title="' + esc(t.remarks || "") + '">' + (t.type === "group" ? "" : esc(t.remarks || "")) + "</div>" : "")
+      + ["ttype","effort","priority","text1","text2","text3","num1","num2","num3"].map(function(k){ return colVis(k) ? '<div class="c-' + k + '">' + p6Cell(t, k) + "</div>" : ""; }).join("")
       + "</div>";
   });
   el.innerHTML = html || '<div style="padding:20px;color:var(--tx3)">—</div>';
@@ -2091,6 +2111,7 @@ function renderGantt(){
     depSvg += '<polygon class="dep-arr" points="' + depArrow(last[0], last[1], L.dir).map(function(p){ return p[0] + "," + p[1]; }).join(" ") + '"/>';
   });
   if(depSvg) html += '<svg class="g-dep" style="left:0;top:0" width="' + W + '" height="' + (BAND_H + vis.length * ROW_H) + '">' + depSvg + "</svg>";
+  html += progLineSvg(vis, function(d){ return X(d, min); }, PX_DAY, BAND_H, ROW_H, W);
   // 色带行占位：任务行整体下移
   if(BAND_H) html += '<div style="height:' + BAND_H + 'px"></div>';
   // 任务条
@@ -2445,6 +2466,9 @@ function exportXML(){
     if(!isG){ L.push(xmlTag("PercentComplete", +t.progress || 0)); if(parseD(t.actStart)) L.push(xmlTag("ActualStart", isoDT(parseD(t.actStart)))); if(parseD(t.actFinish)) L.push(xmlTag("ActualFinish", isoDT(parseD(t.actFinish)))); }
     if(+t.fixedCost) L.push(xmlTag("FixedCost", +t.fixedCost));
     L.push(xmlTag("Cost", taskCost(t)));
+    if(!isG){ if(t.actCost !== undefined && t.actCost !== "") L.push(xmlTag("ActualCost", +t.actCost)); if(t.actWork !== undefined && t.actWork !== "") L.push(xmlTag("ActualWork", "PT" + (+t.actWork) + "H0M0S"));
+      L.push(xmlTag("Priority", t.priority == null ? 500 : +t.priority)); if(t.type === "task"){ L.push(xmlTag("Type", { FU:0, FD:1, FW:2 }[t.ttype || "FU"])); L.push(xmlTag("EffortDriven", t.effort === false ? 0 : 1)); }
+      if(t.remarks) L.push(xmlTag("Notes", t.remarks)); }
     if(t.type === "milestone") L.push(xmlTag("Milestone", "1"));
     if(s) L.push(xmlTag("Start", HM() && !isG ? fmtD(s) + "T" + off2clk(t.startH, false) + ":00" : isoDT(s)));
     if(e){ var _ep = !isG && HM() ? endPos(t) : null; L.push(xmlTag("Finish", _ep ? fmtD(_ep.d) + "T" + off2clk(_ep.h, true) + ":00" : isoDT(e))); }
@@ -2497,13 +2521,16 @@ function xmlTagText(parent, tag){
 }
 function importXMLFile(f){
   var r = new FileReader();
-  r.onload = function(){
+  r.onload = function(){ importXMLText(String(r.result), false); };
+  r.readAsText(f);
+}
+function importXMLText(text, asSub){
     try{
-      var doc = new DOMParser().parseFromString(String(r.result), "text/xml");
+      var doc = new DOMParser().parseFromString(String(text), "text/xml");
       if(doc.getElementsByTagName("parsererror").length){ toast("XML parse error"); return; }
       var taskEls = doc.getElementsByTagName("Task");
       if(!taskEls.length){ toast("No tasks found in XML"); return; }
-      if(!confirm(tr("impXmlConfirm"))) return;
+      if(!asSub && !confirm(tr("impXmlConfirm"))) return;
       var uidMap = {}, imported = [], stack = [];
       Array.prototype.forEach.call(taskEls, function(el){
         var name = xmlTagText(el, "Name");
@@ -2538,6 +2565,12 @@ function importXMLFile(f){
         var _as = xmlTagText(el, "ActualStart").slice(0, 10), _af = xmlTagText(el, "ActualFinish").slice(0, 10);
         if(parseD(_as)) t.actStart = _as; if(parseD(_af)) t.actFinish = _af;
         if(+xmlTagText(el, "FixedCost")) t.fixedCost = +xmlTagText(el, "FixedCost");
+        var _pr = xmlTagText(el, "Priority"); if(_pr !== "" && !isNaN(+_pr)) t.priority = +_pr;
+        var _ty = xmlTagText(el, "Type"); if(_ty !== "") t.ttype = { "0":"FU", "1":"FD", "2":"FW" }[_ty] || "FU";
+        var _ed = xmlTagText(el, "EffortDriven"); if(_ed !== "") t.effort = _ed === "1" || _ed === "true";
+        var _ac = xmlTagText(el, "ActualCost"); if(+_ac) t.actCost = +_ac;
+        var _aw = xmlTagText(el, "ActualWork").match(/PT(\d+(?:\.\d+)?)H(\d+)M/); if(_aw && (+_aw[1] || +_aw[2])) t.actWork = +_aw[1] + (+_aw[2]) / 60;
+        var _nt = xmlTagText(el, "Notes"); if(_nt && !t.remarks) t.remarks = _nt;
         if(xmlTagText(el, "Manual") === "1") t.manual = true;
         var _cty = xmlTagText(el, "ConstraintType"), _cd = xmlTagText(el, "ConstraintDate").slice(0, 10);
         var _cmap = ["ASAP","ALAP","MSO","MFO","SNET","SNLT","FNET","FNLT"][+_cty];
@@ -2576,7 +2609,7 @@ function importXMLFile(f){
       state.tasks = imported.map(function(it){ return it.t; });
       state.collapsed = {};
       var _p = null; try{ _p = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e2){}
-      if(_p && _p.oem){
+      if(_p && _p.oem && !asSub){
         mergeFromPlan(_p); /* 合并版：导入 XML 后保留客户节点行 */
         /* 去重：XML 里与客户节点/推荐任务同名同类型的行，用同步行替代，依赖改指向同步行 */
         var mg = {}, drop = {};
@@ -2588,11 +2621,10 @@ function importXMLFile(f){
         }
       }
       normalizeState();
+      if(asSub) return;
       save(); render();
       toast(tr("importOk") + " · " + imported.length);
-    }catch(e){ toast("XML parse error"); }
-  };
-  r.readAsText(f);
+    }catch(e){ toast("XML parse error"); if(asSub) throw e; }
 }
 /* ============ 导出：甘特图 → PDF / JPG / 预览（风格与计划页统一：600dpi、双层表头、标题、图例、页脚日期） ============ */
 var $ = function(id){ return document.getElementById(id); };
@@ -2780,7 +2812,7 @@ function drawPlanStyleExport(cb, plan, imgL, imgR){
     }
     var lbl = '', lx;
     if(t.type === 'milestone'){
-      var mx = X(s), r = 6.5;
+      var mx = barGeom(t, X, pxDay).c, r = 6.5;
       ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4);
       ctx.fillStyle = t.color || '#dc2626'; ctx.fillRect(-r, -r, r * 2, r * 2);
       ctx.strokeStyle = crit ? '#7f1d1d' : 'rgba(0,0,0,.25)'; ctx.lineWidth = crit ? 2 : 1; ctx.strokeRect(-r, -r, r * 2, r * 2);
@@ -2788,8 +2820,9 @@ function drawPlanStyleExport(cb, plan, imgL, imgR){
       lbl = mode === 'name' ? t.name : barDateText(t); lx = mx + 12;
     } else {
       var e = parseD(taskEnd(t)) || s;
-      var bx = X(s), bw = Math.max((diffDays(s, e) + 1) * pxDay, 4);
+      var _eg = barGeom(t, X, pxDay), bx = _eg.l, bw = Math.max(_eg.w + (HM() ? 1 : 4), 4);
       ctx.fillStyle = t.color || '#2563eb'; rr(ctx, bx, cy - 7, bw, 14, 3); ctx.fill();
+      gapRanges(t).forEach(function(g){ var gx1 = X(g.s), gx2 = X(g.e) + pxDay; ctx.fillStyle = '#ffffff'; ctx.fillRect(gx1, cy - 8, gx2 - gx1, 16); ctx.strokeStyle = t.color || '#2563eb'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(gx1, cy); ctx.lineTo(gx2, cy); ctx.stroke(); ctx.setLineDash([]); });
       if(t.progress > 0){ ctx.fillStyle = 'rgba(255,255,255,.35)'; rr(ctx, bx, cy - 7, bw * Math.min(t.progress, 100) / 100, 14, 3); ctx.fill(); }
       if(crit){ ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 1.5; rr(ctx, bx, cy - 7, bw, 14, 3); ctx.stroke(); }
       lbl = mode === 'name' ? '' : barDateText(t); lx = bx + bw + 6;
@@ -3269,6 +3302,15 @@ function init(){
   document.getElementById("btnXls").addEventListener("click", exportXLS);
   document.getElementById("btnExpXML").addEventListener("click", exportXML);
   document.getElementById("btnImpXML").addEventListener("click", function(){ document.getElementById("fileXML").click(); });
+  document.getElementById("btnMPP").addEventListener("click", function(){ document.getElementById("fileMPP").click(); });
+  document.getElementById("fileMPP").addEventListener("change", function(){ var f = this.files[0]; this.value = ""; importMPPFile(f); });
+  document.getElementById("btnSubProj").addEventListener("click", function(){ document.getElementById("fileSub").click(); });
+  document.getElementById("fileSub").addEventListener("change", function(){ var f = this.files[0]; this.value = ""; insertSubproject(f); });
+  document.getElementById("ckProgLine").addEventListener("change", function(){ state.progLine = this.checked; render(); });
+  document.getElementById("fltSel").addEventListener("change", function(){ state.flt = this.value; render(); });
+  document.getElementById("sortSel").addEventListener("change", function(){ state.sortBy = this.value; render(); });
+  document.getElementById("fltTxt").addEventListener("keydown", function(e){ e.stopPropagation(); });
+  document.getElementById("fltTxt").addEventListener("input", function(){ state.fltTxt = this.value; renderTable(); renderGantt(); });
   document.getElementById("fileXML").addEventListener("change", function(){ if(this.files[0]) importXMLFile(this.files[0]); this.value = ""; });
   document.getElementById("btnTPL").addEventListener("click", function(e){ e.stopPropagation(); toggleTplMenu(); });
   document.getElementById("btnImport").addEventListener("click", function(){ document.getElementById("fileJSON").click(); });
@@ -3372,6 +3414,438 @@ function init(){
   });
   document.addEventListener("keydown", function(e){ if(e.key === "Escape"){ closeModal(); closeSub(); closePreview(); closeColMenu(); closeTplMenu(); } });
 }
+/* ================= ⑥ ProjectLibre 补齐：任务类型/投入比导向、资源日历、实际工时与实际成本、
+   分时费率与成本累算、优先级、筛选/排序/搜索、自定义字段、任务分配状况、资源图表、WBS 图、报表与项目信息、
+   进度线、网络图拖拽链接、MPP 在线导入 ================= */
+var MPP_URL = "https://mpp.45-92-159-155.sslip.io:8443/convert";
+var P6T = {
+zh:{ttype:"任务类型",ttFU:"固定单位",ttFW:"固定工时",ttFD:"固定工期",effort:"投入比导向",priority:"优先级",text1:"文本1",text2:"文本2",text3:"文本3",num1:"数字1",num2:"数字2",num3:"数字3",
+ fltAll:"全部任务",fltCrit:"关键任务",fltMs:"里程碑",fltInc:"未完成",fltDone:"已完成",fltLate:"进度落后",fltPro:"进行中",fltUn:"未分配资源",fltOver:"资源过度分配",fltSearch:"搜索名称/资源",
+ sortOutline:"大纲顺序",sortStart:"按开始",sortEnd:"按完成",sortDur:"按工期",sortName:"按名称",sortPri:"按优先级",sortCost:"按成本",
+ paneTuse:"任务分配状况",paneHist:"资源图表",paneWbs:"WBS 图",paneRep:"报表",progLine:"进度线",
+ actWork:"实际工时",remWork:"剩余工时",actCost:"实际成本",rsCal:"资源日历",rsVac:"休假/例外",rsRates:"分时费率",rsAccrue:"成本累算",acPro:"按比例",acStart:"开始时",acEnd:"结束时",
+ rsVacPh:"2026-11-05~2026-11-07, 2026-12-01",rsRatesPh:"2027-01-01=150",
+ histRes:"资源",histCap:"可用量",histHint:"柱高 = 分配工时；红色 = 超出可用量；虚线 = 最大单位可用工时。",
+ tuseHint:"每个任务下列出资源分配及各期工时。",
+ repInfo:"项目信息",repTitle:"项目名称",repMgr:"项目经理",repCo:"公司",repNotes:"备注",repPrint:"打印报表",
+ repOverview:"项目概览",repStart:"开始",repFinish:"完成",repDur:"工期（工作日）",repWork:"总工时",repCost:"总成本",repBaseCost:"基线成本",repBaseFin:"基线完成",repVarFin:"完成差异",
+ repTasks:"任务数",repDone:"已完成",repPro:"进行中",repNot:"未开始",repLate:"落后",repMs:"里程碑",repCrit:"关键任务",repLateT:"落后任务",repRes:"资源概况",repGrp:"成本按阶段",
+ repNone:"无",mppBtn:"导入 MPP",mppBusy:"正在服务器上解析 MPP…",mppFail:"MPP 解析失败：",subBtn:"插入子项目",subOk:"已插入子项目",
+ netLinkHint:"按住 Shift 从一个方框拖到另一个方框可建立完成-开始链接。",netLinked:"已建立链接",nameCol:"名称",typeCol:"类型",
+ noRes:"没有工时资源",days:"天"},
+en:{ttype:"Task type",ttFU:"Fixed units",ttFW:"Fixed work",ttFD:"Fixed duration",effort:"Effort driven",priority:"Priority",text1:"Text1",text2:"Text2",text3:"Text3",num1:"Number1",num2:"Number2",num3:"Number3",
+ fltAll:"All tasks",fltCrit:"Critical",fltMs:"Milestones",fltInc:"Incomplete",fltDone:"Completed",fltLate:"Late",fltPro:"In progress",fltUn:"Unassigned",fltOver:"Overallocated",fltSearch:"Search name/resource",
+ sortOutline:"Outline",sortStart:"Start",sortEnd:"Finish",sortDur:"Duration",sortName:"Name",sortPri:"Priority",sortCost:"Cost",
+ paneTuse:"Task Usage",paneHist:"Resource Graph",paneWbs:"WBS Chart",paneRep:"Reports",progLine:"Progress line",
+ actWork:"Actual work",remWork:"Remaining work",actCost:"Actual cost",rsCal:"Base calendar",rsVac:"Vacations",rsRates:"Rate changes",rsAccrue:"Accrue at",acPro:"Prorated",acStart:"Start",acEnd:"End",
+ rsVacPh:"2026-11-05~2026-11-07, 2026-12-01",rsRatesPh:"2027-01-01=150",
+ histRes:"Resource",histCap:"Available",histHint:"Bar = assigned work; red = over availability; dashed = max-units capacity.",
+ tuseHint:"Assignments and work per period under each task.",
+ repInfo:"Project information",repTitle:"Title",repMgr:"Manager",repCo:"Company",repNotes:"Notes",repPrint:"Print report",
+ repOverview:"Project overview",repStart:"Start",repFinish:"Finish",repDur:"Duration (workdays)",repWork:"Work",repCost:"Cost",repBaseCost:"Baseline cost",repBaseFin:"Baseline finish",repVarFin:"Finish variance",
+ repTasks:"Tasks",repDone:"Completed",repPro:"In progress",repNot:"Not started",repLate:"Late",repMs:"Milestones",repCrit:"Critical tasks",repLateT:"Late tasks",repRes:"Resources",repGrp:"Cost by phase",
+ repNone:"None",mppBtn:"Import MPP",mppBusy:"Parsing MPP on server…",mppFail:"MPP import failed: ",subBtn:"Insert subproject",subOk:"Subproject inserted",
+ netLinkHint:"Shift-drag from one box to another to create a finish-to-start link.",netLinked:"Link created",nameCol:"Name",typeCol:"Type",
+ noRes:"No work resources",days:"d"},
+de:{ttype:"Vorgangsart",ttFU:"Feste Einheiten",ttFW:"Feste Arbeit",ttFD:"Feste Dauer",effort:"Leistungsgesteuert",priority:"Priorität",text1:"Text1",text2:"Text2",text3:"Text3",num1:"Zahl1",num2:"Zahl2",num3:"Zahl3",
+ fltAll:"Alle Vorgänge",fltCrit:"Kritisch",fltMs:"Meilensteine",fltInc:"Nicht abgeschlossen",fltDone:"Abgeschlossen",fltLate:"Verzögert",fltPro:"In Arbeit",fltUn:"Ohne Ressource",fltOver:"Überlastet",fltSearch:"Name/Ressource suchen",
+ sortOutline:"Gliederung",sortStart:"Anfang",sortEnd:"Ende",sortDur:"Dauer",sortName:"Name",sortPri:"Priorität",sortCost:"Kosten",
+ paneTuse:"Vorgang: Einsatz",paneHist:"Ressourcengrafik",paneWbs:"PSP-Diagramm",paneRep:"Berichte",progLine:"Fortschrittslinie",
+ actWork:"Ist-Arbeit",remWork:"Restarbeit",actCost:"Ist-Kosten",rsCal:"Kalender",rsVac:"Urlaub",rsRates:"Satzänderungen",rsAccrue:"Fälligkeit",acPro:"Anteilig",acStart:"Anfang",acEnd:"Ende",
+ rsVacPh:"2026-11-05~2026-11-07, 2026-12-01",rsRatesPh:"2027-01-01=150",
+ histRes:"Ressource",histCap:"Verfügbar",histHint:"Balken = Arbeit; rot = Überlastung; gestrichelt = Kapazität.",
+ tuseHint:"Zuordnungen und Arbeit je Periode.",
+ repInfo:"Projektinfo",repTitle:"Titel",repMgr:"Projektleiter",repCo:"Firma",repNotes:"Notizen",repPrint:"Bericht drucken",
+ repOverview:"Projektübersicht",repStart:"Anfang",repFinish:"Ende",repDur:"Dauer (AT)",repWork:"Arbeit",repCost:"Kosten",repBaseCost:"Basiskosten",repBaseFin:"Basisende",repVarFin:"Endabweichung",
+ repTasks:"Vorgänge",repDone:"Abgeschlossen",repPro:"In Arbeit",repNot:"Nicht begonnen",repLate:"Verzögert",repMs:"Meilensteine",repCrit:"Kritische Vorgänge",repLateT:"Verzögerte Vorgänge",repRes:"Ressourcen",repGrp:"Kosten je Phase",
+ repNone:"Keine",mppBtn:"MPP importieren",mppBusy:"MPP wird auf dem Server gelesen…",mppFail:"MPP-Import fehlgeschlagen: ",subBtn:"Teilprojekt einfügen",subOk:"Teilprojekt eingefügt",
+ netLinkHint:"Mit Umschalt von einem Kasten zum anderen ziehen = EA-Verknüpfung.",netLinked:"Verknüpft",nameCol:"Name",typeCol:"Art",
+ noRes:"Keine Arbeitsressourcen",days:"T"}};
+Object.keys(P6T).forEach(function(l){ if(I18N[l]) Object.assign(I18N[l], P6T[l]); });
+
+/* ---------- 资源日历：资源的基准日历 + 休假例外；任务按分配的工时资源日历排程（任务日历优先，可忽略资源日历） ---------- */
+var _tres = null, _vacCache = {};
+function vacSet(r){
+  var key = r.vac || ""; var c = _vacCache[key]; if(c) return c; c = {};
+  key.split(/[,，;；\s]+/).forEach(function(p){ if(!p) return; var m = p.split(/~|至|到/); var a = parseD(m[0]), b = parseD(m[1] || m[0]); if(!a || !b) return; for(var d = new Date(a); d <= b; d = addDays(d, 1)) c[fmtD(d)] = 1; });
+  return (_vacCache[key] = c);
+}
+var _resCalCache = {};
+function resCalWork(r, d){ if(!r.cal) return true; var c = _resCalCache[r.cal]; if(!c || c._base !== cal){ c = _resCalCache[r.cal] = Object.assign({}, cal, { mode:r.cal }); c._base = cal; } return WORKCAL.isWork(fmtD(d), c); }
+var _isWorkday0 = isWorkday;
+isWorkday = function(d){
+  if(!_isWorkday0(d)) return false;
+  if(_tres && _tres.length){ var k = fmtD(d); for(var i = 0; i < _tres.length; i++){ var r = _tres[i]; if(vacSet(r)[k] || !resCalWork(r, d)) return false; } }
+  return true;
+};
+function taskResCals(t){
+  if(!t || t.cal || t.ignoreRC || t.type !== "task") return null;
+  var out = []; parseAsg(t.owner).forEach(function(a){ var r = resByName(a.name); if(r && r.type !== "material" && (r.cal || r.vac)) out.push(r); });
+  return out.length ? out : null;
+}
+var _withCal0 = withCal;
+withCal = function(t, fn){ var o = _tres; _tres = taskResCals(t); try{ return _withCal0(t, fn); } finally{ _tres = o; } };
+
+/* ---------- 任务类型 + 投入比导向（ProjectLibre/MS Project 规则） ---------- */
+function workUnits(t){ var u = 0; parseAsg(t.owner).forEach(function(a){ var r = resByName(a.name); if(!r || r.type !== "material") u += a.units; }); return u; }
+function workResCount(owner){ return parseAsg(owner).filter(function(a){ var r = resByName(a.name); return !r || r.type !== "material"; }).length; }
+function roundDur(d){ return HM() ? Math.max(0.001, Math.round(d * 1000) / 1000) : Math.max(1, Math.round(d)); }
+function scaleUnits(t, f){ var a = parseAsg(t.owner); a.forEach(function(x){ var r = resByName(x.name); if(!r || r.type !== "material") x.units = Math.max(1, Math.round(x.units * f)); }); t.owner = asgText(a); }
+function applyTypeRules(t, f, old){
+  if(!t || t.type !== "task") return;
+  var ty = t.ttype || "FU", eff = t.effort !== false, nU = workUnits(t);
+  if(f === "dur" && ty === "FW" && old.work > 0 && old.u > 0 && +t.dur > 0){ scaleUnits(t, (old.work / (+t.dur * HOURS_PER_DAY)) * 100 / old.u); }
+  else if(f === "owner"){
+    if(!(old.work > 0) || !(nU > 0)) return;
+    var cntChanged = workResCount(t.owner) !== old.n;
+    if(ty === "FW" || (ty === "FU" && eff && cntChanged)) t.dur = roundDur(old.work / (HOURS_PER_DAY * nU / 100));
+  }
+}
+var _cellEdit0 = cellEdit;
+cellEdit = function(t, f, v){
+  if(!t) return _cellEdit0(t, f, v);
+  if(f === "ttype"){ t.ttype = v; render(); return; }
+  if(f === "effort"){ t.effort = v === "1"; render(); return; }
+  if(f === "priority"){ var p = parseInt(v, 10); t.priority = isNaN(p) ? 500 : Math.max(0, Math.min(1000, p)); render(); return; }
+  if(/^(text|num)[123]$/.test(f)){ if(f.indexOf("num") === 0){ var n = parseFloat(v); t[f] = isNaN(n) ? "" : n; } else t[f] = v; render(); return; }
+  var old = { work:taskWork(t), u:workUnits(t), n:workResCount(t.owner), dur:+t.dur };
+  if(f === "work" && (t.ttype || "FU") === "FD" && t.type === "task"){
+    var h = parseFloat(String(v).replace(/[^0-9.]/g, "")); if(isNaN(h) || h < 0 || !old.u || !old.dur){ render(); return; }
+    scaleUnits(t, (h / (old.dur * HOURS_PER_DAY)) * 100 / old.u); render(); return;
+  }
+  if(f === "dur" || f === "owner"){
+    var _r = render; render = function(){};
+    try{ _cellEdit0(t, f, v); } finally{ render = _r; }
+    applyTypeRules(t, f, old); render(); return;
+  }
+  return _cellEdit0(t, f, v);
+};
+
+/* ---------- 分时费率 + 成本累算 ---------- */
+function rateList(r){ var out = []; String(r.rates || "").split(/[,，;；\n]+/).forEach(function(p){ var m = p.match(/(\d{4}-\d{1,2}-\d{1,2})\s*[=:：]\s*([\d.]+)/); if(m) out.push({ d:fmtD(parseD(m[1])), v:+m[2] }); }); return out.sort(function(a, b){ return a.d < b.d ? -1 : 1; }); }
+function rateAt(r, k, rl){ var v = +r.rate || 0; (rl || rateList(r)).forEach(function(x){ if(x.d <= k) v = x.v; }); return v; }
+function taskDayFrac(t){ /* {日期: 当日工作量比例 0–1} */
+  var days = taskDays(t), out = {}; if(!days.length) return out;
+  var sp = startPos(t), ep = endPos(t);
+  days.forEach(function(k){ var f = 1; if(HM() && sp && ep){ var a0 = k === fmtD(sp.d), b0 = k === fmtD(ep.d); if(a0 && b0) f = (ep.h - sp.h) / HOURS_PER_DAY; else if(a0) f = (HOURS_PER_DAY - sp.h) / HOURS_PER_DAY; else if(b0) f = ep.h / HOURS_PER_DAY; } out[k] = f; });
+  /* 工期按工作日计，但拆分/日历可能导致天数与工期不一致：按工期归一 */
+  var sum = 0; Object.keys(out).forEach(function(k){ sum += out[k]; }); var want = +t.dur || 0;
+  if(sum > 0 && want > 0 && Math.abs(sum - want) > 1e-6){ var f2 = want / sum; Object.keys(out).forEach(function(k){ out[k] *= f2; }); }
+  return out;
+}
+function asgCostParts(t){ /* [{cost, accrue}]：每个分配一项 + 固定成本 */
+  var parts = [];
+  parseAsg(t.owner).forEach(function(a){
+    var r = resByName(a.name); if(!r) return;
+    var c;
+    if(r.type === "material") c = a.units * (+r.rate || 0) + (+r.perUse || 0);
+    else {
+      var rl = rateList(r);
+      if(!rl.length) c = (+t.dur || 0) * HOURS_PER_DAY * a.units / 100 * (+r.rate || 0);
+      else { c = 0; var fr = taskDayFrac(t); Object.keys(fr).forEach(function(k){ c += fr[k] * HOURS_PER_DAY * a.units / 100 * rateAt(r, k, rl); }); }
+      c += (+r.perUse || 0);
+    }
+    parts.push({ cost:c, accrue:r.accrue || "pro" });
+  });
+  if(+t.fixedCost) parts.push({ cost:+t.fixedCost, accrue:t.fcAccrue || "pro" });
+  return parts;
+}
+taskCost = function(t){
+  if(t.type === "group"){ var s = 0; (function walk(gid){ state.tasks.forEach(function(x){ if(x.group !== gid) return; if(x.type === "group") walk(x.id); else s += taskCost(x); }); })(t.id); return s + (+t.fixedCost || 0); }
+  var c = 0; asgCostParts(t).forEach(function(p){ c += p.cost; }); return Math.round(c * 100) / 100;
+};
+function hasActCost(t){ return t.actCost !== undefined && t.actCost !== null && t.actCost !== ""; }
+function hasActWork(t){ return t.actWork !== undefined && t.actWork !== null && t.actWork !== ""; }
+taskEVM = function(t, bmap, sd){
+  if(t.type === "group"){
+    var z = { bac:0, pv:0, ev:0, ac:0, cost:0 };
+    (function walk(gid){ state.tasks.forEach(function(x){ if(x.group !== gid) return; if(x.type === "group"){ walk(x.id); return; } var v = taskEVM(x, bmap, sd); ["bac","pv","ev","ac","cost"].forEach(function(k){ z[k] += v[k]; }); }); })(t.id);
+    var fc = +t.fixedCost || 0; z.bac += fc; z.cost += fc; if(hasActCost(t)) z.ac += +t.actCost; return evmRatios(z);
+  }
+  var cost = taskCost(t), b = bmap[t.id];
+  var bac = b && b.cost != null ? b.cost : cost;
+  var bs = b ? parseD(b.start) : parseD(t.start), be = b ? parseD(b.end) : parseD(taskEnd(t));
+  var pct = Math.max(0, Math.min(100, +t.progress || 0));
+  var parts = asgCostParts(t), tot = parts.reduce(function(s, p){ return s + p.cost; }, 0), pp = plannedPct(bs, be, sd), pv = 0;
+  if(tot > 0){ parts.forEach(function(p){ var f = p.accrue === "start" ? (bs && sd >= bs ? 100 : 0) : p.accrue === "end" ? (be && sd >= be ? 100 : 0) : pp; pv += bac * (p.cost / tot) * f / 100; }); }
+  else pv = bac * pp / 100;
+  var ac;
+  if(hasActCost(t)) ac = +t.actCost;
+  else if(hasActWork(t)){ var w = taskWork(t); ac = w > 0 ? cost * Math.min(1, (+t.actWork) / w) : cost * pct / 100; }
+  else ac = cost * pct / 100;
+  return evmRatios({ bac:bac, pv:pv, ev:bac * pct / 100, ac:ac, cost:cost });
+};
+var _trackEdit0 = trackEdit;
+trackEdit = function(t, f, v){
+  if(f === "actWork"){ var h = parseFloat(String(v).replace(/[^0-9.]/g, "")); if(isNaN(h) || String(v).trim() === ""){ delete t.actWork; return; } t.actWork = h; var w = taskWork(t); if(w > 0) _trackEdit0(t, "progress", String(Math.min(100, Math.round(h / w * 100)))); return; }
+  if(f === "actCost"){ var c = parseFloat(String(v).replace(/[^0-9.\-]/g, "")); if(isNaN(c) || String(v).trim() === "") delete t.actCost; else t.actCost = c; return; }
+  return _trackEdit0(t, f, v);
+};
+
+/* ---------- 筛选 / 搜索 / 排序（仅改变显示，不改大纲） ---------- */
+function taskMatchFilter(t){
+  var f = state.flt || "all", sd = statusDate();
+  if(t.type === "group") return f === "all";
+  switch(f){
+    case "crit": return floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
+    case "ms": return t.type === "milestone";
+    case "inc": return (+t.progress || 0) < 100;
+    case "done": return (+t.progress || 0) >= 100;
+    case "pro": return (+t.progress || 0) > 0 && (+t.progress || 0) < 100;
+    case "late": var e = parseD(taskEnd(t)), s = parseD(t.start); if(!s) return false; var ex = plannedPct(s, e, sd); return (+t.progress || 0) + 0.5 < ex;
+    case "un": return t.type === "task" && !parseAsg(t.owner).length;
+    case "over": return !!(state.resWarn !== false && resWarnMap && resWarnMap[t.id]);
+  }
+  return true;
+}
+function taskMatchText(t){ var q = String(state.fltTxt || "").trim().toLowerCase(); if(!q) return true; return String(t.name || "").toLowerCase().indexOf(q) >= 0 || String(t.owner || "").toLowerCase().indexOf(q) >= 0 || String(t.text1 || "").toLowerCase().indexOf(q) >= 0; }
+var _visibleTasks0 = visibleTasks;
+visibleTasks = function(){
+  var base = _visibleTasks0(), f = state.flt || "all", q = String(state.fltTxt || "").trim(), so = state.sortBy || "outline";
+  if(f === "all" && !q && so === "outline") return base;
+  var keep = {};
+  state.tasks.forEach(function(t){ if(t.type === "group") return; if(taskMatchFilter(t) && taskMatchText(t)){ keep[t.id] = 1; var g = t.group ? byId(t.group) : null, n = 0; while(g && n++ < 20){ keep[g.id] = 1; g = g.group ? byId(g.group) : null; } } });
+  if(so !== "outline"){
+    var list = state.tasks.filter(function(t){ return t.type !== "group" && keep[t.id]; });
+    var key = { start:function(t){ return (t.start || "") + String(+t.startH || 0).padStart(5, "0"); }, end:function(t){ return taskEnd(t) || ""; }, dur:function(t){ return +t.dur || 0; }, name:function(t){ return String(t.name || ""); }, pri:function(t){ return -(t.priority == null ? 500 : +t.priority); }, cost:function(t){ return -taskCost(t); } }[so] || function(){ return 0; };
+    var rn = rowNoMap();
+    return list.sort(function(a, b){ var x = key(a), y = key(b); if(typeof x === "string") { var c = x.localeCompare(y, "zh"); return c || rn[a.id] - rn[b.id]; } return (x - y) || rn[a.id] - rn[b.id]; });
+  }
+  return base.filter(function(t){ return keep[t.id]; });
+};
+
+/* ---------- 自定义列 ---------- */
+[["ttype", 92, "ttype"], ["effort", 64, "effort"], ["priority", 60, "priority"], ["text1", 90, "text1"], ["text2", 90, "text2"], ["text3", 90, "text3"], ["num1", 70, "num1"], ["num2", 70, "num2"], ["num3", 70, "num3"]].forEach(function(c){
+  COLS.push({ key:c[0], cls:"c-" + c[0], defW:c[1], i18n:c[2], hide:true });
+});
+(function(){ var st = document.createElement("style"); var css = "";
+  ["ttype","effort","priority","text1","text2","text3","num1","num2","num3"].forEach(function(k){ var w = k === "ttype" ? 92 : /^text/.test(k) ? 90 : k === "effort" ? 64 : k === "priority" ? 60 : 70;
+    css += ".trow .c-" + k + ",.table-head .c-" + k + "{width:" + w + "px;flex-shrink:0;justify-content:center;text-align:center}.trow>div.c-" + k + "{padding-top:3px;padding-bottom:3px}"; });
+  css += ".main[data-pane=tuse]>#tuseSheet,.main[data-pane=hist]>#histSheet,.main[data-pane=wbs]>#wbsSheet,.main[data-pane=rep]>#repSheet{display:block;flex:1;overflow:auto;padding:12px 16px;background:var(--bg,#f5f7fa)}"
+    + ".hist{display:flex;align-items:flex-end;gap:2px;height:260px;border-bottom:1px solid #94a3b8;position:relative;padding-top:10px;overflow-x:auto}"
+    + ".hist .hb{flex:0 0 auto;width:26px;background:#3b82f6;position:relative}.hist .hb.ov{background:#dc2626}.hist .hcap{position:absolute;left:0;right:0;border-top:1.5px dashed #0f172a}"
+    + ".hist-x{display:flex;gap:2px;font-size:10px;color:#64748b}.hist-x span{flex:0 0 auto;width:26px;text-align:center;overflow:hidden;white-space:nowrap}"
+    + ".wbs-tree,.wbs-tree ul{list-style:none;margin:0;padding:0}.wbs-tree{display:flex;justify-content:center}.wbs-tree ul{display:flex;padding-top:18px;position:relative}"
+    + ".wbs-tree li{position:relative;padding:18px 6px 0;text-align:center}.wbs-tree li::before,.wbs-tree li::after{content:'';position:absolute;top:0;right:50%;width:50%;height:18px;border-top:1.5px solid #94a3b8}"
+    + ".wbs-tree li::after{right:auto;left:50%;border-left:1.5px solid #94a3b8}.wbs-tree li:only-child::before,.wbs-tree li:only-child::after{display:none}.wbs-tree li:only-child{padding-top:0}"
+    + ".wbs-tree li:first-child::before,.wbs-tree li:last-child::after{border:0 none}.wbs-tree li:last-child::before{border-right:1.5px solid #94a3b8}"
+    + ".wbs-tree ul ul::before{content:'';position:absolute;top:0;left:50%;height:18px;border-left:1.5px solid #94a3b8}.wbs-tree>li{padding-top:0}.wbs-tree>li::before,.wbs-tree>li::after{display:none}"
+    + ".wbs-tree ul.vert{display:block;padding-top:6px}.wbs-tree ul.vert li{padding:4px 0 0 0;text-align:left}.wbs-tree ul.vert li::before,.wbs-tree ul.vert li::after{display:none}.wbs-tree ul.vert::before{display:none}"
+    + ".wbs-node{display:inline-block;min-width:110px;max-width:170px;border:1.5px solid #2563eb;border-radius:4px;background:#fff;padding:4px 6px;font-size:11px;cursor:pointer}"
+    + ".wbs-node.g{background:#eff6ff;font-weight:600}.wbs-node.m{border-color:#7c3aed;border-radius:12px}.wbs-node.crit{border-color:#dc2626}.wbs-node small{display:block;color:#64748b;font-weight:400}"
+    + ".rep h3{margin:14px 0 6px;font-size:14px}.rep .kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px 14px;font-size:12px}.rep .kv div{background:#fff;border:1px solid #e2e8f0;border-radius:4px;padding:6px 8px}.rep .kv b{display:block;font-size:14px}"
+    + ".rep .info{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 14px}.rep .info label{font-size:12px;display:flex;flex-direction:column;gap:2px}.rep .info input,.rep .info textarea{border:1px solid #cbd5e1;border-radius:4px;padding:4px 6px;font:inherit}"
+    + ".g-progline{position:absolute;left:0;top:0;pointer-events:none;z-index:6}"
+    + "@media print{body *{visibility:hidden}#repSheet,#repSheet *{visibility:visible}#repSheet{position:absolute;left:0;top:0;width:100%}#repSheet .noprint{display:none}}";
+  st.textContent = css; document.head.appendChild(st); })();
+function p6Cell(t, k){
+  if(t.type === "group") return "";
+  if(k === "ttype") return t.type !== "task" ? "" : '<select class="cell-in" data-f="ttype">' + ["FU","FW","FD"].map(function(x){ return '<option value="' + x + '"' + ((t.ttype || "FU") === x ? " selected" : "") + ">" + esc(tr("tt" + x)) + "</option>"; }).join("") + "</select>";
+  if(k === "effort") return t.type !== "task" ? "" : '<select class="cell-in" data-f="effort"><option value="1"' + (t.effort !== false ? " selected" : "") + ">✓</option><option value=\"0\"" + (t.effort === false ? " selected" : "") + ">—</option></select>";
+  if(k === "priority") return '<input class="cell-in" data-f="priority" value="' + (t.priority == null ? 500 : t.priority) + '">';
+  return '<input class="cell-in" data-f="' + k + '" value="' + esc(t[k] == null ? "" : t[k]) + '">';
+}
+
+/* ---------- 新视图：任务分配状况 / 资源图表 / WBS 图 / 报表 ---------- */
+function renderTaskUsage(){
+  var box = document.getElementById("tuseSheet"); if(!box || state.pane !== "tuse") return;
+  var b = state.useBucket || "week", U = usageData(), keys = {};
+  U.asg.forEach(function(a){ Object.keys(a.days).forEach(function(k){ keys[bucketKey(k, b)] = 1; }); });
+  var cols = Object.keys(keys).sort(); if(cols.length > 400) cols = cols.slice(0, 400);
+  function lab(k){ return b === "month" ? k : k.slice(5); }
+  var h = '<div class="rs-tb"><select id="tuseBucket">' + ["day","week","month"].map(function(x){ return '<option value="' + x + '"' + (x === b ? " selected" : "") + ">" + esc(tr("ub_" + x)) + "</option>"; }).join("") + "</select><span>" + esc(tr("tuseHint")) + "</span></div>";
+  h += '<table class="rs use"><thead><tr><th style="min-width:200px">' + esc(tr("nameCol")) + "</th><th>" + esc(tr("rsWork")) + "</th>" + cols.map(function(k){ return "<th>" + lab(k) + "</th>"; }).join("") + "</tr></thead><tbody>";
+  var rn = rowNoMap();
+  visibleTasks().forEach(function(t){
+    if(t.type === "group"){ h += '<tr class="ur"><td style="padding-left:' + (6 + depthOf(t) * 14) + 'px"><b>' + esc(t.name) + "</b></td><td></td>" + cols.map(function(){ return "<td></td>"; }).join("") + "</tr>"; return; }
+    var mine = U.asg.filter(function(a){ return a.t === t; }), agg = {}, tot = 0;
+    mine.forEach(function(a){ Object.keys(a.days).forEach(function(k){ var bk = bucketKey(k, b); agg[bk] = (agg[bk] || 0) + a.days[k]; tot += a.days[k]; }); });
+    h += '<tr class="ur" data-id="' + t.id + '"><td style="padding-left:' + (6 + depthOf(t) * 14) + 'px">' + (rn[t.id] || "") + ". " + esc(t.name) + '</td><td class="c">' + fmtWork(tot) + "</td>" + cols.map(function(k){ return '<td class="c">' + (agg[k] ? fmtWork(agg[k]) : "") + "</td>"; }).join("") + "</tr>";
+    mine.forEach(function(a){ var ag = {}, tt = 0; Object.keys(a.days).forEach(function(k){ var bk = bucketKey(k, b); ag[bk] = (ag[bk] || 0) + a.days[k]; tt += a.days[k]; });
+      h += '<tr><td style="padding-left:' + (24 + depthOf(t) * 14) + 'px">' + esc(a.res) + '</td><td class="c">' + fmtWork(tt) + "</td>" + cols.map(function(k){ return '<td class="c">' + (ag[k] ? fmtWork(ag[k]) : "") + "</td>"; }).join("") + "</tr>"; });
+  });
+  box.innerHTML = h + "</tbody></table>";
+  document.getElementById("tuseBucket").addEventListener("change", function(){ state.useBucket = this.value; render(); });
+  box.querySelectorAll("tr[data-id]").forEach(function(r){ r.addEventListener("dblclick", function(){ openModal(r.dataset.id); }); });
+}
+function bucketCapacity(r, bk, b, daysAll){ /* 该期内资源可用工时 */
+  var mx = r.maxUnits == null ? 100 : +r.maxUnits, n = 0;
+  daysAll.forEach(function(k){ if(bucketKey(k, b) !== bk) return; var d = parseD(k); var o = _tres; _tres = [r]; try{ if(isWorkday(d)) n++; } finally{ _tres = o; } });
+  return n * HOURS_PER_DAY * mx / 100;
+}
+function renderHist(){
+  var box = document.getElementById("histSheet"); if(!box || state.pane !== "hist") return;
+  var rs = resList().filter(function(r){ return r.type !== "material"; });
+  if(!rs.length){ box.innerHTML = '<div class="rs-tb"><span>' + esc(tr("noRes")) + "</span></div>"; return; }
+  var cur = resByName(state.histRes) || rs[0], b = state.useBucket || "week", U = usageData(), R = U.res[cur.name] || {};
+  var dk = Object.keys(R).sort(), agg = {}, ov = {};
+  dk.forEach(function(k){ var bk = bucketKey(k, b); agg[bk] = (agg[bk] || 0) + R[k].h; if(R[k].u > (cur.maxUnits == null ? 100 : +cur.maxUnits) + 1e-9) ov[bk] = 1; });
+  var cols = Object.keys(agg).sort(), all = [];
+  if(dk.length){ for(var d = parseD(dk[0]), e = parseD(dk[dk.length - 1]); d <= e; d = addDays(d, 1)) all.push(fmtD(d)); }
+  var caps = {}, mxv = 1; cols.forEach(function(k){ caps[k] = bucketCapacity(cur, k, b, all); mxv = Math.max(mxv, agg[k], caps[k]); });
+  var H = 240;
+  var h = '<div class="rs-tb"><label>' + esc(tr("histRes")) + ' <select id="histRes">' + rs.map(function(r){ return '<option' + (r === cur ? " selected" : "") + ">" + esc(r.name) + "</option>"; }).join("") + '</select></label><select id="histBucket">' + ["day","week","month"].map(function(x){ return '<option value="' + x + '"' + (x === b ? " selected" : "") + ">" + esc(tr("ub_" + x)) + "</option>"; }).join("") + "</select><span>" + esc(tr("histHint")) + "</span></div>";
+  h += '<div class="hist">' + cols.map(function(k){ var hh = agg[k] / mxv * H, ch = caps[k] / mxv * H;
+    return '<div class="hb' + (ov[k] || agg[k] > caps[k] + 1e-6 ? " ov" : "") + '" style="height:' + Math.max(hh, 1).toFixed(1) + 'px" title="' + esc(k + " · " + fmtWork(agg[k]) + " / " + fmtWork(caps[k])) + '"><div class="hcap" style="bottom:' + (ch - hh).toFixed(1) + 'px"></div></div>'; }).join("") + "</div>";
+  h += '<div class="hist-x">' + cols.map(function(k){ return "<span>" + (b === "month" ? k.slice(2) : k.slice(5)) + "</span>"; }).join("") + "</div>";
+  box.innerHTML = h;
+  document.getElementById("histRes").addEventListener("change", function(){ state.histRes = this.value; render(); });
+  document.getElementById("histBucket").addEventListener("change", function(){ state.useBucket = this.value; render(); });
+}
+function renderWbsChart(){
+  var box = document.getElementById("wbsSheet"); if(!box || state.pane !== "wbs") return;
+  var wm = wbsMap(), title = (state.info && state.info.title) || tr("repOverview");
+  function node(t){ var crit = floatMap[t.id] !== undefined && floatMap[t.id] <= 0 && t.type !== "group";
+    return '<div class="wbs-node' + (t.type === "group" ? " g" : t.type === "milestone" ? " m" : "") + (crit ? " crit" : "") + '" data-id="' + t.id + '">' + esc((wm[t.id] ? wm[t.id] + " " : "") + t.name)
+      + "<small>" + (t.type === "group" ? (grpSpan(t).s || "") + " ~ " + (grpSpan(t).e || "") : (t.start || "") + (t.type === "milestone" ? "" : " · " + fmtDur(t))) + "</small></div>"; }
+  function kids(gid, depth){ var ks = state.tasks.filter(function(x){ return (x.group || "") === gid; }); if(!ks.length) return "";
+    return '<ul' + (depth >= 1 ? ' class="vert"' : "") + ">" + ks.map(function(k){ return "<li>" + node(k) + (k.type === "group" ? kids(k.id, depth + 1) : "") + "</li>"; }).join("") + "</ul>"; }
+  box.innerHTML = '<ul class="wbs-tree"><li><div class="wbs-node g">' + esc(title) + "</div>" + kids("", 0) + "</li></ul>";
+  box.querySelectorAll(".wbs-node[data-id]").forEach(function(n){ n.addEventListener("dblclick", function(){ openModal(n.dataset.id); }); });
+}
+function projSpan(){ var s = null, e = null; flatTasks().forEach(function(t){ var a = parseD(t.start), b = parseD(taskEnd(t)); if(a && (!s || a < s)) s = a; if(b && (!e || b > e)) e = b; }); return { s:s, e:e }; }
+function renderReport(){
+  var box = document.getElementById("repSheet"); if(!box || state.pane !== "rep") return;
+  var I = state.info = state.info || {}, P = projSpan(), sd = statusDate(), bmap = baselineMap();
+  var ft = flatTasks(), done = 0, pro = 0, not = 0, late = [], crit = [], ms = [], work = 0, cost = 0;
+  ft.forEach(function(t){ var p = +t.progress || 0; if(p >= 100) done++; else if(p > 0) pro++; else not++;
+    if(t.type === "milestone") ms.push(t); if(floatMap[t.id] !== undefined && floatMap[t.id] <= 0) crit.push(t);
+    var s = parseD(t.start), e = parseD(taskEnd(t)); if(s && p + 0.5 < plannedPct(s, e, sd)) late.push(t);
+    work += taskWork(t); cost += taskCost(t); });
+  state.tasks.forEach(function(t){ if(t.type === "group") cost += +t.fixedCost || 0; });
+  var bc = 0, bf = null, hasB = false; Object.keys(bmap).forEach(function(id){ var b = bmap[id]; if(!byId(id) || byId(id).type === "group") return; hasB = true; bc += +b.cost || 0; var e = parseD(b.end); if(e && (!bf || e > bf)) bf = e; });
+  var rn = rowNoMap();
+  function tbl(list, cols){ if(!list.length) return '<div style="font-size:12px;color:#64748b">' + esc(tr("repNone")) + "</div>";
+    return '<table class="rs"><thead><tr><th>ID</th>' + cols.map(function(c){ return "<th>" + esc(c[0]) + "</th>"; }).join("") + "</tr></thead><tbody>" + list.map(function(t){ return "<tr><td class=\"n\">" + (rn[t.id] || "") + "</td>" + cols.map(function(c){ return '<td class="ro">' + esc(c[1](t)) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>"; }
+  var tc = [[tr("nameCol"), function(t){ return t.name; }], [tr("repStart"), function(t){ return startText(t); }], [tr("repFinish"), function(t){ return endText(t); }], [tr("cDur"), function(t){ return fmtDur(t); }], [tr("cProg"), function(t){ return (+t.progress || 0) + "%"; }], [tr("cOwner"), function(t){ return t.owner || ""; }]];
+  var h = '<div class="rep"><div class="rs-tb noprint"><button class="primary" id="repPrint">' + esc(tr("repPrint")) + "</button></div>"
+    + "<h3>" + esc(tr("repInfo")) + '</h3><div class="info">'
+    + [["title","repTitle"],["manager","repMgr"],["company","repCo"]].map(function(k){ return "<label>" + esc(tr(k[1])) + '<input data-ik="' + k[0] + '" value="' + esc(I[k[0]] || "") + '"></label>'; }).join("")
+    + "<label>" + esc(tr("statusDate")) + '<input type="date" id="repSD" value="' + fmtD(sd) + '"></label>'
+    + '<label style="grid-column:1/-1">' + esc(tr("repNotes")) + '<textarea data-ik="notes" rows="2">' + esc(I.notes || "") + "</textarea></label></div>"
+    + "<h3>" + esc(tr("repOverview")) + '</h3><div class="kv">'
+    + [[tr("repStart"), P.s ? fmtD(P.s) : "—"], [tr("repFinish"), P.e ? fmtD(P.e) : "—"], [tr("repDur"), P.s && P.e ? workdaysBetween(P.s, P.e) + 1 : 0], [tr("repWork"), fmtWork(work)], [tr("repCost"), fmtMoney(cost)],
+       [tr("repBaseCost"), hasB ? fmtMoney(bc) : "—"], [tr("repBaseFin"), bf ? fmtD(bf) : "—"], [tr("repVarFin"), bf && P.e ? (P.e > bf ? "+" : "") + (P.e >= bf ? workdaysBetween(bf, P.e) : -workdaysBetween(P.e, bf)) + tr("days") : "—"],
+       [tr("repTasks"), ft.length], [tr("repDone"), done], [tr("repPro"), pro], [tr("repNot"), not], [tr("repLate"), late.length], [tr("repMs"), ms.length]].map(function(x){ return "<div>" + esc(x[0]) + "<b>" + esc(String(x[1])) + "</b></div>"; }).join("") + "</div>"
+    + "<h3>" + esc(tr("repMs")) + "</h3>" + tbl(ms, [tc[0], tc[1], tc[4]])
+    + "<h3>" + esc(tr("repCrit")) + "</h3>" + tbl(crit, tc)
+    + "<h3>" + esc(tr("repLateT")) + "</h3>" + tbl(late, tc);
+  var wm = resWorkMap();
+  h += "<h3>" + esc(tr("repRes")) + '</h3><table class="rs"><thead><tr><th>' + esc(tr("rsName")) + "</th><th>" + esc(tr("rsType")) + "</th><th>" + esc(tr("rsWork")) + "</th><th>" + esc(tr("repCost")) + "</th><th>⚠</th></tr></thead><tbody>"
+    + resList().map(function(r){ var c = 0; flatTasks().forEach(function(t){ parseAsg(t.owner).forEach(function(a){ if(a.name !== r.name) return; c += r.type === "material" ? a.units * (+r.rate || 0) + (+r.perUse || 0) : (+t.dur || 0) * HOURS_PER_DAY * a.units / 100 * (+r.rate || 0) + (+r.perUse || 0); }); });
+      return '<tr><td class="ro">' + esc(r.name) + '</td><td class="ro">' + esc(tr(r.type === "material" ? "rsMatT" : "rsWorkT")) + '</td><td class="ro">' + (r.type === "material" ? "" : fmtWork(wm[r.name] || 0)) + '</td><td class="ro">' + fmtMoney(c) + '</td><td class="ro">' + (resOverMap[r.name] ? "⚠" : "") + "</td></tr>"; }).join("") + "</tbody></table>";
+  var tops = state.tasks.filter(function(t){ return !t.group; });
+  h += "<h3>" + esc(tr("repGrp")) + '</h3><table class="rs"><thead><tr><th>' + esc(tr("nameCol")) + "</th><th>" + esc(tr("repStart")) + "</th><th>" + esc(tr("repFinish")) + "</th><th>" + esc(tr("repWork")) + "</th><th>" + esc(tr("repCost")) + "</th></tr></thead><tbody>"
+    + tops.map(function(t){ var sp = t.type === "group" ? grpSpan(t) : { s:t.start, e:taskEnd(t) }; return '<tr><td class="ro">' + esc(t.name) + '</td><td class="ro">' + (sp.s || "") + '</td><td class="ro">' + (sp.e || "") + '</td><td class="ro">' + fmtWork(taskWork(t)) + '</td><td class="ro">' + fmtMoney(taskCost(t)) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+  box.innerHTML = h;
+  box.querySelectorAll("[data-ik]").forEach(function(inp){ inp.addEventListener("keydown", function(e){ e.stopPropagation(); }); inp.addEventListener("change", function(){ I[inp.dataset.ik] = inp.value; save(); }); });
+  document.getElementById("repSD").addEventListener("change", function(){ state.statusDate = this.value; render(); });
+  document.getElementById("repPrint").addEventListener("click", function(){ window.print(); });
+}
+var _renderUsage0 = renderUsage;
+renderUsage = function(){ _renderUsage0(); renderTaskUsage(); renderHist(); renderWbsChart(); renderReport(); };
+
+/* ---------- 进度线（状态日期处；进行中/落后任务连到其完成进度点） ---------- */
+function progLineSvg(vis, Xf, pxDay, y0, rowH, W){
+  if(!state.progLine) return "";
+  var sd = statusDate(), sx = Xf(sd), pts = [[sx, y0]];
+  vis.forEach(function(t, i){
+    var y = y0 + i * rowH + rowH / 2, x = sx;
+    if(t.type !== "group"){ var s = parseD(t.start); var p = +t.progress || 0;
+      if(s && s <= sd && p < 100){ var g = barGeom(t, Xf, pxDay); if(g) x = t.type === "milestone" ? g.c : g.l + g.w * p / 100; }
+      else if(s && s > sd && p > 0){ var g2 = barGeom(t, Xf, pxDay); if(g2) x = g2.l + g2.w * p / 100; } }
+    pts.push([x, y]);
+  });
+  pts.push([sx, y0 + vis.length * rowH]);
+  return '<svg class="g-progline" width="' + W + '" height="' + (y0 + vis.length * rowH) + '"><polyline points="' + pts.map(function(p){ return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") + '" fill="none" stroke="#dc2626" stroke-width="1.6"/></svg>';
+}
+
+/* ---------- MPP 在线导入（服务器 MPXJ → MSPDI XML → 现有 XML 导入） ---------- */
+function importMPPFile(f){
+  if(!f) return;
+  toast(tr("mppBusy"));
+  var fd = new FormData(); fd.append("file", f, f.name || "project.mpp");
+  fetch(state.mppUrl || MPP_URL, { method:"POST", body:fd }).then(function(r){
+    return r.text().then(function(tx){ if(!r.ok){ var m = tx; try{ var j = JSON.parse(tx); m = j.error + (j.detail ? " · " + j.detail : ""); }catch(e){} throw new Error(m || ("HTTP " + r.status)); } return tx; });
+  }).then(function(xml){ importXMLFile(new Blob([xml], { type:"application/xml" })); })
+    .catch(function(e){ alert(tr("mppFail") + (e && e.message || e)); });
+}
+
+/* ---------- 插入子项目：把另一个 JSON/XML/MPP 项目作为分组插入当前项目末尾 ---------- */
+function insertSubproject(f){
+  if(!f) return;
+  var name = String(f.name || "Sub").replace(/\.[^.]+$/, "");
+  var snapshot = JSON.stringify({ tasks:state.tasks, resources:state.resources });
+  function merge(sub){
+    var cur = JSON.parse(snapshot);
+    var gid = newId(), map = {};
+    var grp = mkTask({ name:name, type:"group", group:"" }); grp.id = gid; grp.source = "sub";
+    sub.tasks.forEach(function(t){ map[t.id] = newId(); });
+    var add = sub.tasks.map(function(t){ var c = JSON.parse(JSON.stringify(t)); c.id = map[t.id]; c.group = t.group && map[t.group] ? map[t.group] : gid;
+      c.deps = normDeps(t.deps).filter(function(d){ return map[d.id]; }).map(function(d){ return { id:map[d.id], type:d.type, lag:d.lag }; }); if(/^(ms|rec|sup|custom|grp):/.test(String(c.source || ""))) c.source = "sub"; return c; });
+    state.tasks = cur.tasks.concat([grp], add);
+    var rs = cur.resources || []; (sub.resources || []).forEach(function(r){ if(!rs.some(function(x){ return x.name === r.name; })) rs.push(r); }); state.resources = rs;
+    render(); toast(tr("subOk") + " · " + add.length);
+  }
+  function viaXML(xmlText){
+    var keep = JSON.stringify(state);
+    var _r = render; render = function(){};
+    try{ importXMLText(xmlText, true); } finally{ render = _r; }
+    var sub = { tasks:state.tasks, resources:state.resources };
+    var restored = JSON.parse(keep); state.tasks = restored.tasks; state.resources = restored.resources;
+    merge(sub);
+  }
+  var ext = String(f.name || "").toLowerCase();
+  if(/\.json$/.test(ext)){ var r = new FileReader(); r.onload = function(){ try{ var j = JSON.parse(r.result); var s = j.exec || j.state || j; if(typeof s === "string") s = JSON.parse(s); if(j.app === "gantt-project" && j.data){ s = j.data["gantt-exec-v1"]; if(typeof s === "string") s = JSON.parse(s); } merge({ tasks:(s && s.tasks) || [], resources:(s && s.resources) || [] }); }catch(e){ alert("JSON: " + e.message); } }; r.readAsText(f); return; }
+  if(/\.xml$/.test(ext)){ var r2 = new FileReader(); r2.onload = function(){ viaXML(String(r2.result)); }; r2.readAsText(f); return; }
+  toast(tr("mppBusy"));
+  var fd = new FormData(); fd.append("file", f, f.name);
+  fetch(state.mppUrl || MPP_URL, { method:"POST", body:fd }).then(function(r){ return r.text().then(function(tx){ if(!r.ok) throw new Error(tx); return tx; }); }).then(viaXML).catch(function(e){ alert(tr("mppFail") + (e && e.message || e)); });
+}
+
+/* ---------- 任务信息对话框补充：任务类型 / 投入比导向 / 优先级 / 忽略资源日历 / 自定义字段 ---------- */
+var _openModal0 = openModal;
+openModal = function(id){
+  _openModal0(id);
+  var t = id ? byId(id) : null, mb = document.getElementById("modalBody"); if(!mb) return;
+  t = t || { ttype:"FU", effort:true, priority:500 };
+  var d = document.createElement("div");
+  d.innerHTML = '<div class="frow2"><div class="frow"><label>' + esc(tr("ttype")) + '</label><select id="fTType">' + ["FU","FW","FD"].map(function(x){ return '<option value="' + x + '"' + ((t.ttype || "FU") === x ? " selected" : "") + ">" + esc(tr("tt" + x)) + "</option>"; }).join("") + "</select></div>"
+    + '<div class="frow"><label>' + esc(tr("priority")) + '</label><input id="fPri" type="number" min="0" max="1000" value="' + (t.priority == null ? 500 : t.priority) + '"></div></div>'
+    + '<div class="frow"><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="fEffort"' + (t.effort !== false ? " checked" : "") + ' style="width:auto"> ' + esc(tr("effort")) + '</label> <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin-left:16px"><input type="checkbox" id="fIgnRC"' + (t.ignoreRC ? " checked" : "") + ' style="width:auto"> ' + esc(tr("ignRC")) + "</label></div>"
+    + '<div class="frow2">' + ["text1","text2","text3"].map(function(k){ return '<div class="frow"><label>' + esc(tr(k)) + '</label><input id="f_' + k + '" value="' + esc(t[k] || "") + '"></div>'; }).join("") + "</div>"
+    + '<div class="frow2">' + ["num1","num2","num3"].map(function(k){ return '<div class="frow"><label>' + esc(tr(k)) + '</label><input id="f_' + k + '" type="number" value="' + (t[k] === undefined ? "" : t[k]) + '"></div>'; }).join("") + "</div>";
+  var colorRow = document.getElementById("fColor"); if(colorRow && colorRow.closest(".frow")) mb.insertBefore(d, colorRow.closest(".frow")); else mb.appendChild(d);
+};
+var _saveModal0 = saveModal;
+saveModal = function(){
+  var g = function(id){ return document.getElementById(id); };
+  if(!g("fTType")) return _saveModal0();
+  var id = editId, prev = id ? byId(id) : null, n0 = state.tasks.length;
+  var old = prev ? { work:taskWork(prev), u:workUnits(prev), n:workResCount(prev.owner), dur:+prev.dur, owner:prev.owner } : null;
+  var vals = { ttype:g("fTType").value, priority:Math.max(0, Math.min(1000, parseInt(g("fPri").value, 10) || 500)), effort:g("fEffort").checked, ignoreRC:g("fIgnRC").checked };
+  ["text1","text2","text3"].forEach(function(k){ vals[k] = g("f_" + k).value; });
+  ["num1","num2","num3"].forEach(function(k){ var v = g("f_" + k).value; vals[k] = v === "" ? "" : +v; });
+  var _r = render; render = function(){};
+  try{ _saveModal0(); } finally{ render = _r; }
+  var t = id ? byId(id) : (state.tasks.length > n0 ? state.tasks[state.tasks.length - 1] : null);
+  if(t){ Object.assign(t, vals); if(!t.ignoreRC) delete t.ignoreRC;
+    if(old && t.type === "task"){ if(t.owner !== old.owner) applyTypeRules(t, "owner", old); else if(+t.dur !== old.dur) applyTypeRules(t, "dur", old); } }
+  render();
+};
+/* ---------- 网络图：Shift + 拖拽 建立 FS 链接 ---------- */
+var _renderNet0 = renderNet;
+renderNet = function(){
+  _renderNet0();
+  var box = document.getElementById("netSheet"); if(!box || state.pane !== "net") return;
+  var tb = box.querySelector(".rs-tb"); if(tb && !tb.querySelector(".nl-hint")){ var sp = document.createElement("span"); sp.className = "nl-hint"; sp.textContent = tr("netLinkHint"); tb.appendChild(sp); }
+  var from = null;
+  box.querySelectorAll(".net-box").forEach(function(b){
+    b.addEventListener("mousedown", function(e){ if(e.shiftKey){ from = b.dataset.id; e.preventDefault(); } });
+    b.addEventListener("mouseup", function(){ if(from && from !== b.dataset.id){ var t = byId(b.dataset.id); if(t && !normDeps(t.deps).some(function(d){ return d.id === from; })){ cellEdit(t, "pred", depsToText(normDeps(t.deps).concat([{ id:from, type:"FS", lag:0 }]))); toast(tr("netLinked")); } } from = null; });
+  });
+};
+I18N.zh.ignRC = "忽略资源日历"; I18N.en.ignRC = "Ignore resource calendars"; I18N.de.ignRC = "Ressourcenkalender ignorieren";
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
 })();
