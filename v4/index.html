@@ -28,7 +28,20 @@ header button:hover{background:var(--steel3)}
 .toolbar button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .toolbar button.primary:hover{background:#1d4ed8}
 .toolbar .sep{width:1px;height:20px;background:var(--line)}
-.toolbar .tb-break{flex-basis:100%;height:0;border-top:1px dashed var(--line2);margin:0 -16px}
+.toolbar .tb-break{flex-basis:100%;height:0}
+.tb-dd{position:relative;display:inline-block}.tb-ddm{display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.14);padding:8px;z-index:60;flex-direction:column;align-items:stretch;gap:6px;min-width:170px;white-space:nowrap}.tb-ddm.r{left:auto;right:0}.tb-dd.open .tb-ddm{display:flex}.tb-dd.open>.tb-ddb{border-color:var(--accent);color:var(--accent)}.tb-ddm button{text-align:left;width:100%}.tb-ddm select{max-width:none}.tb-ddm .ck{padding:2px 0}
+.toolbar .dd{position:relative;display:inline-flex}
+.toolbar .dd-b::after{content:""}
+.toolbar .dd.open>.dd-b{border-color:var(--accent);color:var(--accent);background:#eff6ff}
+.toolbar .dd-m{display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.14);padding:6px;z-index:300;min-width:190px;flex-direction:column;gap:4px}
+.toolbar .dd.open>.dd-m{display:flex}
+.toolbar #ddExp>.dd-m,.toolbar #ddImp>.dd-m{left:auto;right:0}
+.toolbar .dd-m>button{text-align:left;width:100%;border-color:transparent}
+.toolbar .dd-m>button:hover{background:#f1f5f9;border-color:transparent}
+.toolbar .dd-m .ck{padding:4px 6px}
+.toolbar .dd-m .dd-row{display:flex;gap:4px;align-items:center}
+.toolbar .dd-m select{max-width:none}
+.toolbar .dd-h{font-size:11px;color:var(--tx3);padding:2px 6px}
 .toolbar .tb-lab{font-size:12px;color:var(--tx3);margin-right:2px}
 .toolbar select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--tx1);background:#fff;cursor:pointer;max-width:220px}
 .toolbar select:hover{border-color:var(--accent)}
@@ -298,7 +311,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <button id="btnSyncBack" data-i18n="syncBack" style="display:none">回写里程碑计划</button>
   <button id="btnImportSub" data-i18n="importSub" style="display:none">导入细项</button>
   <button id="btnTPL" data-i18n="tplBtn" style="display:none">模板</button>
-  <span class="sep"></span>
+  <div class="tb-break"></div>
   <div class="viewbtns" id="paneBtns">
     <button data-pane="gantt" class="on" data-i18n="paneGantt">甘特图</button><button data-pane="res" data-i18n="paneRes">资源工作表</button><button data-pane="evm" data-i18n="paneEvm">跟踪 / 挣值</button><button data-pane="net" data-i18n="paneNet">网络图</button><button data-pane="use" data-i18n="paneUse">资源使用</button><button data-pane="tuse" data-i18n="paneTuse">任务分配状况</button><button data-pane="hist" data-i18n="paneHist">资源图表</button><button data-pane="wbs" data-i18n="paneWbs">WBS 图</button><button data-pane="rep" data-i18n="paneRep">报表</button>
   </div>
@@ -307,40 +320,46 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   </div>
   <span class="sep"></span>
   <button id="btnCols" data-i18n="colSettings">显示列 ▾</button>
-  <select id="oemSelect" title="OEM" style="display:none"></select>
-  <label class="ck"><span data-i18n="barLbl">条形标注</span> <select id="selBarLbl" style="height:28px"><option value="name" data-i18n="blName">名称</option><option value="start" data-i18n="blStart">开始日期</option><option value="end" data-i18n="blEnd">完成日期</option><option value="none" data-i18n="blNone">不显示</option></select></label>
-  <label class="ck"><input type="checkbox" id="ckPhase" checked><span data-i18n="showPhase">阶段</span></label>
-  <label class="ck"><input type="checkbox" id="ckCrit"><span data-i18n="criticalPath">关键路径</span></label>
-  <select id="baseSel" title="基线" style="height:28px"></select><button id="btnBaseline" data-i18n="saveBaseline">保存基线</button><button id="btnClearBase" data-i18n="clearBase">清除</button>
-  <label class="ck"><input type="checkbox" id="ckBaseline"><span data-i18n="showBaseline">基线对比</span></label>
-  <label class="ck"><input type="checkbox" id="ckResWarn" checked><span data-i18n="resWarn">资源预警</span></label>
-  <label class="ck"><input type="checkbox" id="ckProgLine"><span data-i18n="progLine">进度线</span></label>
+  <div class="dd" id="ddShow"><button class="dd-b" type="button"><span data-i18n="ddShow">显示</span> ▾</button><div class="dd-m">
+    <label class="ck"><span data-i18n="barLbl">条形标注</span> <select id="selBarLbl" style="height:28px"><option value="name" data-i18n="blName">名称</option><option value="start" data-i18n="blStart">开始日期</option><option value="end" data-i18n="blEnd">完成日期</option><option value="none" data-i18n="blNone">不显示</option></select></label>
+    <label class="ck"><input type="checkbox" id="ckPhase" checked><span data-i18n="showPhase">阶段</span></label>
+    <label class="ck"><input type="checkbox" id="ckCrit"><span data-i18n="criticalPath">关键路径</span></label>
+    <label class="ck"><input type="checkbox" id="ckResWarn" checked><span data-i18n="resWarn">资源预警</span></label>
+    <label class="ck"><input type="checkbox" id="ckProgLine"><span data-i18n="progLine">进度线</span></label>
+    <select id="oemSelect" title="OEM" style="display:none"></select>
+  </div></div>
+  <div class="dd" id="ddBase"><button class="dd-b" type="button"><span data-i18n="ddBase">基线</span> ▾</button><div class="dd-m">
+    <div class="dd-row"><select id="baseSel" title="基线" style="height:28px"></select><button id="btnBaseline" data-i18n="saveBaseline">保存基线</button><button id="btnClearBase" data-i18n="clearBase">清除</button></div>
+    <label class="ck"><input type="checkbox" id="ckBaseline"><span data-i18n="showBaseline">基线对比</span></label>
+  </div></div>
   <span class="sep"></span>
-  <select id="fltSel" style="height:28px"></select><select id="sortSel" style="height:28px"></select><input id="fltTxt" data-i18n-ph="fltSearch" placeholder="搜索名称/资源" style="height:26px;width:120px">
-  <span class="sep"></span>
-  <label class="ck"><span data-i18n="unitLbl">排程单位</span> <select id="unitSel" style="height:28px"><option value="day" data-i18n="unitDay">按天</option><option value="hour" data-i18n="unitHour">按小时</option></select></label>
-  <button id="btnCal" data-i18n="workCal">工作日历</button>
-  <button id="btnLevel" data-i18n="levelBtn">资源平衡</button><button id="btnUnlevel" data-i18n="unlevelBtn">清除平衡</button>
-  <button id="btnRecur" data-i18n="recurBtn">周期性任务</button>
-  <div class="tb-break"></div>
-  <span class="tb-lab" data-i18n="tbOut">导出 / 导入</span>
+  <input id="fltTxt" data-i18n-ph="fltSearch" placeholder="搜索名称/资源" style="height:26px;width:120px">
+  <div class="dd" id="ddFlt"><button class="dd-b" type="button"><span data-i18n="ddFlt">筛选</span> ▾</button><div class="dd-m">
+    <select id="fltSel" style="height:28px"></select><select id="sortSel" style="height:28px"></select>
+  </div></div>
+  <div class="dd" id="ddSched"><button class="dd-b" type="button"><span data-i18n="ddSched">排程</span> ▾</button><div class="dd-m">
+    <label class="ck"><span data-i18n="unitLbl">排程单位</span> <select id="unitSel" style="height:28px"><option value="day" data-i18n="unitDay">按天</option><option value="hour" data-i18n="unitHour">按小时</option></select></label>
+    <button id="btnCal" data-i18n="workCal">工作日历</button>
+    <button id="btnLevel" data-i18n="levelBtn">资源平衡</button>
+    <button id="btnUnlevel" data-i18n="unlevelBtn">清除平衡</button>
+    <button id="btnRecur" data-i18n="recurBtn">周期性任务</button>
+  </div></div>
+  <div class="dd" id="ddImp"><button class="dd-b" type="button"><span data-i18n="ddImp">导入</span> ▾</button><div class="dd-m">
+    <button id="btnImport" data-i18n="importJSON">导入JSON</button>
+    <button id="btnImpXML" data-i18n="impXml">导入 XML</button>
+    <button id="btnMPP" data-i18n="mppBtn">导入 MPP</button>
+    <button id="btnSubProj" data-i18n="subBtn">插入子项目</button>
+  </div></div>
   <button id="btnPreview" data-i18n="preview">预览</button>
-  <button id="btnPDF" data-i18n="exportPDF">导出 PDF</button>
-  <button id="btnJPG" data-i18n="exportJPG">导出 JPG</button>
-  <button id="btnXls" data-i18n="expXls">导出 Excel</button>
-  <span class="sep"></span>
-  <button id="btnExport" data-i18n="exportJSON">导出JSON</button>
-  <button id="btnImport" data-i18n="importJSON">导入JSON</button>
-  <input type="file" id="fileJSON" accept=".json" style="display:none">
-  <button id="btnCSV" data-i18n="exportCSV">导出CSV</button>
-  <span class="sep"></span>
-  <button id="btnExpXML" data-i18n="expXml">导出 XML</button>
-  <button id="btnImpXML" data-i18n="impXml">导入 XML</button>
-  <input type="file" id="fileXML" accept=".xml" style="display:none">
-  <button id="btnMPP" data-i18n="mppBtn">导入 MPP</button>
-  <input type="file" id="fileMPP" accept=".mpp,.mpt,.mpx,.pod,.planner,.gan,.xer,.pmxml" style="display:none">
-  <button id="btnSubProj" data-i18n="subBtn">插入子项目</button>
-  <input type="file" id="fileSub" accept=".json,.xml,.mpp,.mpt,.mpx" style="display:none">
+  <div class="dd" id="ddExp"><button class="dd-b" type="button"><span data-i18n="ddExp">导出</span> ▾</button><div class="dd-m">
+    <button id="btnPDF" data-i18n="exportPDF">导出 PDF</button>
+    <button id="btnJPG" data-i18n="exportJPG">导出 JPG</button>
+    <button id="btnXls" data-i18n="expXls">导出 Excel</button>
+    <button id="btnExport" data-i18n="exportJSON">导出JSON</button>
+    <button id="btnCSV" data-i18n="exportCSV">导出CSV</button>
+    <button id="btnExpXML" data-i18n="expXml">导出 XML</button>
+  </div></div>
+  <input type="file" id="fileJSON" accept=".json" style="display:none"> <input type="file" id="fileXML" accept=".xml" style="display:none"> <input type="file" id="fileMPP" accept=".mpp,.mpt,.mpx,.pod,.planner,.gan,.xer,.pmxml" style="display:none"> <input type="file" id="fileSub" accept=".json,.xml,.mpp,.mpt,.mpx" style="display:none">
 </div>
 <div class="cal-panel" id="calPanel" style="display:none">
   <h3 data-i18n="calTitle">工作日历 · 自然语言导入</h3>
@@ -4350,6 +4369,25 @@ I18N.zh.netLinkHint = "拖动方框右侧的蓝色圆点（或按住 Shift 拖�
 I18N.en.netLinkHint = "Drag the blue dot on a box\u2019s right edge (or Shift+drag the box) onto another box to create a finish-to-start link.";
 I18N.de.netLinkHint = "Blauen Punkt am rechten Rand (oder Shift+Ziehen) auf einen anderen Kasten ziehen, um eine Ende-Anfang-Verknüpfung zu erstellen.";
 I18N.zh.netLinkDup = "这两个任务已经有链接了"; I18N.en.netLinkDup = "These tasks are already linked"; I18N.de.netLinkDup = "Bereits verknüpft";
+
+/* v4：工具栏下拉菜单 */
+(function(){
+  function closeAll(except){ document.querySelectorAll(".toolbar .dd.open").forEach(function(d){ if(d !== except) d.classList.remove("open"); }); }
+  document.addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest(".toolbar .dd-b");
+    if(b){ var d = b.parentNode; closeAll(d); d.classList.toggle("open"); e.preventDefault(); return; }
+    var m = e.target.closest && e.target.closest(".toolbar .dd-m");
+    if(m){ if(e.target.closest("button")) setTimeout(function(){ closeAll(); }, 0); return; }
+    closeAll();
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeAll(); });
+})();
+I18N.zh.ddShow = "显示"; I18N.en.ddShow = "View"; I18N.de.ddShow = "Ansicht";
+I18N.zh.ddBase = "基线"; I18N.en.ddBase = "Baseline"; I18N.de.ddBase = "Basisplan";
+I18N.zh.ddFlt = "筛选"; I18N.en.ddFlt = "Filter"; I18N.de.ddFlt = "Filter";
+I18N.zh.ddSched = "排程"; I18N.en.ddSched = "Schedule"; I18N.de.ddSched = "Planung";
+I18N.zh.ddExp = "导出"; I18N.en.ddExp = "Export"; I18N.de.ddExp = "Export";
+I18N.zh.ddImp = "导入"; I18N.en.ddImp = "Import"; I18N.de.ddImp = "Import";
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
 })();
