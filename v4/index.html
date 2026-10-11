@@ -60,6 +60,16 @@ header button:hover{background:var(--steel3)}
 #fmtBar .fm-a{font-weight:700;font-size:12px;line-height:12px;font-family:serif}#fmtBar .fm-cbar{width:16px;height:3px;margin-top:2px;border-radius:1px}
 #fmtBar .fm-c input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;padding:0;border:0}
 #fmtBar.dis{opacity:.55}
+#mspBar{display:inline-flex;align-items:center;gap:4px}#mspBar>button{padding:5px 8px}
+#mspBar .ms-pct{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#mspBar .ms-pct button{border:0;border-radius:0;padding:4px 6px;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:30px}
+#mspBar .ms-pct button+button{border-left:1px solid var(--line)}
+#mspBar .ms-pct i{display:block;width:18px;height:5px;border:1px solid #64748b;border-radius:1px;background:linear-gradient(90deg,#1e3a8a calc(var(--p)*1%),transparent 0)}
+.trow.drop-b{box-shadow:inset 0 2px 0 var(--accent)}.trow.drop-a{box-shadow:inset 0 -2px 0 var(--accent)}
+body.row-dragging,body.row-dragging *{cursor:grabbing!important;user-select:none}
+.trow .c-id{cursor:grab}
+.g-bar.msel,.g-ms.msel{outline:2px solid #f59e0b;outline-offset:1px}
+.g-bar.flash,.g-ms.flash{animation:v4flash .9s}@keyframes v4flash{0%,60%{box-shadow:0 0 0 4px #fbbf24}100%{box-shadow:none}}
 .trow input,.trow select{font-family:inherit;font-weight:inherit;font-style:inherit}
 .toolbar .ck{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--tx1);cursor:pointer;user-select:none;white-space:nowrap}
 .toolbar .ck input{margin:0;accent-color:var(--accent);cursor:pointer}
@@ -3539,6 +3549,7 @@ function init(){
     var row = document.querySelector('#taskList .trow[data-id="' + t.id + '"]');
     if(row){ row.scrollIntoView({ block:"nearest" }); startInlineName(row, t); }
   }
+  window.__v4QuickAdd = quickAdd;
   document.getElementById("btnAdd").addEventListener("click", function(){ quickAdd("task"); });
   document.getElementById("btnAddGroup").addEventListener("click", function(){
     var t = mkTask({ name:"新分组", type:"group" }); state.tasks.push(t); render();
@@ -4886,6 +4897,188 @@ function v4ExpPlan(){
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4NewProj = open;
+})();
+/* ===== v4：MS Project 基础操作对标 —— 多选（Ctrl/Shift）、链接/取消链接（Ctrl+F2）、完成百分比 0–100%、
+   复制/剪切/粘贴行（Ctrl+C/X/V）、Insert 插入、方向键/F2、Ctrl+A、拖动 ID 移动行、大纲级别、滚动到任务、放大/缩小 ===== */
+(function(){
+  var TX = {
+    zh:{ link:"链接任务 (Ctrl+F2)：按顺序把选中任务以「完成-开始」串起来", unlink:"取消链接：删除选中任务之间（只选一个时为它的全部）链接", pct:"完成百分比", need:"请先选中任务", need2:"请至少选中两个任务（Ctrl/Shift+单击多选）", linked:"已链接 {0} 个任务", unlinked:"已删除 {0} 个链接", copied:"已复制 {0} 行", cut:"已剪切 {0} 行", pasted:"已粘贴 {0} 行", delN:"删除选中的 {0} 个任务？", scroll:"滚动到任务", zin:"放大", zout:"缩小", lvl:"大纲", lvlAll:"所有子任务", lvlN:"级别 {0}", moved:"已移动", sel:"已选 {0} 项", sys:"客户里程碑等同步行不能剪切/移动" },
+    en:{ link:"Link tasks (Ctrl+F2): chain the selected tasks finish-to-start", unlink:"Unlink: remove links among the selected tasks (all links if one is selected)", pct:"% complete", need:"Select a task first", need2:"Select at least two tasks (Ctrl/Shift+click)", linked:"Linked {0} tasks", unlinked:"Removed {0} links", copied:"Copied {0} rows", cut:"Cut {0} rows", pasted:"Pasted {0} rows", delN:"Delete the {0} selected tasks?", scroll:"Scroll to task", zin:"Zoom in", zout:"Zoom out", lvl:"Outline", lvlAll:"All subtasks", lvlN:"Level {0}", moved:"Moved", sel:"{0} selected", sys:"Synced rows (customer milestones) can't be cut or moved" },
+    de:{ link:"Vorgänge verknüpfen (Strg+F2): Auswahl als Ende-Anfang verketten", unlink:"Verknüpfung lösen", pct:"% abgeschlossen", need:"Bitte zuerst einen Vorgang wählen", need2:"Mindestens zwei Vorgänge wählen (Strg/Umschalt+Klick)", linked:"{0} Vorgänge verknüpft", unlinked:"{0} Verknüpfungen entfernt", copied:"{0} Zeilen kopiert", cut:"{0} Zeilen ausgeschnitten", pasted:"{0} Zeilen eingefügt", delN:"{0} ausgewählte Vorgänge löschen?", scroll:"Zu Vorgang blättern", zin:"Vergrößern", zout:"Verkleinern", lvl:"Gliederung", lvlAll:"Alle Teilvorgänge", lvlN:"Ebene {0}", moved:"Verschoben", sel:"{0} ausgewählt", sys:"Synchronisierte Zeilen können nicht verschoben werden" }
+  };
+  function L(k, a){ var s = (TX[lang] || TX.zh)[k]; return a != null ? s.replace("{0}", a) : s; }
+  var msel = {}, anchor = null, clip = null;
+  function visIds(){ return visibleTasks().map(function(t){ return t.id; }); }
+  function selList(){ var ids = Object.keys(msel).filter(byId); if(ids.length > 1){ var ord = {}; state.tasks.forEach(function(t, i){ ord[t.id] = i; }); return ids.sort(function(a, b){ return ord[a] - ord[b]; }); } return selId && byId(selId) ? [selId] : []; }
+  window.__v4SelList = selList;
+  function paint(){
+    var many = Object.keys(msel).length > 1;
+    document.querySelectorAll("#taskList .trow[data-id]").forEach(function(r){ var on = r.dataset.id === selId || (many && msel[r.dataset.id]); r.classList.toggle("sel", !!on); });
+    document.querySelectorAll(".g-bar[data-id],.g-ms[data-id]").forEach(function(b){ b.classList.toggle("msel", many && !!msel[b.dataset.id]); });
+  }
+  function setSingle(id){ msel = {}; if(id){ msel[id] = 1; } selId = id; anchor = id; paint(); }
+  var _r = render; render = function(){ var x = _r.apply(this, arguments); Object.keys(msel).forEach(function(id){ if(!byId(id)) delete msel[id]; }); if(selId && !msel[selId] && Object.keys(msel).length <= 1){ msel = {}; msel[selId] = 1; } paint(); return x; };
+  /* —— 多选：Ctrl/⌘+单击切换，Shift+单击连续选择（捕获阶段，抢在行自己的单击处理之前） —— */
+  document.addEventListener("click", function(e){
+    var r = e.target.closest && e.target.closest("#taskList .trow[data-id]"); if(!r) return;
+    if(e.target.closest("input,select,.row-del,.g-tog")) return;
+    var id = r.dataset.id;
+    if(e.ctrlKey || e.metaKey){ e.stopPropagation(); e.preventDefault(); if(!Object.keys(msel).length && selId) msel[selId] = 1;
+      if(msel[id] && Object.keys(msel).length > 1){ delete msel[id]; if(selId === id) selId = Object.keys(msel)[0]; } else { msel[id] = 1; selId = id; } anchor = id; paint(); toastSel(); return; }
+    if(e.shiftKey && (anchor || selId)){ e.stopPropagation(); e.preventDefault(); var v = visIds(), a = v.indexOf(anchor || selId), b = v.indexOf(id); if(a < 0 || b < 0) return;
+      msel = {}; for(var i = Math.min(a, b); i <= Math.max(a, b); i++) msel[v[i]] = 1; selId = id; paint(); toastSel(); return; }
+    msel = {}; msel[id] = 1; anchor = id; setTimeout(paint, 0);
+  }, true);
+  function toastSel(){ var n = Object.keys(msel).length; if(n > 1) toast(L("sel", n)); }
+  /* —— 链接 / 取消链接 —— */
+  function depId(d){ return (d && d.id) || d; }
+  function linkSel(){
+    var ids = selList().filter(function(id){ return byId(id).type !== "group"; });
+    if(ids.length < 2){ toast(L("need2")); return; }
+    var n = 0;
+    for(var i = 1; i < ids.length; i++){ var t = byId(ids[i]); t.deps = t.deps || [];
+      if(!t.deps.some(function(d){ return depId(d) === ids[i - 1]; })){ t.deps.push({ id:ids[i - 1], type:"FS", lag:0 }); n++; } }
+    render(); toast(L("linked", ids.length));
+  }
+  function unlinkSel(){
+    var ids = selList(); if(!ids.length){ toast(L("need")); return; }
+    var set = {}, n = 0, one = ids.length === 1; ids.forEach(function(id){ set[id] = 1; });
+    state.tasks.forEach(function(t){ if(!t.deps || !t.deps.length) return; var b = t.deps.length;
+      t.deps = t.deps.filter(function(d){ var p = depId(d); return one ? !(t.id === ids[0] || p === ids[0]) : !(set[t.id] && set[p]); }); n += b - t.deps.length; });
+    render(); toast(L("unlinked", n));
+  }
+  /* —— 完成百分比 —— */
+  function setPct(p){
+    var ids = selList(); if(!ids.length){ toast(L("need")); return; }
+    var hit = {};
+    (function add(list){ list.forEach(function(id){ var t = byId(id); if(!t) return; if(t.type === "group") add(state.tasks.filter(function(x){ return x.group === id; }).map(function(x){ return x.id; })); else hit[id] = t; }); })(ids);
+    Object.keys(hit).forEach(function(id){ hit[id].progress = p; });
+    render();
+  }
+  /* —— 复制 / 剪切 / 粘贴 —— */
+  function withKids(ids){ var out = [], seen = {};
+    ids.forEach(function(id){ if(seen[id]) return; var t = byId(id); if(!t) return; seen[id] = 1; out.push(t);
+      if(t.type === "group") (function walk(gid){ state.tasks.forEach(function(x){ if(x.group === gid && !seen[x.id]){ seen[x.id] = 1; out.push(x); if(x.type === "group") walk(x.id); } }); })(id); });
+    var ord = {}; state.tasks.forEach(function(t, i){ ord[t.id] = i; }); return out.sort(function(a, b){ return ord[a.id] - ord[b.id]; }); }
+  function copySel(cut){
+    var ids = selList(); if(!ids.length){ toast(L("need")); return; }
+    var rows = withKids(ids);
+    if(cut && rows.some(function(t){ return isSysRow(t); })){ toast(L("sys")); return; }
+    clip = JSON.parse(JSON.stringify(rows));
+    try{ navigator.clipboard && navigator.clipboard.writeText(rows.map(function(t){ return [t.name, t.start || "", taskEnd(t) || "", t.type === "group" ? "" : t.dur].join("\t"); }).join("\n")); }catch(e){}
+    if(cut){ var gone = {}; rows.forEach(function(t){ gone[t.id] = 1; }); state.tasks = state.tasks.filter(function(t){ return !gone[t.id]; });
+      state.tasks.forEach(function(x){ if(x.deps) x.deps = x.deps.filter(function(d){ return !gone[depId(d)]; }); }); selId = null; msel = {}; render(); toast(L("cut", rows.length)); }
+    else toast(L("copied", rows.length));
+  }
+  function pasteRows(){
+    if(!clip || !clip.length) return;
+    var map = {}; clip.forEach(function(t){ map[t.id] = newId(); });
+    var sel = selId ? byId(selId) : null, grp = sel ? (sel.group || "") : "", at = state.tasks.length;
+    if(sel){ var blk = withKids([sel.id]); at = state.tasks.indexOf(blk[blk.length - 1]) + 1; }
+    var rows = clip.map(function(o){ var t = JSON.parse(JSON.stringify(o)); t.id = map[o.id];
+      t.group = map[o.group] ? map[o.group] : grp; if(/^(oem:|ms:|grp:|oemgrp:)/.test(String(t.source || ""))) t.source = "";
+      t.deps = (t.deps || []).filter(function(d){ return map[depId(d)]; }).map(function(d){ return typeof d === "object" ? Object.assign({}, d, { id:map[depId(d)] }) : map[d]; });
+      return t; });
+    Array.prototype.splice.apply(state.tasks, [at, 0].concat(rows));
+    msel = {}; rows.forEach(function(t){ if(!map[t.group] || t.group === grp) msel[t.id] = 1; }); selId = rows[0].id; anchor = selId;
+    render(); toast(L("pasted", rows.length));
+  }
+  function delSel(){
+    var ids = selList(); if(ids.length < 2) return false;
+    if(!confirm(L("delN", ids.length))) return true;
+    ids.forEach(function(id){ if(byId(id)) deleteTask(id, false); }); msel = {}; selId = null; render(); return true;
+  }
+  /* —— 键盘 —— */
+  document.addEventListener("keydown", function(e){
+    var tg = e.target, tn = tg && tg.tagName;
+    if(tn === "INPUT" || tn === "TEXTAREA" || tn === "SELECT" || (tg && tg.isContentEditable)) return;
+    if(document.querySelector(".modal-bg.show")) return;
+    var k = (e.key || "").toLowerCase(), c = e.ctrlKey || e.metaKey;
+    if(c && !e.altKey && !e.shiftKey && (k === "c" || k === "x" || k === "v" || k === "a")){
+      if(window.getSelection && String(window.getSelection()) && k !== "v") return;
+      e.preventDefault();
+      if(k === "c") copySel(false); else if(k === "x") copySel(true); else if(k === "v") pasteRows();
+      else { msel = {}; visIds().forEach(function(id){ msel[id] = 1; }); paint(); toastSel(); }
+      return;
+    }
+    if(e.key === "F2" && c){ e.preventDefault(); linkSel(); return; }
+    if(e.key === "F2" && !c && selId){ e.preventDefault(); var row = document.querySelector('#taskList .trow[data-id="' + selId + '"]'), t = byId(selId);
+      if(row && t && !isManaged(t.source)) startInlineName(row, t); return; }
+    if(e.key === "Insert"){ e.preventDefault(); if(window.__v4QuickAdd) window.__v4QuickAdd("task"); return; }
+    if(e.key === "Delete" && Object.keys(msel).length > 1){ e.preventDefault(); e.stopImmediatePropagation(); delSel(); return; }
+    if((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.altKey && !c){
+      var v = visIds(); if(!v.length) return; e.preventDefault();
+      var i = v.indexOf(selId), j = i < 0 ? 0 : Math.max(0, Math.min(v.length - 1, i + (e.key === "ArrowUp" ? -1 : 1)));
+      if(e.shiftKey){ var a = v.indexOf(anchor || selId); if(a < 0) a = j; msel = {}; for(var q = Math.min(a, j); q <= Math.max(a, j); q++) msel[v[q]] = 1; selId = v[j]; paint(); }
+      else setSingle(v[j]);
+      var r = document.querySelector('#taskList .trow[data-id="' + v[j] + '"]'); if(r) r.scrollIntoView({ block:"nearest" });
+      return;
+    }
+    if(e.key === "Escape" && Object.keys(msel).length > 1){ setSingle(selId); }
+  }, true);
+  /* 删除按钮：多选时一次删除全部 */
+  document.addEventListener("click", function(e){ if(e.target.closest && e.target.closest("#btnDelSel") && Object.keys(msel).length > 1){ e.stopPropagation(); delSel(); } }, true);
+  /* —— 拖动 ID 列移动行（含子任务） —— */
+  var drag = null;
+  document.addEventListener("pointerdown", function(e){
+    var cell = e.target.closest && e.target.closest("#taskList .trow[data-id] .c-id"); if(!cell || e.button !== 0) return;
+    var r = cell.closest(".trow"), t = byId(r.dataset.id); if(!t) return;
+    drag = { id:t.id, y:e.clientY, on:false };
+  });
+  document.addEventListener("pointermove", function(e){
+    if(!drag) return; if(!drag.on && Math.abs(e.clientY - drag.y) < 6) return;
+    drag.on = true; document.body.classList.add("row-dragging");
+    document.querySelectorAll(".trow.drop-b,.trow.drop-a").forEach(function(x){ x.classList.remove("drop-b", "drop-a"); });
+    var el = document.elementFromPoint(e.clientX, e.clientY), r = el && el.closest && el.closest("#taskList .trow[data-id]");
+    if(r && r.dataset.id !== drag.id){ var bb = r.getBoundingClientRect(); r.classList.add(e.clientY < bb.top + bb.height / 2 ? "drop-b" : "drop-a"); drag.tgt = r.dataset.id; drag.after = e.clientY >= bb.top + bb.height / 2; } else drag.tgt = null;
+  });
+  document.addEventListener("pointerup", function(){
+    if(!drag) return; var d = drag; drag = null; document.body.classList.remove("row-dragging");
+    document.querySelectorAll(".trow.drop-b,.trow.drop-a").forEach(function(x){ x.classList.remove("drop-b", "drop-a"); });
+    if(!d.on || !d.tgt) return;
+    var t = byId(d.id), tg = byId(d.tgt); if(!t || !tg) return;
+    if(isSysRow(t)){ toast(L("sys")); return; }
+    var blk = withKids([t.id]), inBlk = {}; blk.forEach(function(x){ inBlk[x.id] = 1; }); if(inBlk[tg.id]) return;
+    state.tasks = state.tasks.filter(function(x){ return !inBlk[x.id]; });
+    var at, ng;
+    if(d.after){ var tb = tg.type === "group" && !state.collapsed[tg.id] ? null : withKids([tg.id]);
+      if(tb){ at = state.tasks.indexOf(tb[tb.length - 1]) + 1; ng = tg.group || ""; } else { at = state.tasks.indexOf(tg) + 1; ng = tg.id; } }
+    else { at = state.tasks.indexOf(tg); ng = tg.group || ""; }
+    t.group = ng;
+    Array.prototype.splice.apply(state.tasks, [at, 0].concat(blk));
+    selId = t.id; msel = {}; msel[t.id] = 1; render(); toast(L("moved"));
+  });
+  /* —— 大纲级别、滚动到任务、放大/缩小 —— */
+  function showLevel(n){ state.tasks.forEach(function(t){ if(t.type === "group") state.collapsed[t.id] = n > 0 && depthOf(t) + 1 >= n; }); render(); }
+  function scrollToTask(){
+    var id = selId; if(!id){ toast(L("need")); return; }
+    var b = document.querySelector('.g-bar[data-id="' + id + '"],.g-ms[data-id="' + id + '"]'), gb = document.getElementById("ganttBody");
+    if(!b){ var t = byId(id); if(t && t.type === "group"){ var kid = state.tasks.find(function(x){ return x.group === id && x.type !== "group"; }); if(kid) b = document.querySelector('.g-bar[data-id="' + kid.id + '"],.g-ms[data-id="' + kid.id + '"]'); } }
+    if(b && gb){ gb.scrollLeft = Math.max(0, b.offsetLeft - 40); b.classList.add("flash"); setTimeout(function(){ b.classList.remove("flash"); }, 900); }
+  }
+  var ZORD = ["day","week","month","fit"];
+  function zoom(dir){ var i = ZORD.indexOf(state.view); if(i < 0) i = 3; var j = Math.max(0, Math.min(ZORD.length - 1, i + dir)); var btn = document.querySelector('.viewbtns button[data-view="' + ZORD[j] + '"]'); if(btn) btn.click(); }
+  function setup(){
+    if(document.getElementById("mspBar")) return;
+    var after = document.getElementById("btnIndent"); if(!after) return;
+    var bar = document.createElement("span"); bar.id = "mspBar";
+    bar.innerHTML = '<button type="button" class="ms-link" title="' + L("link") + '">🔗</button><button type="button" class="ms-unlink" title="' + L("unlink") + '">⛓‍💥</button>'
+      + '<span class="ms-pct" title="' + L("pct") + '">' + [0,25,50,75,100].map(function(p){ return '<button type="button" data-p="' + p + '" title="' + L("pct") + ' ' + p + '%"><i style="--p:' + p + '"></i>' + p + '</button>'; }).join("") + '</span>';
+    after.after(bar);
+    bar.querySelector(".ms-link").onclick = linkSel; bar.querySelector(".ms-unlink").onclick = unlinkSel;
+    bar.querySelectorAll(".ms-pct button").forEach(function(b){ b.onclick = function(){ setPct(+b.dataset.p); }; });
+    /* 显示 ▾ 菜单：大纲级别 / 滚动到任务 / 放大缩小 */
+    var cb = document.getElementById("btnColors");
+    if(cb){ var row = document.createElement("div"); row.className = "dd-row"; row.id = "mspView";
+      row.innerHTML = '<select class="ms-lvl" title="' + L("lvl") + '" style="height:28px"><option value="">' + L("lvl") + '…</option><option value="0">' + L("lvlAll") + '</option>' + [1,2,3,4].map(function(n){ return '<option value="' + n + '">' + L("lvlN", n) + '</option>'; }).join("") + '</select>'
+        + '<button type="button" class="ms-scroll">⇢ ' + L("scroll") + '</button><button type="button" class="ms-zin" title="' + L("zin") + '">＋</button><button type="button" class="ms-zout" title="' + L("zout") + '">－</button>';
+      var host = cb.closest(".dd-m") || cb.parentNode; host.appendChild(row);
+      row.querySelector(".ms-lvl").onchange = function(){ if(this.value !== "") showLevel(+this.value); this.value = ""; };
+      row.querySelector(".ms-scroll").onclick = scrollToTask; row.querySelector(".ms-zin").onclick = function(){ zoom(-1); }; row.querySelector(".ms-zout").onclick = function(){ zoom(1); };
+    }
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Msp = { linkSel:linkSel, unlinkSel:unlinkSel, setPct:setPct, copySel:copySel, pasteRows:pasteRows, showLevel:showLevel, scrollToTask:scrollToTask, zoom:zoom, msel:function(){ return msel; } };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
