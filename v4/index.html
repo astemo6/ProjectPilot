@@ -453,14 +453,92 @@ html[data-theme=dark] #taskList .trow.hl-row>div{background:rgba(250,204,21,.28)
 html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
 html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:none!important}
 </style>
+<style id="macStyle">
+/* ===== v4.11：macOS 风格（字体统一 / 半透明顶栏 / 分段控件 / 细线 / 柔和阴影） ===== */
+:root{--accent:#007aff;--mac-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Helvetica Neue","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+  --tx1:#1d1d1f;--tx2:#424245;--tx3:#86868b;--bg:#f5f5f7;--side:#fbfbfd;--line:rgba(0,0,0,.12);--line2:rgba(0,0,0,.07);
+  --m-bar:rgba(246,246,248,.86);--m-ctl:#fff;--m-ctl-h:#f6f6f6;--m-ctl-a:#e9e9eb;--m-bd:rgba(0,0,0,.14);--m-sh:0 .5px 1.5px rgba(0,0,0,.1);--m-seg:rgba(0,0,0,.06);--m-hd:#f2f2f4;--m-sel:rgba(0,122,255,.12);--m-hov:rgba(0,0,0,.035)}
+html[data-theme=dark]{--accent:#0a84ff;--tx1:#f5f5f7;--tx2:#d1d1d6;--tx3:#98989d;--bg:#1c1c1e;--side:#1c1c1e;--card:#232325;--line:rgba(255,255,255,.12);--line2:rgba(255,255,255,.07);
+  --m-bar:rgba(40,40,42,.86);--m-ctl:#3a3a3c;--m-ctl-h:#444446;--m-ctl-a:#505052;--m-bd:rgba(255,255,255,.1);--m-sh:0 .5px 1px rgba(0,0,0,.4);--m-seg:rgba(255,255,255,.08);--m-hd:#2a2a2c;--m-sel:rgba(10,132,255,.28);--m-hov:rgba(255,255,255,.04)}
+body{font-family:var(--mac-font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:.01em}
+/* 所有控件统一继承字体（原先 button/select 落回 Arial，造成中英文字形不一致） */
+button,input,select,textarea,optgroup{font-family:inherit!important;letter-spacing:inherit}
+/* —— 顶栏 —— */
+header{background:var(--m-bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);color:var(--tx1);border-bottom:1px solid var(--line);gap:10px}
+header h1{font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--tx1)}
+header #appVer,header .sub{color:var(--tx3);opacity:1}
+header button,header a.btn,header #lnkOem,header #lnkOem *,header select{font-size:12px!important;background:var(--m-ctl);color:var(--tx1);border:.5px solid var(--m-bd);box-shadow:var(--m-sh);border-radius:7px;font-size:12px;font-weight:500;height:28px!important;padding:0 12px}
+header button:hover,header #lnkOem:hover{background:var(--m-ctl-h)}header button:active{background:var(--m-ctl-a)}
+#projName{background:var(--m-seg);border:1px solid transparent;color:var(--tx1);border-radius:7px;height:28px!important;font-size:13px}
+#projName::placeholder{color:var(--tx3)}
+#projName:focus{background:var(--m-ctl);border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,122,255,.25)}
+/* 分段控件：主题 / 语言 */
+header #themeBtns,header .langbtns{display:inline-flex;gap:0;background:var(--m-seg);border:none;border-radius:8px;padding:2px;height:28px!important;box-shadow:none;overflow:visible}
+header #themeBtns button,header .langbtns button{background:transparent;border:none;box-shadow:none;color:var(--tx2);height:24px!important;padding:0 9px;border-radius:6px;font-size:12px;font-weight:500}
+header #themeBtns button.on,header .langbtns button.on{background:var(--m-ctl);color:var(--tx1);box-shadow:0 1px 2px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06)}
+/* —— Ribbon —— */
+.toolbar{background:var(--card);border-bottom:1px solid var(--line)}
+.ribbon .rb-tabs{background:var(--m-bar);border-bottom:1px solid var(--line2);align-items:center;padding:4px 12px;gap:2px}
+.ribbon .rb-tabs .rb-tab{border:none!important;border-radius:6px;margin:0;padding:3px 14px;font-size:13px;font-weight:500;color:var(--tx2);background:transparent;height:24px;box-shadow:none}
+.ribbon .rb-tabs .rb-tab:hover{background:var(--m-hov);color:var(--tx1)}
+.ribbon .rb-tabs .rb-tab.on{background:var(--m-seg);color:var(--tx1);font-weight:600}
+html[data-theme=dark] .ribbon .rb-tabs{background:var(--m-bar)}html[data-theme=dark] .ribbon .rb-tabs .rb-tab.on{background:var(--m-seg);border:none}
+.ribbon .rb-qat,.ribbon .rb-tabs .rb-fold{margin-bottom:0}
+.ribbon .rb-body{padding:8px 12px 2px}
+.ribbon .rb-grp{border-right:1px solid var(--line2);padding:0 12px}
+.ribbon .rb-lab{font-size:11px;color:var(--tx3);font-weight:400;padding-top:4px}
+.toolbar button,.toolbar select,.ribbon .rb-qat button,html[data-theme=dark] .toolbar button,html[data-theme=dark] .toolbar select{background:var(--m-ctl);color:var(--tx1);border:.5px solid var(--m-bd);box-shadow:var(--m-sh);border-radius:6px;font-size:12px;font-weight:400;height:26px;line-height:1;padding:0 10px}
+.toolbar select{padding:0 6px}
+.toolbar button:hover,.toolbar select:hover{background:var(--m-ctl-h);border-color:var(--m-bd);color:var(--tx1)}
+.toolbar button:active{background:var(--m-ctl-a)}
+.toolbar button:focus-visible,.toolbar select:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(0,122,255,.3)}
+.toolbar button.primary{background:var(--accent);border-color:transparent;color:#fff}.toolbar button.primary:hover{background:#0068d9;color:#fff}
+.toolbar .dd.open>.dd-b,.ribbon .rb-px.on,html[data-theme=dark] .ribbon .rb-px.on{background:var(--m-sel);color:var(--accent);border-color:transparent}
+.ribbon .rb-qat button{height:22px;padding:0 9px}.ribbon .rb-qat .qat-m,.ribbon .rb-tabs .rb-fold{box-shadow:none;border:none;background:transparent}
+.toolbar .ck{font-size:12px}.ribbon .rb-box>button,.ribbon .rb-box select,.ribbon .rb-box>span>button,.ribbon .rb-box>div>button{height:26px!important;font-size:12px!important}.toolbar .tb-lab{font-size:12px;color:var(--tx3)}
+/* 菜单：macOS 弹出菜单 */
+.toolbar .dd-m,.tb-ddm,html[data-theme=dark] .toolbar .dd-m{background:color-mix(in srgb,var(--card) 92%,transparent);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);border:.5px solid var(--m-bd);border-radius:10px;padding:5px;box-shadow:0 12px 32px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.05)}
+.toolbar .dd-m>button{box-shadow:none;border:none;background:transparent;border-radius:5px;height:24px;padding:0 10px;font-size:13px}
+.toolbar .dd-m>button:hover{background:var(--accent);color:#fff}
+/* —— 表格 —— */
+.table-head,.table-head .c-id,.table-head .c-name{background:var(--m-hd);color:var(--tx2);font-weight:600;border-bottom:1px solid var(--line)}
+.table-head>div{border-right-color:var(--line2)}
+.trow{border-bottom:1px solid var(--line2)}
+.trow:hover{background:var(--m-hov)}
+.trow.sel{background:var(--m-sel)}
+.trow.group,.trow.group .c-id,.trow.group .c-name,html[data-theme=dark] .trow.group,html[data-theme=dark] .trow.group .c-id,html[data-theme=dark] .trow.group .c-name{background:var(--m-hd);font-weight:600}
+.trow.band-sp{background:var(--side)}
+.trow select{border-color:transparent;background-color:transparent}
+.cell-in:focus{outline:none;box-shadow:0 0 0 2px var(--accent) inset;border-radius:4px}
+table.rs th,.cal-hd{background:var(--m-hd);color:var(--tx2)}
+.viewbtns button.on{background:var(--m-sel);color:var(--accent)}
+.cal-panel button{background:var(--m-ctl);color:var(--tx1);border:.5px solid var(--m-bd);box-shadow:var(--m-sh)}
+/* —— 对话框：macOS 面板 —— */
+.modal-bg{background:rgba(0,0,0,.25);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.modal,html[data-theme=dark] .modal{border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.28),0 0 0 .5px rgba(0,0,0,.12);background:var(--card)}
+.modal-h{background:transparent;color:var(--tx1);border-radius:12px 12px 0 0;font-size:13px;font-weight:600;justify-content:center;position:relative;padding:12px 40px;border-bottom:1px solid var(--line2)}
+.modal-h button{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-radius:50%;background:#ff5f57!important;color:transparent!important;font-size:0!important;padding:0!important;border:.5px solid rgba(0,0,0,.15)!important;box-shadow:none!important}
+.modal-h button:hover{color:rgba(0,0,0,.6)!important;font-size:10px!important;line-height:12px}
+.modal-f{border-top:1px solid var(--line2)}
+.modal-f button,.modal-b button,html[data-theme=dark] .modal-f button,html[data-theme=dark] .modal-b button{background:var(--m-ctl);color:var(--tx1);border:.5px solid var(--m-bd);box-shadow:var(--m-sh);border-radius:6px;font-size:13px;font-weight:400;padding:0 16px;height:28px}
+.modal-f .ok,.modal .primary,.modal button.primary,html[data-theme=dark] .modal-f .ok{background:var(--accent)!important;color:#fff!important;border-color:transparent!important}
+.modal input:not([type=checkbox]):not([type=radio]):not([type=color]),.modal select,.modal textarea{border:.5px solid var(--m-bd);border-radius:6px;background:var(--m-ctl);color:var(--tx1);font-size:13px}
+.modal input:focus,.modal select:focus,.modal textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,122,255,.25)}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
+/* 右键菜单 */
+.tctx{border-radius:10px!important;padding:5px!important;box-shadow:0 12px 32px rgba(0,0,0,.2),0 0 0 .5px rgba(0,0,0,.08)!important;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+/* 细滚动条 */
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);border-radius:10px;border:3px solid transparent;background-clip:content-box}::-webkit-scrollbar-thumb:hover{background-color:rgba(0,0,0,.35)}::-webkit-scrollbar-track{background:transparent}
+html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,255,.22)}
+</style>
 <script>if(window.self !== window.top) document.documentElement.className += " embed";</script>
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.10</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.11</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
-  <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
+  <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM 开发计划 ↗</a>
   <div class="langbtns">
     <button data-lang="zh">中文</button><button data-lang="en">EN</button><button data-lang="de">DE</button>
   </div>
@@ -4796,7 +4874,7 @@ I18N.zh.chartColors = "颜色"; I18N.en.chartColors = "Colors"; I18N.de.chartCol
     var ec = state.info && state.info.expColors; if(ec && !state.chartColors){ state.chartColors = { ms:ec.ms, sum:ec.sum }; } if(state.info) delete state.info.expColors;
     save();
   }
-  var DARK_DEF = { hy:"#2c4a63", hm:"#1d2d42", bg:"#0b1220", wk:"#121c2c" };
+  var DARK_DEF = { hy:"#3a3a3c", hm:"#2c2c2e", bg:"#1c1c1e", wk:"#232325" };
   function applyVars(){ var c = CC(), s = document.documentElement.style;
     if(window.v4IsDark && window.v4IsDark()) for(var k in DARK_DEF){ if(c[k] === CHART_COL_DEF[k]) c[k] = DARK_DEF[k]; }
     function txc(hex){ var n = parseInt(hex.slice(1), 16), L = (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)); return L > 150 ? "#1f2937" : "#ffffff"; }
