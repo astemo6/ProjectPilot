@@ -3334,6 +3334,7 @@ function init(){
     state.planOem = newOem;
     save();
     if(!newOem){ render(); return; } // 清空选择 = 仅去掉色带
+    if(true){ render(); openOemMs(newOem); return; }
     var plan = null;
     try{ plan = JSON.parse(localStorage.getItem("gantt-plan-v4-unused")); }catch(e){}
     if(plan && plan.oem && (plan.oem === newOem || oemSlug(plan.oem) === oemSlug(newOem))){
@@ -3342,7 +3343,8 @@ function init(){
       toast(tr("oemAutoImport").replace("{0}", newOem));
       return;
     }
-    render(); /* v4：只切换阶段色带；客户里程碑通过「+ 客户里程碑」插入 */
+    render(); /* v4：选择主机厂后直接打开「插入客户里程碑」 */
+    openOemMs(newOem);
   });
   (function(){ var sb = document.getElementById("selBarLbl"); if(!sb) return; sb.value = barLblMode(); sb.addEventListener("change", function(){ state.barLbl = this.value; save(); renderGantt(); }); })();
   document.getElementById("ckPhase").addEventListener("change", function(){
