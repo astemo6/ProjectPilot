@@ -944,7 +944,21 @@ function dateRange(){
 }
 function X(d, min){ return diffDays(min, d) * PX_DAY; }
 /* 行顺序规范化：分组行后紧跟它的子行（含子分组），孤儿行（分组已删）归到顶级。避免子任务显示在分组标题上方 */
+function isSysGroupName(n){
+  n = String(n || "").trim();
+  var sys = false;
+  ["zh","en","de"].forEach(function(l){ var d = I18N[l] || {}; ["planGroupMs","planGroupRec","planGroupSup","planGroupCustom"].forEach(function(k){ if(d[k] && n === d[k]) sys = true; }); });
+  return sys || /^(APQP\s?\d|ML\s?\d|ANPQP\s?\d)\b/i.test(n);
+}
 function normalizeOrder(){
+  /* 自动清掉空的系统分组：同步/旧版导入/交付物模板留下的空分组（客户里程碑、推荐任务、APQPx、MLx…）；用户自建的空分组保留 */
+  var hasKid = {};
+  state.tasks.forEach(function(t){ if(t.group) hasKid[t.group] = 1; });
+  state.tasks = state.tasks.filter(function(t){
+    if(t.type !== "group" || hasKid[t.id]) return true;
+    var src = String(t.source || "");
+    return !(/^(grp:|tpl)/.test(src) || isSysGroupName(t.name));
+  });
   var ids = {}, kids = {}, top = [];
   state.tasks.forEach(function(t){ if(t.type === "group") ids[t.id] = 1; });
   state.tasks.forEach(function(t){
@@ -1082,7 +1096,7 @@ function toggleTplMenu(){
 function closeTplMenu(){ var m = document.getElementById("tplMenu"); if(m) m.style.display = "none"; }
 /* 插入模板：新建分组承载交付物，任务名=交付物名，工期默认5天、开始=今天、负责人空、前置空 */
 function insertTemplate(tp){
-  var g = mkTask({ name:tp.key + " " + planPickName(tp.name), type:"group", start:"", dur:0 });
+  var g = mkTask({ name:tp.key + " " + planPickName(tp.name), type:"group", start:"", dur:0, source:"tpl" });
   state.tasks.push(g);
   var today = fmtD(snapWorkday(new Date())); /* 避开周末/节假日 */
   tp.items.forEach(function(it){
@@ -2653,7 +2667,8 @@ function init(){
     if(t){
       var src = String(t.source || "");
       /* 客户里程碑/推荐任务/供应商节点由②客户节点同步，在这里删了下次同步会回来 → 引导到节点页 */
-      if(isManaged(src) || /^grp:(ms|rec|sup|custom)/.test(src)){ alert(tr("managedDel")); return; }
+      var _hasKids = state.tasks.some(function(x){ return x.group === t.id; });
+      if(isManaged(src) || (/^grp:(ms|rec|sup|custom)/.test(src) && _hasKids)){ alert(tr("managedDel")); return; }
       var gone = {}; gone[t.id] = 1;
       if(t.type === "group"){
         var kids = state.tasks.filter(function(x){ return x.group === t.id; });
