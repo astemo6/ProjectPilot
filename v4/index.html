@@ -4205,9 +4205,9 @@ var CASCADE_GAPS = {
 
 /* ============ v4：客户里程碑按需插入（取代「客户节点」页与推荐任务） ============ */
 var V4T = {
- zh:{oemMsBtn:"+ 客户里程碑",oemMsT:"插入客户里程碑",oemMsOem:"主机厂",oemMsPick:"请选择主机厂",oemMsNode:"节点",oemMsDate:"日期",oemMsFill:"按标准间隔补全空白日期",oemMsAll:"全选",oemMsNone:"全不选",oemMsHint:"勾选并填写日期的节点会作为“必须开始于”里程碑插入到「客户里程碑」分组；取消勾选的已插入节点会被移除。",oemMsOk:"已更新客户里程碑：{0} 个",oemMsNeedDate:"请至少给一个勾选的节点填写日期",oemMsGrp:"客户里程碑",oemMsFirst:"先填写第一个节点的日期"},
- en:{oemMsBtn:"+ Customer milestones",oemMsT:"Insert customer milestones",oemMsOem:"OEM",oemMsPick:"Select OEM",oemMsNode:"Milestone",oemMsDate:"Date",oemMsFill:"Fill blank dates by standard gaps",oemMsAll:"All",oemMsNone:"None",oemMsHint:"Ticked milestones with a date are inserted as Must Start On milestones in the Customer Milestones group; unticked ones already inserted are removed.",oemMsOk:"Customer milestones updated: {0}",oemMsNeedDate:"Enter a date for at least one ticked milestone",oemMsGrp:"Customer Milestones",oemMsFirst:"Enter the first milestone date first"},
- de:{oemMsBtn:"+ Kundenmeilensteine",oemMsT:"Kundenmeilensteine einfügen",oemMsOem:"OEM",oemMsPick:"OEM wählen",oemMsNode:"Meilenstein",oemMsDate:"Datum",oemMsFill:"Leere Daten nach Standardabständen füllen",oemMsAll:"Alle",oemMsNone:"Keine",oemMsHint:"Angehakte Meilensteine mit Datum werden als „Muss anfangen am“ in die Gruppe Kundenmeilensteine eingefügt; abgewählte werden entfernt.",oemMsOk:"Kundenmeilensteine aktualisiert: {0}",oemMsNeedDate:"Bitte mindestens ein Datum eintragen",oemMsGrp:"Kundenmeilensteine",oemMsFirst:"Zuerst das Datum des ersten Meilensteins eintragen"}};
+ zh:{oemMsBtn:"+ 客户里程碑",oemMsT:"插入客户里程碑",oemMsOem:"主机厂",oemMsPick:"请选择主机厂",oemMsNode:"节点",oemMsDate:"日期",oemMsFill:"按标准间隔推算其余日期",oemMsAll:"全选",oemMsNone:"全不选",oemMsHint:"填任意一个节点日期（如 SOP）后点“推算”，其余自动前后补全。勾选并有日期的节点会作为“必须开始于”里程碑插入到「客户里程碑」分组；取消勾选的已插入节点会被移除。",oemMsOk:"已更新客户里程碑：{0} 个",oemMsNeedDate:"请至少给一个勾选的节点填写日期",oemMsGrp:"客户里程碑",oemMsFirst:"请先填写任意一个节点的日期（例如 SOP）,其余会自动前后推算",oemMsAuto:"已从今天起按标准间隔排好日期,请检查后再点确定"},
+ en:{oemMsBtn:"+ Customer milestones",oemMsT:"Insert customer milestones",oemMsOem:"OEM",oemMsPick:"Select OEM",oemMsNode:"Milestone",oemMsDate:"Date",oemMsFill:"Fill blank dates by standard gaps",oemMsAll:"All",oemMsNone:"None",oemMsHint:"Ticked milestones with a date are inserted as Must Start On milestones in the Customer Milestones group; unticked ones already inserted are removed.",oemMsOk:"Customer milestones updated: {0}",oemMsNeedDate:"Enter a date for at least one ticked milestone",oemMsGrp:"Customer Milestones",oemMsFirst:"Enter any one milestone date (e.g. SOP); the rest are calculated both ways",oemMsAuto:"Dates proposed from today by standard gaps; review, then press OK"},
+ de:{oemMsBtn:"+ Kundenmeilensteine",oemMsT:"Kundenmeilensteine einfügen",oemMsOem:"OEM",oemMsPick:"OEM wählen",oemMsNode:"Meilenstein",oemMsDate:"Datum",oemMsFill:"Leere Daten nach Standardabständen füllen",oemMsAll:"Alle",oemMsNone:"Keine",oemMsHint:"Angehakte Meilensteine mit Datum werden als „Muss anfangen am“ in die Gruppe Kundenmeilensteine eingefügt; abgewählte werden entfernt.",oemMsOk:"Kundenmeilensteine aktualisiert: {0}",oemMsNeedDate:"Bitte mindestens ein Datum eintragen",oemMsGrp:"Kundenmeilensteine",oemMsFirst:"Ein beliebiges Datum eintragen (z. B. SOP); der Rest wird berechnet",oemMsAuto:"Daten ab heute vorgeschlagen; bitte prüfen und OK drücken"}};
 Object.keys(V4T).forEach(function(l){ if(I18N[l]) Object.assign(I18N[l], V4T[l]); });
 function oemMsKey(oem, name){ return "oem:" + oem + "|" + name; }
 function oemMsTasks(oem){ return state.tasks.filter(function(t){ return t.type === "milestone" && String(t.source || "").indexOf("oem:" + oem + "|") === 0; }); }
@@ -4222,7 +4222,7 @@ function openOemMs(oem){
     + '<div class="frow"><label>' + esc(tr("oemMsOem")) + '</label><select id="omOem"><option value="">' + esc(tr("oemMsPick")) + "</option>"
     + OEM_ORDER.map(function(o){ return '<option value="' + esc(o) + '"' + (o === oem ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select></div>";
   if(oem){
-    h += '<div style="display:flex;gap:6px;margin:6px 0"><button id="omAll">' + esc(tr("oemMsAll")) + '</button><button id="omNone">' + esc(tr("oemMsNone")) + '</button><button id="omFill">' + esc(tr("oemMsFill")) + "</button></div>"
+    h += '<div class="omBtns" style="display:flex;gap:6px;margin:6px 0"><button id="omAll">' + esc(tr("oemMsAll")) + '</button><button id="omNone">' + esc(tr("oemMsNone")) + '</button><button id="omFill" style="background:var(--accent);color:#fff;border-color:var(--accent)">' + esc(tr("oemMsFill")) + "</button></div><style>.omBtns button{height:28px;padding:0 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;font-size:13px}</style>"
       + '<div style="max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:6px"><table class="rs" style="width:100%"><thead><tr><th></th><th>' + esc(tr("oemMsNode")) + "</th><th>" + esc(tr("oemMsDate")) + "</th></tr></thead><tbody>"
       + OEM_NODES[oem].map(function(n, i){ var t = have[oemMsKey(oem, n[0])];
           return '<tr><td style="text-align:center"><input type="checkbox" class="omCk" data-i="' + i + '"' + (t || fresh ? " checked" : "") + ' style="width:auto"></td><td title="' + esc(n[L] || n[2] || "") + '">' + esc(n[0]) + (n[1] ? ' <span style="color:#94a3b8">' + esc(n[1]) + "</span>" : "") + '</td><td><input type="date" class="omD" data-i="' + i + '" value="' + esc(t ? t.start : "") + '"></td></tr>'; }).join("")
@@ -4237,20 +4237,29 @@ function openOemMs(oem){
   if(!oem) return;
   bg.querySelector("#omAll").onclick = function(){ bg.querySelectorAll(".omCk").forEach(function(c){ c.checked = true; }); };
   bg.querySelector("#omNone").onclick = function(){ bg.querySelectorAll(".omCk").forEach(function(c){ c.checked = false; }); };
+  function fillDates(){
+    var ds = bg.querySelectorAll(".omD"), gaps = CASCADE_GAPS[oem] || CASCADE_GAPS.DEFAULT, first = -1, i, cur;
+    function g(k){ return typeof gaps[k] === "number" ? gaps[k] : 30; }
+    for(i = 0; i < ds.length; i++) if(parseD(ds[i].value)){ first = i; break; }
+    if(first < 0) return false;
+    cur = parseD(ds[first].value); /* 向前反推 */
+    for(i = first - 1; i >= 0; i--){ cur = addDays(cur, -g(i)); while(!isWorkday(cur)) cur = addDays(cur, -1); ds[i].value = fmtD(cur); }
+    cur = parseD(ds[first].value); /* 向后顺推（已填的日期保留） */
+    for(i = first + 1; i < ds.length; i++){ var v = parseD(ds[i].value); if(v){ cur = v; continue; } cur = snapWorkday(addDays(cur, g(i - 1))); ds[i].value = fmtD(cur); }
+    return true;
+  }
   bg.querySelector("#omFill").onclick = function(){
-    var ds = bg.querySelectorAll(".omD"), gaps = CASCADE_GAPS[oem] || CASCADE_GAPS.DEFAULT, cur = null, k = 0;
-    for(var i = 0; i < ds.length; i++){
-      var v = parseD(ds[i].value);
-      if(v){ cur = v; continue; }
-      if(!cur){ if(i === 0){ toast(tr("oemMsFirst")); return; } continue; }
-      cur = snapWorkday(addDays(cur, typeof gaps[i - 1] === "number" ? gaps[i - 1] : 30)); ds[i].value = fmtD(cur); k++;
-    }
+    if(!fillDates()){ var ds = bg.querySelectorAll(".omD"); ds[ds.length - 1].focus(); toast(tr("oemMsFirst")); }
   };
   bg.querySelector("#omOk").onclick = function(){
     var pick = [];
     bg.querySelectorAll(".omCk").forEach(function(c){ var i = +c.dataset.i, d = bg.querySelector('.omD[data-i="' + i + '"]').value; if(c.checked && parseD(d)) pick.push({ n:OEM_NODES[oem][i], d:fmtD(snapWorkday(parseD(d))) }); });
     var keep = {}; pick.forEach(function(p){ keep[oemMsKey(oem, p.n[0])] = p; });
-    if(!pick.length && !oemMsTasks(oem).length){ toast(tr("oemMsNeedDate")); return; }
+    if(!pick.length && !oemMsTasks(oem).length){
+      /* 一个日期都没填：以今天为第一个节点自动排出示例日期，让用户确认后再点确定 */
+      var d0 = bg.querySelectorAll(".omD")[0]; d0.value = fmtD(snapWorkday(new Date())); fillDates();
+      toast(tr("oemMsAuto")); return;
+    }
     /* 分组 */
     var gsrc = "oemgrp:" + oem, grp = null;
     state.tasks.forEach(function(t){ if(t.type === "group" && t.source === gsrc) grp = t; });
