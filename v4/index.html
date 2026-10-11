@@ -149,6 +149,10 @@ table.rs .del{cursor:pointer;color:var(--danger,#dc2626);text-align:center;width
 .table-head .c-var{width:52px;text-align:center;flex-shrink:0}
 /* ===== 冻结列：ID + 任务名称（横向滚动时固定左侧，表头与表体均冻结） ===== */
 .table-head>div{position:relative}
+/* v4：除名称列外均不压缩；名称列保底宽度，表头与表体竖线对齐 */
+.table-head>div:not(.c-name),.trow>div:not(.c-name){flex-shrink:0}
+.table-head .c-name,.trow .c-name{min-width:180px}
+.table-head,.trow{min-width:max-content}
 .table-head .c-id,.table-head .c-name{position:sticky;background:var(--steel);z-index:4}
 .table-head .c-id{left:0}
 .table-head .c-name{left:36px}
