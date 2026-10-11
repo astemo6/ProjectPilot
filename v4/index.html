@@ -4289,6 +4289,7 @@ var V4T = {
  en:{modePick:"Select a task (or group) first",modeSetM:"Set to manually scheduled: {0}",modeSetA:"Set to auto scheduled: {0}",tmManual:"📌 Manual",tmAuto:"⚙ Auto",oemMsBtn:"+ Customer milestones",oemMsBtnCur:"Customer milestones: {0} ▾",oemMsT:"Insert customer milestones",oemMsOem:"OEM",oemMsPick:"Select OEM",oemMsNode:"Milestone",oemMsDate:"Date",oemMsFill:"Fill blank dates by standard gaps",oemMsAll:"All",oemMsNone:"None",oemMsHint:"Ticked milestones with a date are inserted as Must Start On milestones in the Customer Milestones group; unticked ones already inserted are removed.",oemMsOk:"Customer milestones updated: {0}",oemMsNeedDate:"Enter a date for at least one ticked milestone",oemMsGrp:"Customer Milestones",oemMsFirst:"Enter any one milestone date (e.g. SOP); the rest are calculated both ways",oemMsAuto:"Dates proposed from today by standard gaps; review, then press OK"},
  de:{modePick:"Zuerst einen Vorgang (oder eine Gruppe) wählen",modeSetM:"Manuell geplant: {0}",modeSetA:"Automatisch geplant: {0}",tmManual:"📌 Manuell",tmAuto:"⚙ Automatisch",oemMsBtn:"+ Kundenmeilensteine",oemMsBtnCur:"Kundenmeilensteine: {0} ▾",oemMsT:"Kundenmeilensteine einfügen",oemMsOem:"OEM",oemMsPick:"OEM wählen",oemMsNode:"Meilenstein",oemMsDate:"Datum",oemMsFill:"Leere Daten nach Standardabständen füllen",oemMsAll:"Alle",oemMsNone:"Keine",oemMsHint:"Angehakte Meilensteine mit Datum werden als „Muss anfangen am“ in die Gruppe Kundenmeilensteine eingefügt; abgewählte werden entfernt.",oemMsOk:"Kundenmeilensteine aktualisiert: {0}",oemMsNeedDate:"Bitte mindestens ein Datum eintragen",oemMsGrp:"Kundenmeilensteine",oemMsFirst:"Ein beliebiges Datum eintragen (z. B. SOP); der Rest wird berechnet",oemMsAuto:"Daten ab heute vorgeschlagen; bitte prüfen und OK drücken"}};
 Object.keys(V4T).forEach(function(l){ if(I18N[l]) Object.assign(I18N[l], V4T[l]); });
+function oemShort(s){ var r = String(s || "").replace(/\s*[（(][^（）()]*[）)]\s*/g, " ").replace(/\s+/g, " ").trim(); return r || String(s || "").trim(); }
 function oemMsKey(oem, name){ return "oem:" + oem + "|" + name; }
 function oemMsTasks(oem){ return state.tasks.filter(function(t){ return t.type === "milestone" && String(t.source || "").indexOf("oem:" + oem + "|") === 0; }); }
 function openOemMs(oem){
@@ -4305,7 +4306,7 @@ function openOemMs(oem){
     h += '<div class="omBtns" style="display:flex;gap:6px;margin:6px 0"><button id="omAll">' + esc(tr("oemMsAll")) + '</button><button id="omNone">' + esc(tr("oemMsNone")) + '</button><button id="omFill" style="background:var(--accent);color:#fff;border-color:var(--accent)">' + esc(tr("oemMsFill")) + "</button></div><style>.omBtns button{height:28px;padding:0 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;font-size:13px}</style>"
       + '<div style="max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:6px"><table class="rs" style="width:100%"><thead><tr><th></th><th>' + esc(tr("oemMsNode")) + "</th><th>" + esc(tr("oemMsDate")) + "</th></tr></thead><tbody>"
       + OEM_NODES[oem].map(function(n, i){ var t = have[oemMsKey(oem, n[0])];
-          return '<tr><td style="text-align:center"><input type="checkbox" class="omCk" data-i="' + i + '"' + (t || fresh ? " checked" : "") + ' style="width:auto"></td><td title="' + esc(n[L] || n[2] || "") + '">' + esc(n[0]) + (n[1] ? ' <span style="color:#94a3b8">' + esc(n[1]) + "</span>" : "") + '</td><td><input type="date" class="omD" data-i="' + i + '" value="' + esc(t ? t.start : "") + '"></td></tr>'; }).join("")
+          return '<tr><td style="text-align:center"><input type="checkbox" class="omCk" data-i="' + i + '"' + (t || fresh ? " checked" : "") + ' style="width:auto"></td><td title="' + esc(n[0] + " — " + (n[L] || n[2] || "")) + '">' + esc(oemShort(n[0])) + (n[1] ? ' <span style="color:#94a3b8">' + esc(n[1]) + "</span>" : "") + '</td><td><input type="date" class="omD" data-i="' + i + '" value="' + esc(t ? t.start : "") + '"></td></tr>'; }).join("")
       + "</tbody></table></div>";
   }
   h += '<div class="hint" style="font-size:12px;color:#64748b;margin-top:6px">' + esc(tr("oemMsHint")) + "</div>"
@@ -4353,9 +4354,9 @@ function openOemMs(oem){
     var insertAt = state.tasks.indexOf(grp) + 1;
     pick.forEach(function(p){
       var key = oemMsKey(oem, p.n[0]), t = existing[key];
-      if(t){ t.start = p.d; t.cons = "MSO"; t.consDate = p.d; t.group = grp.id; }
+      if(t){ if(t.name === p.n[0]) t.name = oemShort(t.name); t.start = p.d; t.cons = "MSO"; t.consDate = p.d; t.group = grp.id; }
       else {
-        t = mkTask({ name:p.n[0], type:"milestone", group:grp.id, start:p.d, dur:0 });
+        t = mkTask({ name:oemShort(p.n[0]), type:"milestone", group:grp.id, start:p.d, dur:0 });
         t.source = key; t.cons = "MSO"; t.consDate = p.d; t.remarks = (lang === "zh" ? p.n[2] : p.n[3]) || p.n[2] || "";
         state.tasks.splice(insertAt, 0, t);
       }
@@ -4417,8 +4418,12 @@ function v4ExpPlan(){
 }
 (function(){
   function syncName(){ var el = document.getElementById("projName"); if(el && document.activeElement !== el) el.value = (state.info && state.info.title) || ""; }
-  var _r = render; render = function(){ _r.apply(this, arguments); syncName(); };
+  function migOemNames(){ var mig = 0;
+    (state.tasks || []).forEach(function(t){ var s = String(t.source || ""); if(s.indexOf("oem:") === 0){ var full = s.slice(s.indexOf("|") + 1); if(t.name === full && oemShort(full) !== full){ t.name = oemShort(full); mig++; } } });
+    if(mig) save(); }
+  var _r = render; render = function(){ migOemNames(); _r.apply(this, arguments); syncName(); };
   function setup(){
+    /* 迁移：已插入的客户里程碑名称去掉（）说明 */
     var el = document.getElementById("projName");
     if(el && !el._v4){ el._v4 = 1; syncName();
       el.addEventListener("input", function(){ state.info = state.info || {}; state.info.title = el.value.trim(); save(); });
