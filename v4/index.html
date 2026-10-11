@@ -152,6 +152,7 @@ table.rs .del{cursor:pointer;color:var(--danger,#dc2626);text-align:center;width
 /* v4：除名称列外均不压缩；名称列保底宽度，表头与表体竖线对齐 */
 .table-head>div:not(.c-name),.trow>div:not(.c-name){flex-shrink:0}
 .table-head .c-name,.trow .c-name{min-width:180px}
+.trow .c-name .nm-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .table-head,.trow{min-width:max-content}
 .table-head .c-id,.table-head .c-name{position:sticky;background:var(--steel);z-index:4}
 .table-head .c-id{left:0}
@@ -1648,8 +1649,7 @@ function applyColWidths(){
     Array.prototype.forEach.call(els, function(el){
       if(c.key === "name"){ // 名称列默认 flex:1 吸收余宽，用户调过则固定
         var w = colWOf("name");
-        if(w){ el.style.flex = "none"; el.style.width = w + "px"; }
-        else { el.style.flex = ""; el.style.width = ""; }
+        el.style.flex = "none"; el.style.width = (w || 240) + "px"; // v4：名称列固定宽（默认 240），表头/表体一致，长名称省略
         el.style.left = idW + "px"; // 冻结在 ID 列右侧
       } else {
         el.style.width = (colWOf(c.key) || c.defW) + "px";
@@ -1828,7 +1828,7 @@ function renderTable(){
     var warnHtml = warn ? '<span class="dl-warn" title="' + esc(tr("deadlineWarn")) + '">⚠</span>' : "";
     var nm = t.type === "group"
       ? '<span class="g-tog">' + (state.collapsed[t.id] ? "▶" : "▼") + '</span> <span class="nm-t">' + esc(t.name) + "</span>"
-      : t.type === "milestone" ? '<span class="ms-diamond">◆</span>&nbsp;<span class="nm-t">' + esc(t.name) + "</span>" + warnHtml : '<span class="nm-t">' + esc(t.name) + "</span>" + warnHtml;
+      : t.type === "milestone" ? '<span class="ms-diamond">◆</span>&nbsp;<span class="nm-t">' + esc(t.name) + "</span>" + warnHtml : '<span class="nm-t" title="' + esc(t.name) + '">' + esc(t.name) + "</span>" + warnHtml;
     if(t.type !== "group" && t.manual) nm += '<span class="manual-badge" title="' + esc(tr("manualSched")) + '">📌</span>';
     var ow = esc(t.owner || "");
     if(t.type !== "group" && resWarnMap[t.id]) ow += '<span class="ow-warn" title="' + esc(tr("resWarnTip")) + '">⚠️</span>';
