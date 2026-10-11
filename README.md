@@ -1,5 +1,10 @@
 # 汽车零部件项目甘特图（v3 合并版）
 
+## v3.1（2026-10-11）
+- 顶栏按工作顺序排成三步：① 客户（OEM 下拉，唯一入口）→ ② 客户节点 → ③ 开发任务；未选客户时高亮引导。
+- 德系（VDA-MLA）阶段色带改为标准样式：左侧「VDA-MLA」，最早节点到 ML3 合并为 ML0–ML2，之后为 ML3 Release of Technical Specifications、ML4 Production Planning Completed、ML5 Production-Level Parts & Tools Available、ML6 Product & Process Approval、ML7 Handover to Production，蓝→粉渐变；节点页、开发任务页及其 PDF/JPG 导出一致。
+- 导入 MS Project XML 时，与客户节点/推荐任务同名的行自动去重。
+
 ## v3：里程碑计划与执行计划合并为一个项目
 - 入口 `index.html`：一个页面、一个项目，顶栏切换「项目甘特图」和「客户节点」两个视图。
 - 客户节点自动成为项目甘特图最上面的里程碑行（固定约束，不被依赖推移），下面接推荐任务、供应商节点、自定义任务和你自己的任务。
