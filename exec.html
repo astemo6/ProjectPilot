@@ -73,6 +73,9 @@ header button:hover{background:var(--steel3)}
 .cell-in:hover{border-color:#cbd5e1;background:#fff}
 .cell-in:focus{border-color:#2563eb;background:#fff}
 .cell-in::placeholder{color:#b6bcc6}
+.date-in{text-align:center;font-variant-numeric:tabular-nums}
+.date-in[disabled]{color:var(--tx);-webkit-text-fill-color:var(--tx);opacity:1;cursor:default}
+.date-in[disabled]:hover{border-color:transparent;background:transparent}
 .c-cons .cons-sel{flex:1}
 .c-cons .cons-date{width:104px;flex:none}
 .trow .c-var{width:52px;justify-content:center;flex-shrink:0;color:var(--tx2)}
@@ -1215,6 +1218,9 @@ function grpSpan(g){
     var a = parseD(x.start), b = parseD(taskEnd(x)); if(a && (!s || a < s)) s = a; if(b && (!e || b > e)) e = b; }); })(g.id);
   return { s:s ? fmtD(s) : "", e:e ? fmtD(e) : "" };
 }
+function dateIn(f, v, locked){
+  return '<input type="text" class="cell-in date-in" data-f="' + f + '" value="' + esc(v) + '"' + (locked ? ' disabled title="' + esc(tr("msPinnedDeps")) + '"' : '') + '>';
+}
 function consCell(t){
   var c = t.cons || "ASAP";
   var h = '<select class="cell-in cons-sel" data-f="cons">' + CONS_TYPES.map(function(k){ return '<option value="' + k + '"' + (k === c ? " selected" : "") + ">" + esc(tr("cons" + k)) + "</option>"; }).join("") + "</select>";
@@ -1266,8 +1272,8 @@ function renderTable(){
       + (colVis("owner") ? '<div class="c-owner">' + ow + "</div>" : "")
       + (colVis("dur") ? '<div class="c-dur">' + (t.type === "group" ? "" : t.type === "milestone" ? "◆" : t.dur) + "</div>" : "")
       + (colVis("prog") ? '<div class="c-prog">' + prog + "</div>" : "")
-      + (colVis("start") ? '<div class="c-start">' + (t.type === "group" ? "<b>" + (grpSpan(t).s || "") + "</b>" : (locked ? (t.start || "") : '<input type="date" class="cell-in" data-f="start" value="' + (t.start || "") + '">')) + "</div>" : "")
-      + (colVis("end") ? '<div class="c-end">' + (t.type === "group" ? "<b>" + (grpSpan(t).e || "") + "</b>" : (locked ? taskEnd(t) : '<input type="date" class="cell-in" data-f="end" value="' + taskEnd(t) + '">')) + "</div>" : "")
+      + (colVis("start") ? '<div class="c-start">' + (t.type === "group" ? "<b>" + (grpSpan(t).s || "") + "</b>" : dateIn("start", t.start || "", locked)) + "</div>" : "")
+      + (colVis("end") ? '<div class="c-end">' + (t.type === "group" ? "<b>" + (grpSpan(t).e || "") + "</b>" : dateIn("end", taskEnd(t), locked)) + "</div>" : "")
       + (colVis("pred") ? '<div class="c-pred">' + (t.type === "group" ? "" : '<input class="cell-in" data-f="pred" value="' + esc(depsToText(t.deps)) + '" placeholder="' + esc(tr("predPh")) + '">') + "</div>" : "")
       + (colVis("cons") ? '<div class="c-cons">' + (t.type === "group" ? "—" : (t.manual ? '<span style="color:var(--tx3)" title="' + esc(tr("manualSched")) + '">—</span>' : consCell(t))) + "</div>" : "")
       + (colVis("var") ? '<div class="c-var">' + vv + "</div>" : "")
@@ -1294,6 +1300,11 @@ function renderTable(){
         if(!isManaged(t.source) && !/^grp:(ms|rec|sup|custom)/.test(String(t.source || ""))) startInlineName(this, t);
         else if(wasSel) toast(tr("managedRename"));
       }
+    });
+    r.querySelectorAll(".date-in:not([disabled])").forEach(function(inp){
+      /* 平时显示为与手动行一致的 YYYY-MM-DD 文本；获得焦点时切换为日期控件，可直接输入或弹出选择 */
+      inp.addEventListener("focus", function(){ if(inp.type !== "date"){ inp.type = "date"; try{ if(inp.showPicker) inp.showPicker(); }catch(e){} } });
+      inp.addEventListener("blur", function(){ inp.type = "text"; });
     });
     r.querySelectorAll(".cell-in").forEach(function(inp){
       inp.addEventListener("change", function(){ var t = byId(r.dataset.id); if(t) cellEdit(t, inp.dataset.f, inp.value.trim()); });
