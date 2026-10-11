@@ -3664,10 +3664,10 @@ function init(){
     sp.addEventListener("pointerdown", function(e){
       e.preventDefault(); var x0 = e.clientX, w0 = pane.getBoundingClientRect().width; sp.classList.add("drag");
       function mv(ev){ var mx = Math.max(200, (document.querySelector(".main").clientWidth || window.innerWidth) - 160); state.paneW = Math.round(Math.min(mx, Math.max(200, w0 + ev.clientX - x0))); apply(); }
-      function up(){ sp.classList.remove("drag"); document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up); save(); }
+      function up(){ sp.classList.remove("drag"); document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up); save(); if(state.view === "fit") render(); }
       document.addEventListener("pointermove", mv); document.addEventListener("pointerup", up);
     });
-    sp.addEventListener("dblclick", function(){ state.paneW = 0; apply(); save(); });
+    sp.addEventListener("dblclick", function(){ state.paneW = 0; apply(); save(); if(state.view === "fit") render(); });
   })();
   document.getElementById("modalCancel").addEventListener("click", closeModal);
   document.getElementById("modalOk").addEventListener("click", saveModal);
