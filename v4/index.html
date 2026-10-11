@@ -312,6 +312,33 @@ body.resizing .col-resize{display:block}
   .gh-wd{font-size:7px}
   .toast{max-width:90vw}
 }
+/* ===== v4 暗色主题（html[data-theme=dark]） ===== */
+html[data-theme=dark]{--tx1:#e5e7eb;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--side:#111a29;--card:#141e2e;--line:#2b3a50;--line2:#223047;--steel:#0f2236;--steel2:#1f3b57;--steel3:#2c5070;color-scheme:dark}
+html[data-theme=dark] .toolbar button,html[data-theme=dark] .toolbar select,html[data-theme=dark] .rs-tb button,html[data-theme=dark] .modal-f button,html[data-theme=dark] .modal-b button,
+html[data-theme=dark] .modal input,html[data-theme=dark] .modal select,html[data-theme=dark] .modal textarea,html[data-theme=dark] .toolbar input:not([type=checkbox]):not([type=color]),html[data-theme=dark] #fmtBar .fm-c{background:#1a2638;color:var(--tx1);border-color:var(--line)}
+html[data-theme=dark] .toolbar button:disabled{opacity:.45}
+html[data-theme=dark] .viewbtns button.on,html[data-theme=dark] #modeBtns button.on{background:#2c5070;color:#fff}
+html[data-theme=dark] #fmtBar button.on{background:#1e3a5f;border-color:#3b82f6}
+html[data-theme=dark] .modal-f .ok,html[data-theme=dark] .modal button.primary,html[data-theme=dark] .modal .primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+html[data-theme=dark] .toolbar .dd-m,html[data-theme=dark] .tb-ddm,html[data-theme=dark] .modal,html[data-theme=dark] .pv-box,html[data-theme=dark] table.rs,html[data-theme=dark] .net-box,html[data-theme=dark] #colMenu,html[data-theme=dark] #tplMenu{background:var(--card);color:var(--tx1);border-color:var(--line)}
+html[data-theme=dark] .nm-edit,html[data-theme=dark] .cell-in:hover,html[data-theme=dark] .cell-in:focus,html[data-theme=dark] table.rs input:hover,html[data-theme=dark] table.rs input:focus,html[data-theme=dark] table.rs select:focus{background:#1a2638;color:var(--tx1)}
+html[data-theme=dark] .cell-in,html[data-theme=dark] .date-in,html[data-theme=dark] .trow select{color:var(--tx1)}
+html[data-theme=dark] .trow:hover,html[data-theme=dark] .trow:hover .c-id,html[data-theme=dark] .trow:hover .c-name{background:#1a2a40}
+html[data-theme=dark] .trow.sel,html[data-theme=dark] .trow.sel .c-id,html[data-theme=dark] .trow.sel .c-name{background:#1e3a5f}
+html[data-theme=dark] .trow.group,html[data-theme=dark] .trow.group .c-id,html[data-theme=dark] .trow.group .c-name{background:#17233a}
+html[data-theme=dark] .g-row.group{background:#17233a66}
+html[data-theme=dark] .g-side{color:#cbd5e1}
+html[data-theme=dark] .g-holiday{background:#3a1d24}
+html[data-theme=dark] .net-box.done{background:repeating-linear-gradient(135deg,#141e2e,#141e2e 6px,#1b2638 6px,#1b2638 8px)}
+html[data-theme=dark] .net-box.crit .nb-h{background:#4c1d1d}
+html[data-theme=dark] table.rs td{border-color:var(--line)}
+html[data-theme=dark] .frow input,html[data-theme=dark] .frow select,html[data-theme=dark] .frow textarea{border-color:var(--line)}
+html[data-theme=dark] .g-gap{--bg-gantt:#0b1220}
+html[data-theme=dark] .row-del{background:#1a2638;border-color:var(--line)}
+html[data-theme=dark] .omBtns button{background:#1a2638!important;color:var(--tx1);border-color:var(--line)!important}
+#themeBtns{display:flex;border:1px solid #4b6a85;border-radius:6px;overflow:hidden}
+#themeBtns button{border:0;border-radius:0;padding:5px 8px;background:transparent;font-size:12px}
+#themeBtns button.on{background:var(--accent)}
 </style>
 <style id="embedCss">
 html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
@@ -2207,7 +2234,7 @@ function renderGantt(){
     var y = BAND_H + ri * ROW_H;
     html += '<div class="g-row' + (t.type === "group" ? " group" : "") + '" style="height:' + ROW_H + 'px"></div>';
     if(t.type === "group"){ var _gs = grpSpan(t), _a = parseD(_gs.s), _b = parseD(_gs.e);
-      if(_a && _b){ var _x1 = X(_a, min), _x2 = X(addDays(_b, 1), min); html += '<div class="g-sum" style="left:' + _x1 + 'px;top:' + (y + 11) + 'px;width:' + Math.max(_x2 - _x1, 4) + 'px;color:' + tColor(t) + '" title="' + esc(t.name) + '"></div>'; }
+      if(_a && _b){ var _x1 = X(_a, min), _x2 = X(addDays(_b, 1), min); html += '<div class="g-sum" style="left:' + _x1 + 'px;top:' + (y + 11) + 'px;width:' + Math.max(_x2 - _x1, 4) + 'px;color:' + ((!t.color && window.v4IsDark && window.v4IsDark() && CC().sum === CHART_COL_DEF.sum) ? "#e5e7eb" : tColor(t)) + '" title="' + esc(t.name) + '"></div>'; }
       return; }
     var s = parseD(t.start); if(!s) return;
     var crit = state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
@@ -4627,7 +4654,9 @@ I18N.zh.chartColors = "颜色"; I18N.en.chartColors = "Colors"; I18N.de.chartCol
     var ec = state.info && state.info.expColors; if(ec && !state.chartColors){ state.chartColors = { ms:ec.ms, sum:ec.sum }; } if(state.info) delete state.info.expColors;
     save();
   }
+  var DARK_DEF = { hy:"#2c4a63", hm:"#1d2d42", bg:"#0b1220", wk:"#121c2c" };
   function applyVars(){ var c = CC(), s = document.documentElement.style;
+    if(window.v4IsDark && window.v4IsDark()) for(var k in DARK_DEF){ if(c[k] === CHART_COL_DEF[k]) c[k] = DARK_DEF[k]; }
     function txc(hex){ var n = parseInt(hex.slice(1), 16), L = (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)); return L > 150 ? "#1f2937" : "#ffffff"; }
     s.setProperty("--cc-hy", c.hy); s.setProperty("--cc-hyt", txc(c.hy)); s.setProperty("--cc-hm", c.hm); s.setProperty("--cc-hmt", txc(c.hm));
     s.setProperty("--cc-bg", c.bg); s.setProperty("--cc-wk", c.wk); }
@@ -5079,6 +5108,32 @@ function v4ExpPlan(){
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4Msp = { linkSel:linkSel, unlinkSel:unlinkSel, setPct:setPct, copySel:copySel, pasteRows:pasteRows, showLevel:showLevel, scrollToTask:scrollToTask, zoom:zoom, msel:function(){ return msel; } };
+})();
+/* ===== v4：整体主题 浅色 / 暗色 / 跟随系统（偏好存 localStorage gantt-theme-v4，不进项目数据） ===== */
+(function(){
+  var KEY = "gantt-theme-v4", mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var TX = { zh:{ light:"浅色", dark:"暗色", sys:"跟随系统" }, en:{ light:"Light", dark:"Dark", sys:"System" }, de:{ light:"Hell", dark:"Dunkel", sys:"System" } };
+  function L(k){ return (TX[lang] || TX.zh)[k]; }
+  function pref(){ var v = ""; try{ v = localStorage.getItem(KEY) || ""; }catch(e){} return /^(light|dark|system)$/.test(v) ? v : "system"; }
+  function eff(){ var p = pref(); return p === "system" ? (mq && mq.matches ? "dark" : "light") : p; }
+  function apply(rerender){
+    var d = eff(); document.documentElement.dataset.theme = d;
+    document.querySelectorAll("#themeBtns button").forEach(function(b){ b.classList.toggle("on", b.dataset.th === pref()); });
+    if(rerender && typeof render === "function") render();
+  }
+  window.v4IsDark = function(){ return document.documentElement.dataset.theme === "dark"; };
+  apply(false);
+  if(mq){ var h = function(){ if(pref() === "system") apply(true); }; if(mq.addEventListener) mq.addEventListener("change", h); else if(mq.addListener) mq.addListener(h); }
+  function setup(){
+    if(document.getElementById("themeBtns")) return;
+    var lb = document.querySelector('header [data-lang="zh"]'); var host = lb ? lb.parentNode : document.querySelector("header"); if(!host) return;
+    var g = document.createElement("div"); g.id = "themeBtns";
+    g.innerHTML = [["light","☀"],["dark","🌙"],["system","🖥"]].map(function(x){ return '<button type="button" data-th="' + x[0] + '" title="' + L(x[0] === "system" ? "sys" : x[0]) + '">' + x[1] + "</button>"; }).join("");
+    host.parentNode.insertBefore(g, host);
+    g.querySelectorAll("button").forEach(function(b){ b.onclick = function(){ try{ localStorage.setItem(KEY, b.dataset.th); }catch(e){} apply(true); }; });
+    apply(false);
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
