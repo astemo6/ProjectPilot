@@ -1233,7 +1233,7 @@ function renderChart(){
     // 月份分隔白线
     s += '<line x1="' + mx1.toFixed(1) + '" y1="22" x2="' + mx1.toFixed(1) + '" y2="44" stroke="#ffffff" stroke-width="1"/>';
     // 月份标签居中
-    var mName = lang === 'zh' ? (cur.getMonth()+1) + '月' : MONTHS[lang][cur.getMonth()];
+    var mName = String(cur.getMonth()+1);
     s += '<text x="' + ((mx1+mx2)/2).toFixed(1) + '" y="37" text-anchor="middle" fill="#374151" font-size="11">' + mName + '</text>';
     cur = nM;
   }
