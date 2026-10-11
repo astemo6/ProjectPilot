@@ -3490,7 +3490,15 @@ function init(){
   (function(){ /* 左右分隔条：拖动改左侧表格宽度，记在 state.paneW */
     var sp = document.getElementById("paneSplit"), pane = document.querySelector(".table-pane");
     if(!sp || !pane) return;
-    function apply(){ if(state.paneW) pane.style.width = state.paneW + "px"; else pane.style.width = ""; }
+    function apply(){
+      if(state.paneW){ pane.style.width = state.paneW + "px"; return; }
+      /* v4：默认宽度刚好容纳可见列（不超过窗口 55%），避免名称列被挤没 */
+      var hd = document.querySelector(".table-head"), need = 0;
+      if(hd) Array.prototype.forEach.call(hd.children, function(c){ if(c.offsetParent !== null) need += c.getBoundingClientRect().width; });
+      pane.style.width = need ? Math.round(Math.min(need + 18, Math.max(320, window.innerWidth * 0.55))) + "px" : "";
+    }
+    window.addEventListener("resize", function(){ if(!state.paneW) apply(); });
+    setTimeout(apply, 0);
     apply();
     sp.addEventListener("pointerdown", function(e){
       e.preventDefault(); var x0 = e.clientX, w0 = pane.getBoundingClientRect().width; sp.classList.add("drag");
