@@ -130,6 +130,8 @@ body.resizing .col-resize{display:block}
 .g-bandrow{position:absolute;left:0;top:0;border-bottom:1px solid var(--line);background:var(--card)}
 .g-band{position:absolute;top:0;height:100%;display:flex;align-items:center;overflow:hidden;font-size:10px;color:#1e3a52;border-right:1px solid rgba(255,255,255,.8);white-space:nowrap}
 .g-band span{padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-band.vda{font-size:11px;color:#1f2937}
+.g-band.vda span{padding:0 6px}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100}
 .modal-bg.show{display:flex}
 .modal{background:#fff;border-radius:10px;width:520px;max-width:94vw;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -1131,8 +1133,16 @@ function phaseAnchors(){
     out.push({ pid:pid, d:d });
   });
   out.sort(function(a, b){ return a.d - b.d; });
+  /* VDA-MLA（德系）：最早客户节点 → 第一个标准阶段之间合并为 ML0–ML2 */
+  if(sys === "vda" && out.length && out[0].pid !== "ML0"){
+    var first = null;
+    ms.forEach(function(t){ var d = parseD(t.start); if(d && (!first || d < first)) first = d; });
+    if(first && first < out[0].d) out.unshift({ pid:"ML0–ML2", d:first, lead:true });
+  }
   return out;
 }
+var VDA_EN = { "ML0–ML2":"", ML0:"Innovation Release", ML1:"Requirements Management for Contract Award", ML2:"Determination of Supply Chain / Placing of Orders", ML3:"Release of Technical Specifications", ML4:"Production Planning Completed", ML5:"Production-Level Parts & Tools Available", ML6:"Product & Process Approval", ML7:"Handover to Production" };
+var VDA_COL = ["#dbeafe", "#e0e7ff", "#ebe5fb", "#f3e4f8", "#fae4f1", "#fde4ea", "#fde8e4"];
 function bandShade(i, n){ // 钢蓝系渐变 #dbe7f3 → #9fc0dd
   var c1 = [219, 231, 243], c2 = [159, 192, 221];
   var t = n <= 1 ? 0 : i / (n - 1);
@@ -1212,12 +1222,15 @@ function renderGantt(){
       var bx1 = X(ba.d, min), bx2 = bb ? X(bb.d, min) : X(max, min);
       var bw = bx2 - bx1;
       if(bw <= 0) continue;
-      var meta = PHASE_NAMES[sys][ba.pid];
-      var label = ba.pid + " " + (meta[lang] || meta.zh);
+      var meta = PHASE_NAMES[sys][ba.pid] || {};
+      var vda = sys === "vda";
+      var nm = vda ? (VDA_EN[ba.pid] || "") : (meta[lang] || meta.zh || "");
+      var label = ba.pid + (nm ? " " + nm : "");
       var maxCh = Math.max(3, Math.floor(bw / 6.5));
       var showLbl = label.length > maxCh ? label.slice(0, Math.max(1, maxCh - 1)) + "…" : label;
-      var tip = label + " · " + fmtD(ba.d) + (bb ? " ~ " + fmtD(bb.d) : " ~ " + fmtD(max));
-      html += '<div class="g-band" style="left:' + bx1 + 'px;width:' + Math.max(bw, 2) + 'px;background:' + bandShade(bi, bands.length) + '" title="' + esc(tip) + '"><span>' + esc(showLbl) + "</span></div>";
+      var tip = label + (vda && meta.zh ? "（" + (meta[lang] || meta.zh) + "）" : "") + " · " + fmtD(ba.d) + (bb ? " ~ " + fmtD(bb.d) : " ~ " + fmtD(max));
+      var pidPart = showLbl.slice(0, Math.min(ba.pid.length, showLbl.length));
+      html += '<div class="g-band' + (vda ? " vda" : "") + '" style="left:' + bx1 + 'px;width:' + Math.max(bw, 2) + 'px;background:' + (vda ? VDA_COL[Math.min(bi, VDA_COL.length - 1)] : bandShade(bi, bands.length)) + '" title="' + esc(tip) + '"><span>' + (vda ? "<b>" + esc(pidPart) + "</b>" + esc(showLbl.slice(pidPart.length)) : esc(showLbl)) + "</span></div>";
     }
     html += "</div>";
   }
@@ -1630,7 +1643,17 @@ function importXMLFile(f){
       state.tasks = imported.map(function(it){ return it.t; });
       state.collapsed = {};
       var _p = null; try{ _p = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e2){}
-      if(_p && _p.oem) mergeFromPlan(_p); /* 合并版：导入 XML 后保留客户节点行 */
+      if(_p && _p.oem){
+        mergeFromPlan(_p); /* 合并版：导入 XML 后保留客户节点行 */
+        /* 去重：XML 里与客户节点/推荐任务同名同类型的行，用同步行替代，依赖改指向同步行 */
+        var mg = {}, drop = {};
+        state.tasks.forEach(function(t){ if(isManaged(t.source)) mg[t.type + "|" + t.name] = t.id; });
+        state.tasks.forEach(function(t){ if(t.source === "xml" && mg[t.type + "|" + t.name]) drop[t.id] = mg[t.type + "|" + t.name]; });
+        if(Object.keys(drop).length){
+          state.tasks = state.tasks.filter(function(t){ return !drop[t.id]; });
+          state.tasks.forEach(function(t){ (t.deps || []).forEach(function(d){ if(drop[d.id]) d.id = drop[d.id]; }); });
+        }
+      }
       normalizeState();
       save(); render();
       toast(tr("importOk") + " · " + imported.length);
@@ -1831,16 +1854,19 @@ function renderExportCanvas(cb){
       var bx1 = hx + X(ba.d), bx2 = bb ? hx + X(bb.d) : hx + X(max);
       var bw = bx2 - bx1;
       if(bw <= 0) continue;
-      ctx.fillStyle = bandShade(bi, bands.length);
+      var vda = sys === 'vda';
+      ctx.fillStyle = vda ? VDA_COL[Math.min(bi, VDA_COL.length - 1)] : bandShade(bi, bands.length);
       ctx.fillRect(bx1, bandY, Math.max(bw, 2), BAND_H);
       var meta = PHASE_NAMES[sys] ? PHASE_NAMES[sys][ba.pid] : null;
-      var label = ba.pid + ' ' + (meta ? (meta[lang] || meta.zh) : ba.pid);
-      ctx.font = expFont(10, false);
-      ctx.fillStyle = '#1e3a52';
+      var nm = vda ? (VDA_EN[ba.pid] || '') : (meta ? (meta[lang] || meta.zh) : '');
       ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.save();
       ctx.beginPath(); ctx.rect(bx1, bandY, Math.max(bw, 2), BAND_H); ctx.clip();
-      ctx.fillText(fitText(ctx, label, Math.max(bw - 8, 0)), bx1 + 4, bandY + BAND_H / 2);
+      ctx.fillStyle = vda ? '#1f2937' : '#1e3a52';
+      ctx.font = expFont(vda ? 11 : 10, true);
+      var pw = ctx.measureText(ba.pid).width;
+      ctx.fillText(ba.pid, bx1 + 5, bandY + BAND_H / 2);
+      if(nm){ ctx.font = expFont(vda ? 11 : 10, false); ctx.fillText(fitText(ctx, nm, Math.max(bw - pw - 14, 0)), bx1 + 5 + pw + 4, bandY + BAND_H / 2); }
       ctx.restore();
     }
     ctx.textBaseline = 'alphabetic';
