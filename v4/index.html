@@ -61,11 +61,11 @@ header button:hover{background:var(--steel3)}
 #fmtBar .fm-a{font-weight:700;font-size:12px;line-height:12px;font-family:serif}#fmtBar .fm-cbar{width:16px;height:3px;margin-top:2px;border-radius:1px}
 #fmtBar .fm-c input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;padding:0;border:0}
 #fmtBar.dis{opacity:.55}
-#mspBar{display:inline-flex;align-items:center;gap:4px}#mspBar>button{padding:5px 8px}
-#mspBar .ms-pct{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
-#mspBar .ms-pct button{border:0;border-radius:0;padding:4px 6px;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:30px}
-#mspBar .ms-pct button+button{border-left:1px solid var(--line)}
-#mspBar .ms-pct i{display:block;width:18px;height:5px;border:1px solid #64748b;border-radius:1px;background:linear-gradient(90deg,#1e3a8a calc(var(--p)*1%),transparent 0)}
+#mspBar{display:inline-flex;align-items:center;gap:4px}#mspBar>button,.toolbar .ms-link,.toolbar .ms-unlink{padding:5px 8px}
+.ms-pct{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ms-pct button{border:0;border-radius:0;padding:4px 6px;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:30px}
+.ms-pct button+button{border-left:1px solid var(--line)}
+.ms-pct i{display:block;width:18px;height:5px;border:1px solid #64748b;border-radius:1px;background:linear-gradient(90deg,#1e3a8a calc(var(--p)*1%),transparent 0)}
 .trow.drop-b{box-shadow:inset 0 2px 0 var(--accent)}.trow.drop-a{box-shadow:inset 0 -2px 0 var(--accent)}
 body.row-dragging,body.row-dragging *{cursor:grabbing!important;user-select:none}
 .trow .c-id{cursor:grab}
@@ -392,6 +392,33 @@ header button,header input,header select,header a.btn,header #lnkOem,header #the
 header input{display:inline-block}
 .toolbar #fltTxt{height:28px;box-sizing:border-box}.toolbar .ms-pct{height:28px;box-sizing:border-box}
 header #themeBtns{display:flex}header #themeBtns button{height:100%;padding:0 9px}
+/* v4.3 功能区 Ribbon */
+.toolbar.ribbon{display:block;padding:0;gap:0}
+.ribbon .rb-tabs{display:flex;align-items:flex-end;gap:2px;padding:4px 12px 0;border-bottom:1px solid var(--line);background:var(--bg,#f8fafc)}
+.ribbon .rb-tabs .rb-tab{border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;background:transparent;padding:5px 16px;font-size:13px;margin-bottom:-1px;color:var(--tx2,#475569)}
+.ribbon .rb-tabs .rb-tab:hover{color:var(--accent);border-color:transparent;background:rgba(37,99,235,.06)}
+.ribbon .rb-tabs .rb-tab.on{background:var(--card);border-color:var(--line);color:var(--accent);font-weight:600}
+.ribbon .rb-qat{margin-left:auto;display:inline-flex;gap:4px;margin-bottom:3px}.ribbon .rb-qat button{padding:2px 10px;font-size:12px}
+.ribbon .rb-tabs .rb-fold{margin-left:6px;margin-bottom:3px;border:none;background:transparent;padding:2px 8px;font-size:14px;color:var(--tx3)}
+.ribbon .rb-body{padding:6px 12px 2px;min-height:62px}
+.ribbon .rb-pane{display:none;align-items:stretch;flex-wrap:wrap;gap:0}
+.ribbon .rb-pane.on{display:flex}
+.ribbon .rb-grp{display:flex;flex-direction:column;justify-content:space-between;padding:0 10px;border-right:1px solid var(--line);min-height:58px}
+.ribbon .rb-grp:first-child{padding-left:0}
+.ribbon .rb-grp:last-child{border-right:none}
+.ribbon .rb-box{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;flex:1}
+.ribbon .rb-box button{padding:5px 10px}
+.ribbon .rb-box>span,.ribbon .rb-box>div{display:inline-flex;align-items:center;gap:6px}
+.ribbon .rb-box>#paneBtns,.ribbon .rb-box>.viewbtns{display:inline-flex}
+.ribbon .rb-lab{font-size:11px;color:var(--tx3);text-align:center;padding:3px 0 2px;white-space:nowrap}
+.ribbon .rb-px.on{border-color:var(--accent);color:var(--accent);background:#eff6ff}
+.toolbar.ribbon.rb-folded .rb-body{display:none}
+.toolbar.ribbon.rb-folded.rb-peek{position:relative;z-index:250}
+.toolbar.ribbon.rb-folded.rb-peek .rb-body{display:block;position:absolute;left:0;right:0;top:100%;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 8px 20px rgba(15,23,42,.12)}
+html[data-theme=dark] .ribbon .rb-tabs{background:rgba(0,0,0,.15)}
+html[data-theme=dark] .ribbon .rb-tabs .rb-tab,html[data-theme=dark] .ribbon .rb-tabs .rb-fold{background:transparent;border-color:transparent}
+html[data-theme=dark] .ribbon .rb-tabs .rb-tab.on{background:var(--card);border-color:var(--line)}
+html[data-theme=dark] .ribbon .rb-px.on{background:rgba(37,99,235,.2)}
 </style>
 <style id="embedCss">
 html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
@@ -401,7 +428,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.2</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.3</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -5670,6 +5697,77 @@ function v4ExpPlan(){
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4Msp4 = { cfDlg:cfDlg, cfMatch:cfMatch };
+})();
+/* ===== v4.3：功能区（Ribbon）—— 对标 MS Project，把工具栏按「文件 / 任务 / 资源 / 报表 / 项目 / 视图 / 格式」分页签分组 ===== */
+(function(){
+  var TX = {
+    zh:{ file:"文件", task:"任务", res:"资源", rep:"报表", proj:"项目", view:"视图", fmt:"格式",
+      gUndo:"撤销", gIns:"插入", gSched:"日程", gTask:"任务", gFont:"字体", gOem:"客户", gResView:"资源视图", gRepView:"报表与分析", gOut:"输出", gImp:"导入", gExp:"导出", gProj:"排程", gBase:"基线",
+      gViews:"任务视图", gZoom:"缩放", gData:"数据", gShow:"显示", gCols:"列", fold:"折叠功能区（双击页签也可）", unfold:"展开功能区" },
+    en:{ file:"File", task:"Task", res:"Resource", rep:"Report", proj:"Project", view:"View", fmt:"Format",
+      gUndo:"Undo", gIns:"Insert", gSched:"Schedule", gTask:"Tasks", gFont:"Font", gOem:"Customer", gResView:"Resource views", gRepView:"Reports & analysis", gOut:"Output", gImp:"Import", gExp:"Export", gProj:"Scheduling", gBase:"Baseline",
+      gViews:"Task views", gZoom:"Zoom", gData:"Data", gShow:"Show/Hide", gCols:"Columns", fold:"Collapse the ribbon (or double-click a tab)", unfold:"Expand the ribbon" },
+    de:{ file:"Datei", task:"Vorgang", res:"Ressource", rep:"Bericht", proj:"Projekt", view:"Ansicht", fmt:"Format",
+      gUndo:"Rückgängig", gIns:"Einfügen", gSched:"Terminplan", gTask:"Vorgänge", gFont:"Schriftart", gOem:"Kunde", gResView:"Ressourcenansichten", gRepView:"Berichte & Analyse", gOut:"Ausgabe", gImp:"Import", gExp:"Export", gProj:"Planung", gBase:"Basisplan",
+      gViews:"Vorgangsansichten", gZoom:"Zoom", gData:"Daten", gShow:"Anzeigen", gCols:"Spalten", fold:"Menüband reduzieren (oder Doppelklick auf Register)", unfold:"Menüband erweitern" } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+  var KEY = "gantt-ribbon-v4", proxies = [];
+  function $(s){ return document.querySelector(s); }
+  function proxy(pane){ var b = document.createElement("button"); b.type = "button"; b.className = "rb-px"; b.dataset.px = pane;
+    b.onclick = function(){ var o = $('#paneBtns [data-pane="' + pane + '"]'); if(o) o.click(); setTimeout(syncPx, 0); }; proxies.push(b); return b; }
+  function syncPx(){ proxies.forEach(function(b){ var o = $('#paneBtns [data-pane="' + b.dataset.px + '"]'); if(!o) return; b.textContent = o.textContent; b.classList.toggle("on", o.classList.contains("on")); }); }
+  function setup(){
+    var tb = $(".toolbar"); if(!tb || tb.classList.contains("ribbon")) return;
+    var zoomBox = ($('[data-view="fit"]') || {}).parentNode;
+    var mspBar = $("#mspBar"), msp2 = $("#msp2Bar");
+    var T = [
+      ["file", [["gImp", ["#ddImp"]], ["gExp", ["#ddExp"]]]],
+      ["task", [["gIns", ["#btnAdd", "#btnAddGroup", "#btnAddMs", "#btnDelSel"]], ["gOem", ["#btnOemMs"]],
+                ["gSched", [mspBar && mspBar.querySelector(".ms-pct"), mspBar && mspBar.querySelector(".ms-link"), mspBar && mspBar.querySelector(".ms-unlink"), "#btnOutdent", "#btnIndent"]],
+                ["gTask", ["#modeBtns", msp2]], ["gFont", ["#fmtBar"]]]],
+      ["res", [["gResView", [proxy("res"), proxy("use"), proxy("tuse"), proxy("hist")]]]],
+      ["rep", [["gRepView", [proxy("rep"), proxy("evm"), proxy("wbs"), proxy("net")]], ["gOut", ["#btnPreview"]]]],
+      ["proj", [["gProj", ["#ddSched"]], ["gBase", ["#ddBase"]]]],
+      ["view", [["gViews", ["#paneBtns"]], ["gZoom", [zoomBox]], ["gData", ["#fltTxt", "#ddFlt"]]]],
+      ["fmt", [["gCols", ["#btnCols"]], ["gShow", ["#ddShow"]]]]
+    ];
+    var used = [], tabs = document.createElement("div"), body = document.createElement("div"), stash = document.createElement("div");
+    tabs.className = "rb-tabs"; body.className = "rb-body"; stash.className = "rb-stash"; stash.style.display = "none";
+    T.forEach(function(tab){
+      var tbn = document.createElement("button"); tbn.type = "button"; tbn.className = "rb-tab"; tbn.dataset.tab = tab[0]; tbn.textContent = L(tab[0]); tabs.appendChild(tbn);
+      var pn = document.createElement("div"); pn.className = "rb-pane"; pn.dataset.tab = tab[0];
+      tab[1].forEach(function(g){ var grp = document.createElement("div"), box = document.createElement("div"); grp.className = "rb-grp"; box.className = "rb-box";
+        g[1].forEach(function(s){ var el = typeof s === "string" ? $(s) : s; if(!el) return; used.push(el); box.appendChild(el); });
+        if(!box.children.length) return; var lb = document.createElement("div"); lb.className = "rb-lab"; lb.textContent = L(g[0]); grp.appendChild(box); grp.appendChild(lb); pn.appendChild(grp); });
+      body.appendChild(pn); });
+    /* 快速访问工具栏（撤销/重做，同 MS Project 标题栏）放在页签行右侧 */
+    var qat = document.createElement("span"); qat.className = "rb-qat"; ["#btnUndo", "#btnRedo"].forEach(function(s){ var el = $(s); if(el) qat.appendChild(el); }); tabs.appendChild(qat);
+    var fold = document.createElement("button"); fold.type = "button"; fold.className = "rb-fold"; tabs.appendChild(fold);
+    /* 剩余元素（隐藏按钮、文件输入、分隔线）收起 */
+    Array.prototype.slice.call(tb.children).forEach(function(c){ if(c.classList.contains("sep") || c.classList.contains("tb-break")){ c.remove(); return; } stash.appendChild(c); });
+    if(mspBar && !mspBar.children.length) mspBar.remove();
+    tb.classList.add("ribbon"); tb.appendChild(tabs); tb.appendChild(body); tb.appendChild(stash);
+    var st = {}; try { st = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch(e){}
+    function show(k, keep){ tb.querySelectorAll(".rb-tab").forEach(function(b){ b.classList.toggle("on", b.dataset.tab === k); }); tb.querySelectorAll(".rb-pane").forEach(function(p){ p.classList.toggle("on", p.dataset.tab === k); });
+      st.tab = k; if(!keep) save2(); }
+    function save2(){ try { localStorage.setItem(KEY, JSON.stringify(st)); } catch(e){} }
+    function setFold(f){ st.fold = !!f; tb.classList.toggle("rb-folded", st.fold); fold.textContent = st.fold ? "⌄" : "⌃"; fold.title = st.fold ? L("unfold") : L("fold"); save2(); setTimeout(function(){ window.dispatchEvent(new Event("resize")); }, 0); }
+    tabs.addEventListener("click", function(e){ var b = e.target.closest(".rb-tab"); if(!b) return;
+      if(st.fold){ if(tb.classList.contains("rb-peek") && st.tab === b.dataset.tab){ tb.classList.remove("rb-peek"); return; } tb.classList.add("rb-peek"); }
+      show(b.dataset.tab); });
+    tabs.addEventListener("dblclick", function(e){ if(e.target.closest(".rb-tab")){ tb.classList.remove("rb-peek"); setFold(!st.fold); } });
+    fold.onclick = function(){ tb.classList.remove("rb-peek"); setFold(!st.fold); };
+    /* 折叠状态下临时展开的功能区：点功能区外面或用完按钮后收起 */
+    document.addEventListener("mousedown", function(e){ if(tb.classList.contains("rb-peek") && !tb.contains(e.target) && !e.target.closest(".modal-bg")) tb.classList.remove("rb-peek"); });
+    show(TX.zh[st.tab] ? st.tab : "task", true); setFold(st.fold);
+    /* Alt+键快速切换页签：F 文件 / H 任务 / R 资源 / P 项目 / W 视图 / O 格式 */
+    document.addEventListener("keydown", function(e){ if(!e.altKey || e.ctrlKey || e.metaKey) return; var m = { f:"file", h:"task", r:"res", p:"proj", w:"view", o:"fmt", e:"rep" }[e.key.toLowerCase()]; if(!m) return;
+      var a = document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; e.preventDefault(); if(st.fold) tb.classList.add("rb-peek"); show(m); });
+    syncPx();
+  }
+  var _rd = render; render = function(){ var x = _rd.apply(this, arguments); try { syncPx(); } catch(e){} return x; };
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Ribbon = { syncPx:syncPx };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
