@@ -372,6 +372,19 @@ html[data-theme=dark] .omBtns button{background:#1a2638!important;color:var(--tx
 #themeBtns{display:flex;border:1px solid #4b6a85;border-radius:6px;overflow:hidden}
 #themeBtns button{border:0;border-radius:0;padding:5px 8px;background:transparent;font-size:12px}
 #themeBtns button.on{background:var(--accent)}
+
+/* 任务窗体 / 分组依据 */
+#v4Form{display:none;height:200px;flex-shrink:0;border-top:2px solid var(--accent);background:var(--card);padding:8px 10px;gap:12px;position:relative;overflow:auto;font-size:12px}
+#v4Form .tf-f{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:6px 12px;align-content:start;flex:1.4;min-width:520px}
+#v4Form .tf-f label{display:flex;flex-direction:column;gap:2px;color:var(--tx2)}#v4Form .tf-f label.wide{grid-column:span 4}
+#v4Form .tf-f input,#v4Form .tf-f select{height:26px;box-sizing:border-box;border:1px solid var(--line);border-radius:4px;padding:0 6px;background:var(--card);color:var(--tx1);font-size:12px}
+#v4Form .tf-tb{flex:1;min-width:220px;overflow:auto}#v4Form .tf-h{font-weight:600;margin-bottom:4px;color:var(--tx1)}
+#v4Form table{width:100%;border-collapse:collapse}#v4Form th,#v4Form td{border:1px solid var(--line);padding:2px 6px;text-align:left;white-space:nowrap}#v4Form th{background:var(--bg);font-weight:600}
+#v4Form tr[data-id]{cursor:pointer}#v4Form tr[data-id]:hover td{background:rgba(37,99,235,.08)}#v4Form .tf-none{color:var(--tx3);text-align:center}
+#v4Form .tf-nav{display:flex;flex-direction:column;gap:4px}#v4Form .tf-nav button{width:26px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--tx2);cursor:pointer}
+#v4Form .tf-empty{margin:auto;color:var(--tx3)}#v4Form>.tf-x{position:absolute;right:8px;top:6px;width:26px;height:24px;border:1px solid var(--line);border-radius:4px;background:var(--card);cursor:pointer}
+#taskList .trow[data-id^="gb:"] .row-del{display:none}#taskList .trow[data-id^="gb:"]{font-weight:600}
+label.v4gb{display:flex;align-items:center;gap:6px}label.v4gb select{height:24px;font-size:12px}
 /* 顶部栏控件统一高度 32px（与 v3 根页一致）（新建项目 / 项目名称 / OEM 链接 / 主题 / 语言） */
 header button,header input,header select,header a.btn,header #lnkOem,header #themeBtns{height:32px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;line-height:1;vertical-align:middle}
 header input{display:inline-block}
@@ -5351,6 +5364,131 @@ function v4ExpPlan(){
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4FP = { start:start, stop:stop };
+})();
+/* ===== v4：对标 MS Project 第三轮 —— 分组依据 / 向下填充 (Ctrl+D) / 任务窗体（详细信息拆分视图） ===== */
+(function(){
+  var TX = {
+    zh:{ gb:"分组依据", gbNone:"无分组", gbCrit:"关键 / 非关键", gbStat:"完成状态", gbMode:"任务模式", gbType:"任务 / 里程碑", gbRes:"资源",
+      crit:"关键", nonCrit:"非关键", st0:"未开始", st1:"进行中", st2:"已完成", mMan:"手动计划", mAuto:"自动计划", tTask:"任务", tMs:"里程碑", noRes:"无资源",
+      form:"任务窗体（详细信息）", fill:"向下填充 (Ctrl+D)：先点要填充的列，再多选行", fillNeed:"请多选至少两行，并先点一下要填充的列", filled:function(n){ return "已向下填充 " + n + " 行"; },
+      fName:"名称", fDur:"工期", fStart:"开始", fEnd:"完成", fPct:"完成%", fMode:"模式", fCons:"约束", fRes:"资源", fPred:"前置任务", fSucc:"后续任务", fNotes:"备注",
+      pId:"ID", pName:"任务名称", pType:"类型", pLag:"延隔", none:"（无）", pick:"选中一个任务查看详细信息", prev:"上一个", next:"下一个", close:"关闭" },
+    en:{ gb:"Group by", gbNone:"No group", gbCrit:"Critical", gbStat:"Complete status", gbMode:"Task mode", gbType:"Task / milestone", gbRes:"Resource",
+      crit:"Critical", nonCrit:"Non-critical", st0:"Not started", st1:"In progress", st2:"Complete", mMan:"Manually scheduled", mAuto:"Auto scheduled", tTask:"Tasks", tMs:"Milestones", noRes:"No resource",
+      form:"Task form (details)", fill:"Fill down (Ctrl+D): click the column, then select rows", fillNeed:"Select at least two rows and click the column first", filled:function(n){ return n + " rows filled"; },
+      fName:"Name", fDur:"Duration", fStart:"Start", fEnd:"Finish", fPct:"% complete", fMode:"Mode", fCons:"Constraint", fRes:"Resources", fPred:"Predecessors", fSucc:"Successors", fNotes:"Notes",
+      pId:"ID", pName:"Task name", pType:"Type", pLag:"Lag", none:"(none)", pick:"Select a task to see details", prev:"Previous", next:"Next", close:"Close" },
+    de:{ gb:"Gruppieren nach", gbNone:"Keine Gruppe", gbCrit:"Kritisch", gbStat:"Status", gbMode:"Vorgangsmodus", gbType:"Vorgang / Meilenstein", gbRes:"Ressource",
+      crit:"Kritisch", nonCrit:"Nicht kritisch", st0:"Nicht begonnen", st1:"In Arbeit", st2:"Abgeschlossen", mMan:"Manuell", mAuto:"Automatisch", tTask:"Vorgänge", tMs:"Meilensteine", noRes:"Keine Ressource",
+      form:"Vorgangsmaske (Details)", fill:"Nach unten ausfüllen (Strg+D)", fillNeed:"Mindestens zwei Zeilen wählen und zuerst die Spalte anklicken", filled:function(n){ return n + " Zeilen ausgefüllt"; },
+      fName:"Name", fDur:"Dauer", fStart:"Anfang", fEnd:"Ende", fPct:"% Abgeschl.", fMode:"Modus", fCons:"Einschränkung", fRes:"Ressourcen", fPred:"Vorgänger", fSucc:"Nachfolger", fNotes:"Notizen",
+      pId:"Nr.", pName:"Vorgangsname", pType:"Art", pLag:"Abstand", none:"(keine)", pick:"Vorgang wählen, um Details zu sehen", prev:"Zurück", next:"Weiter", close:"Schließen" } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+
+  /* —— 分组依据：只改显示顺序，不改大纲结构（与 MSP 一致） —— */
+  var GB_KEYS = ["", "crit", "stat", "mode", "type", "res"];
+  var pseudo = {};
+  function gbKey(t){ var k = state.groupBy;
+    if(k === "crit") return floatMap[t.id] !== undefined && floatMap[t.id] <= 0 ? ["0", L("crit")] : ["1", L("nonCrit")];
+    if(k === "stat"){ var p = +t.progress || 0; return p >= 100 ? ["2", L("st2")] : p > 0 ? ["1", L("st1")] : ["0", L("st0")]; }
+    if(k === "mode") return t.manual ? ["0", L("mMan")] : ["1", L("mAuto")];
+    if(k === "type") return t.type === "milestone" ? ["1", L("tMs")] : ["0", L("tTask")];
+    if(k === "res"){ var o = String(t.owner || "").split(/[,，;；]/)[0].replace(/\[.*?\]/g, "").trim(); return o ? ["0" + o, o] : ["1", L("noRes")]; }
+    return ["0", ""]; }
+  var _vt = visibleTasks;
+  visibleTasks = function(){
+    if(!state.groupBy || GB_KEYS.indexOf(state.groupBy) < 0) return _vt();
+    var rn = rowNoMap(), buckets = {}, order = [];
+    state.tasks.forEach(function(t){ if(t.type === "group") return; if(typeof taskMatchFilter === "function" && !taskMatchFilter(t)) return; if(typeof taskMatchText === "function" && !taskMatchText(t)) return;
+      var k = gbKey(t); if(!buckets[k[0]]){ buckets[k[0]] = { name:k[1], list:[] }; order.push(k[0]); } buckets[k[0]].list.push(t); });
+    order.sort(function(a, b){ return a.localeCompare(b, "zh"); });
+    var out = []; pseudo = {};
+    order.forEach(function(k){ var b = buckets[k], id = "gb:" + state.groupBy + ":" + k, s = null, e = null;
+      b.list.forEach(function(t){ if(t.inactive || !t.start) return; var te = taskEnd(t); if(!s || t.start < s) s = t.start; if(!e || te > e) e = te; });
+      var g = { id:id, type:"group", name:b.name + "（" + b.list.length + "）", _gb:true, _span:{ s:s || "", e:e || "" }, _kids:b.list };
+      pseudo[id] = g; out.push(g);
+      if(!state.collapsed[id]) b.list.sort(function(x, y){ return rn[x.id] - rn[y.id]; }).forEach(function(t){ out.push(t); }); });
+    return out;
+  };
+  var _gs = grpSpan; grpSpan = function(g){ return g && g._gb ? g._span : _gs(g); };
+  var _gp = grpProg; grpProg = function(g){ if(!(g && g._gb)) return _gp(g); var w = 0, d = 0; g._kids.forEach(function(x){ if(x.inactive) return; var k = x.type === "milestone" ? 0 : Math.max(+x.dur || 0, 1); w += k; d += k * (+x.progress || 0); }); return w ? Math.round(d / w) : null; };
+  var _dp = depthOf; depthOf = function(t){ if(state.groupBy && GB_KEYS.indexOf(state.groupBy) > 0) return t && t._gb ? 0 : 1; return _dp(t); };
+  var _bi = byId; byId = function(id){ return _bi(id) || (typeof id === "string" && id.indexOf("gb:") === 0 ? pseudo[id] : undefined); };
+
+  /* —— 向下填充 —— */
+  var lastCol = null, FILL = ["mode", "owner", "dur", "start", "end", "pred", "cons", "work", "prog"];
+  document.addEventListener("focusin", function(e){ var i = e.target; if(i && i.classList && i.classList.contains("cell-in") && i.closest("#taskList")) lastCol = i.dataset.f; }, true);
+  document.addEventListener("mousedown", function(e){ var c = e.target.closest && e.target.closest("#taskList .trow > div"); if(!c) return; var m = String(c.className).match(/\bc-([a-z0-9]+)/); if(m && FILL.indexOf(m[1]) >= 0) lastCol = m[1]; }, true);
+  function fillDown(){
+    var ids = (window.__v4SelList ? window.__v4SelList() : []).filter(function(id){ var t = byId(id); return t && t.type !== "group" && !t._gb; });
+    if(ids.length < 2 || !lastCol){ toast(L("fillNeed")); return; }
+    var rn = rowNoMap(); ids.sort(function(a, b){ return rn[a] - rn[b]; });
+    var src = byId(ids[0]), f = lastCol, n = 0;
+    var v = f === "prog" ? (+src.progress || 0) : f === "mode" ? (src.manual ? "manual" : "auto") : f === "owner" ? (src.owner || "") : f === "dur" ? fmtDur(src) : f === "start" ? startText(src) : f === "end" ? endText(src) : f === "pred" ? depsToText(src.deps) : f === "cons" ? (src.cons || "ASAP") : f === "work" ? fmtWork(taskWork(src)) : null;
+    if(v == null) return;
+    var _r = render; render = function(){}; /* 批量修改，最后统一重排一次 */
+    try { ids.slice(1).forEach(function(id){ var t = byId(id); if(!t || (t.type === "milestone" && (f === "dur" || f === "work"))) return;
+        if(f === "prog") t.progress = v; else { cellEdit(t, f, String(v)); if(f === "cons" && src.consDate) t.consDate = src.consDate; } n++; }); }
+    finally { render = _r; }
+    render(); toast(L("filled")(n));
+  }
+  document.addEventListener("keydown", function(e){ if((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "d" || e.key === "D")){ var tg = e.target; if(tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName) && !(tg.classList && tg.classList.contains("cell-in"))) return; e.preventDefault(); if(tg && tg.blur) tg.blur(); setTimeout(fillDown, 0); } }, true);
+
+  /* —— 任务窗体 —— */
+  function drawForm(){
+    var box = document.getElementById("v4Form"); if(!box) return;
+    var show = !!state.showForm && (state.pane || "gantt") === "gantt"; box.style.display = show ? "flex" : "none"; if(!show) return;
+    var act = document.activeElement; if(act && box.contains(act) && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)) return; /* 正在编辑时不重画 */
+    var t = selId ? _bi(selId) : null, rn = rowNoMap();
+    if(!t || t.type === "group"){ box.innerHTML = '<div class="tf-empty">' + L("pick") + '</div><button type="button" class="tf-x" title="' + L("close") + '">×</button>'; box.querySelector(".tf-x").onclick = function(){ state.showForm = false; render(); }; return; }
+    var ms = t.type === "milestone", lock = !!(t.manual && isManaged(t.source));
+    function row(lbl, inner){ return '<label><span>' + lbl + "</span>" + inner + "</label>"; }
+    var preds = normDeps(t.deps), succ = [];
+    state.tasks.forEach(function(x){ normDeps(x.deps).forEach(function(d){ if(d.id === t.id) succ.push({ id:x.id, type:d.type, lag:d.lag }); }); });
+    function tbl(list, ttl){ return '<div class="tf-tb"><div class="tf-h">' + ttl + '</div><table><tr><th>' + L("pId") + "</th><th>" + L("pName") + "</th><th>" + L("pType") + "</th><th>" + L("pLag") + "</th></tr>"
+      + (list.length ? list.map(function(d){ var x = _bi(d.id); return '<tr data-id="' + d.id + '"><td>' + (rn[d.id] || "") + "</td><td>" + esc(x ? x.name : "?") + "</td><td>" + (d.type || "FS") + "</td><td>" + (d.lag ? (d.lag > 0 ? "+" : "") + d.lag + "d" : "0d") + "</td></tr>"; }).join("") : '<tr><td colspan="4" class="tf-none">' + L("none") + "</td></tr>") + "</table></div>"; }
+    box.innerHTML = '<div class="tf-f">'
+      + row(L("fName"), '<input data-f="name" value="' + esc(t.name || "") + '">')
+      + row(L("fDur"), ms ? '<input disabled value="0">' : '<input data-f="dur" value="' + esc(fmtDur(t)) + '"' + (lock ? " disabled" : "") + ">")
+      + row(L("fStart"), '<input data-f="start" value="' + esc(startText(t)) + '"' + (lock ? " disabled" : "") + ">")
+      + row(L("fEnd"), '<input data-f="end" value="' + esc(endText(t)) + '"' + (lock ? " disabled" : "") + ">")
+      + row(L("fPct"), '<input data-f="prog" type="number" min="0" max="100" step="5" value="' + (+t.progress || 0) + '">')
+      + row(L("fMode"), '<select data-f="mode"><option value="auto"' + (t.manual ? "" : " selected") + ">" + L("mAuto") + '</option><option value="manual"' + (t.manual ? " selected" : "") + ">" + L("mMan") + "</option></select>")
+      + row(L("fRes"), '<input data-f="owner" list="resDL" value="' + esc(t.owner || "") + '">')
+      + row(L("fPred"), '<input data-f="pred" value="' + esc(depsToText(t.deps)) + '">')
+      + '<label class="wide"><span>' + L("fNotes") + '</span><input data-f="remarks" value="' + esc(t.remarks || "") + '"></label>'
+      + '</div>' + tbl(preds, L("fPred")) + tbl(succ, L("fSucc"))
+      + '<div class="tf-nav"><button type="button" class="tf-p" title="' + L("prev") + '">▲</button><button type="button" class="tf-n" title="' + L("next") + '">▼</button><button type="button" class="tf-x" title="' + L("close") + '">×</button></div>';
+    box.querySelectorAll(".tf-f [data-f]").forEach(function(i){ i.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Enter") i.blur(); });
+      i.addEventListener("change", function(){ var x = _bi(selId); if(!x) return; var f = i.dataset.f, v = i.value.trim();
+        if(f === "name"){ if(v){ x.name = v; } i.blur(); render(); }
+        else if(f === "remarks"){ x.remarks = v; i.blur(); render(); }
+        else if(f === "prog"){ x.progress = Math.max(0, Math.min(100, Math.round(+v || 0))); i.blur(); render(); }
+        else { i.blur(); cellEdit(x, f, v); } }); });
+    box.querySelectorAll(".tf-tb tr[data-id]").forEach(function(r){ r.onclick = function(){ selId = r.dataset.id; render(); }; });
+    var vis = visibleTasks().filter(function(x){ return x.type !== "group"; });
+    function step(n){ var i = vis.findIndex(function(x){ return x.id === selId; }); var nx = vis[Math.max(0, Math.min(vis.length - 1, i + n))]; if(nx){ selId = nx.id; render(); } }
+    box.querySelector(".tf-p").onclick = function(){ step(-1); }; box.querySelector(".tf-n").onclick = function(){ step(1); };
+    box.querySelector(".tf-x").onclick = function(){ state.showForm = false; render(); };
+  }
+  var _rd = render; render = function(){ _rd.apply(this, arguments); try { drawForm(); syncUi(); } catch(e){ console.error(e); } };
+  function syncUi(){ var s = document.getElementById("v4GbSel"); if(s && s.value !== (state.groupBy || "")) s.value = state.groupBy || ""; var c = document.getElementById("v4FormCk"); if(c) c.checked = !!state.showForm; }
+  /* 选中变化（点行）时也刷新窗体 */
+  document.addEventListener("click", function(e){ if(state.showForm && e.target.closest && e.target.closest("#taskList .trow, .g-bar, .g-ms")) setTimeout(drawForm, 0); });
+
+  function setup(){
+    var main = document.querySelector(".main"); if(!main || document.getElementById("v4Form")) return;
+    var f = document.createElement("div"); f.id = "v4Form"; main.parentNode.insertBefore(f, main.nextSibling);
+    var after = document.getElementById("ckProgLine"); after = after && after.closest("label");
+    if(after){ var lb = document.createElement("label"); lb.className = "ck"; lb.innerHTML = '<input type="checkbox" id="v4FormCk"><span>' + L("form") + "</span>"; after.after(lb);
+      lb.querySelector("input").onchange = function(){ state.showForm = this.checked; save(); render(); };
+      var gl = document.createElement("label"); gl.className = "ck v4gb"; gl.innerHTML = "<span>" + L("gb") + '</span><select id="v4GbSel">' + GB_KEYS.map(function(k){ return '<option value="' + k + '">' + L(k ? "gb" + k.charAt(0).toUpperCase() + k.slice(1) : "gbNone") + "</option>"; }).join("") + "</select>";
+      lb.after(gl); gl.querySelector("select").onchange = function(){ state.groupBy = this.value; save(); render(); }; }
+    var bar = document.getElementById("msp2Bar");
+    if(bar){ var b = document.createElement("button"); b.type = "button"; b.className = "m3-fill"; b.title = L("fill"); b.textContent = "⤓"; bar.appendChild(b); b.onclick = fillDown; }
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Msp3 = { fillDown:fillDown, drawForm:drawForm, setCol:function(c){ lastCol = c; } };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
