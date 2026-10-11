@@ -16,7 +16,9 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
 .tabs button.on:hover{background:#fff}
 .sp{flex:1}
 .oemwrap{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
-.oemwrap select{height:32px;border-radius:6px;border:1px solid #4b6a85;background:#fff;color:#1f2937;font-size:13px;padding:0 8px;max-width:220px}
+.oemwrap select{height:32px;box-sizing:border-box;border-radius:6px;border:1px solid #5b7a94;background:#2b4d6a;color:#fff;font-size:13px;padding:0 8px;max-width:220px}
+.oemwrap select option{background:#fff;color:#1f2937}
+#top button,#top input,#top select,#top a.tb{box-sizing:border-box}
 .oemwrap.need select{outline:3px solid #fbbf24;animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{50%{outline-color:rgba(251,191,36,.25)}}
 .arrow{opacity:.55;font-size:13px}
