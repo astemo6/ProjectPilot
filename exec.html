@@ -127,6 +127,9 @@ body.resizing .col-resize{display:block}
 .g-weekend{position:absolute;top:0;bottom:0;background:#f3f4f6;z-index:0}
 .g-holiday{position:absolute;top:0;bottom:0;background:#fef2f2;z-index:0}
 .g-dep{position:absolute;z-index:4;pointer-events:none}
+.gh-y{position:absolute;top:0;height:22px;line-height:22px;background:#7BA7BC;color:#fff;font-weight:700;font-size:12px;text-align:center;border-right:1.5px solid #fff;box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.gh-m{position:absolute;top:22px;height:22px;line-height:22px;background:#BDD5E5;color:#1f2937;font-size:11px;text-align:center;border-right:1px solid #fff;box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.gh-m.off{background:#d6e3ec;color:#6b7280}
 .day-cell{position:absolute;top:0;bottom:0;border-right:1px dashed #e5e7eb}
 .gh-day{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden}
 .gh-date{font-size:9px;font-weight:600;color:var(--tx2);white-space:nowrap;line-height:1.25}
@@ -1215,6 +1218,48 @@ function bandShade(i, n){ // 钢蓝系渐变 #dbe7f3 → #9fc0dd
   var c = c1.map(function(v, k){ return Math.round(v + (c2[k] - v) * t); });
   return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
 }
+function ymLabel(d){ var y = d.getFullYear(), m = d.getMonth() + 1; return lang === "zh" ? y + "年" + m + "月" : (lang === "de" ? m + "." + y : m + "/" + y); }
+/* 时间轴双层表头：月视图 = 年 / 月(数字)；周视图 = 年月 / 周(起止日)；日视图 = 年月 / 日 */
+function headSegs(min, max, view, pxDay){
+  var top = [], bot = [], days = diffDays(min, max) + 1;
+  function X(d){ return diffDays(min, d) * pxDay; }
+  if(view === "month"){
+    for(var y = min.getFullYear(); y <= max.getFullYear(); y++){
+      var a = new Date(Math.max(new Date(y,0,1).getTime(), min.getTime())), b = new Date(Math.min(new Date(y,11,31).getTime(), max.getTime()));
+      top.push({ x:X(a), w:(diffDays(a, b) + 1) * pxDay, t:String(y) });
+    }
+  } else {
+    var mc = new Date(min.getFullYear(), min.getMonth(), 1);
+    while(mc <= max){
+      var ma = mc < min ? min : mc, mb = new Date(mc.getFullYear(), mc.getMonth() + 1, 0); if(mb > max) mb = max;
+      top.push({ x:X(ma), w:(diffDays(ma, mb) + 1) * pxDay, t:ymLabel(mc) });
+      mc = new Date(mc.getFullYear(), mc.getMonth() + 1, 1);
+    }
+  }
+  if(view === "month"){
+    var c = new Date(min.getFullYear(), min.getMonth(), 1);
+    while(c <= max){
+      var f = c < min ? min : c, l = new Date(c.getFullYear(), c.getMonth() + 1, 0); if(l > max) l = max;
+      bot.push({ x:X(f), w:(diffDays(f, l) + 1) * pxDay, t:String(c.getMonth() + 1), tip:ymLabel(c) });
+      c = new Date(c.getFullYear(), c.getMonth() + 1, 1);
+    }
+  } else if(view === "week"){
+    for(var i = 0; i < days; i++){
+      var dw = addDays(min, i); if(i > 0 && dw.getDay() !== 1) continue;
+      var e = i; while(e + 1 < days && addDays(min, e + 1).getDay() !== 1) e++;
+      var de = addDays(min, e);
+      bot.push({ x:i * pxDay, w:(e - i + 1) * pxDay, t:dw.getDate() + "–" + de.getDate(), tip:fmtD(dw) + " ~ " + fmtD(de) });
+      i = e;
+    }
+  } else {
+    var wd = tr("weekdayNames");
+    for(var k = 0; k < days; k++){
+      var dd = addDays(min, k), we = dd.getDay() === 0 || dd.getDay() === 6;
+      bot.push({ x:k * pxDay, w:pxDay, t:String(dd.getDate()), tip:fmtD(dd) + " " + wd[(dd.getDay() + 6) % 7] + (holName(fmtD(dd)) ? " " + holName(fmtD(dd)) : ""), off:we || !!holName(fmtD(dd)) });
+    }
+  }
+  return { top:top, bot:bot };
+}
 function renderGantt(){
   var R = dateRange(), min = R.min, max = R.max;
   var days = diffDays(min, max) + 1;
@@ -1224,45 +1269,9 @@ function renderGantt(){
   var bmap = baselineMap();
   // 表头：日视图每列两行（M/D + 星期）；周视图在每周第一列画跨周宽度的 M/D~M/D 标签；
   // 月视图每列一个月，列宽按当月实际天数（30天月=PX_MONTH），与 X() 按天映射对齐
-  var hh = "";
-  if(state.view === "month"){
-    var moCur = new Date(min.getFullYear(), min.getMonth(), 1), moI = 0;
-    while(moCur <= max){
-      var moFirst = moCur < min ? min : moCur;
-      var moLast = new Date(moCur.getFullYear(), moCur.getMonth() + 1, 0); // 当月最后一天
-      if(moLast > max) moLast = max;
-      var moX = X(moFirst, min), moW = (diffDays(moFirst, moLast) + 1) * PX_DAY;
-      hh += '<div class="gh-wk" style="left:' + moX + 'px;width:' + moW + 'px;background:' + (moI % 2 ? "#f9fafb" : "transparent") + ';border-right:1px solid var(--line)">' + monthLabel(moCur) + "</div>";
-      moCur = new Date(moCur.getFullYear(), moCur.getMonth() + 1, 1);
-      moI++;
-    }
-  } else {
-    for(var i = 0; i < days; i++){
-      var d = addDays(min, i), x = i * PX_DAY;
-      var isWk = d.getDay() === 0 || d.getDay() === 6, s = fmtD(d);
-      var isHol = holName(s);
-      hh += '<div class="day-cell" style="left:' + x + 'px;width:' + PX_DAY + 'px;background:' + (isHol ? "#fef2f2" : isWk ? "#f9fafb" : "transparent") + '"></div>';
-    }
-    var wdNames = tr("weekdayNames");
-    if(state.view === "week"){
-      for(var wi = 0; wi < days; wi++){
-        var dw = addDays(min, wi);
-        if(wi > 0 && dw.getDay() !== 1) continue; // 每周第一列（周一起）
-        var we = wi;
-        while(we + 1 < days && addDays(min, we + 1).getDay() !== 1) we++;
-        var dEnd = addDays(min, we);
-        hh += '<div class="gh-wk" style="left:' + (wi * PX_DAY) + 'px;width:' + ((we - wi + 1) * PX_DAY) + 'px">'
-          + (dw.getMonth()+1) + "/" + dw.getDate() + "~" + (dEnd.getMonth()+1) + "/" + dEnd.getDate() + "</div>";
-      }
-    } else {
-      for(var di = 0; di < days; di++){
-        var dd = addDays(min, di);
-        hh += '<div class="gh-day" style="left:' + (di * PX_DAY) + 'px;width:' + PX_DAY + 'px">'
-          + '<div class="gh-date">' + (dd.getMonth()+1) + "/" + dd.getDate() + '</div>'
-          + '<div class="gh-wd">' + wdNames[(dd.getDay() + 6) % 7] + "</div></div>";
-      }
-    }
-  }
+  var hh = "", HS = headSegs(min, max, state.view, PX_DAY);
+  HS.top.forEach(function(g){ hh += '<div class="gh-y" style="left:' + g.x + 'px;width:' + g.w + 'px">' + esc(g.t) + "</div>"; });
+  HS.bot.forEach(function(g){ hh += '<div class="gh-m' + (g.off ? " off" : "") + '" style="left:' + g.x + 'px;width:' + g.w + 'px" title="' + esc(g.tip || "") + '">' + esc(g.t) + "</div>"; });
   document.getElementById("ganttHead").innerHTML = '<div style="position:relative;width:' + W + 'px;height:44px">' + hh + "</div>";
   // 内容
   var inner = document.getElementById("ganttInner");
@@ -1842,53 +1851,27 @@ function renderExportCanvas(cb){
     ctx.fillText(hd.t, hd.ctr ? hd.x + hd.w / 2 : hd.x + 6, bodyY + HEAD_H / 2);
   });
 
-  /* ---- 右侧双层日期表头（年行 + 月行） ---- */
-  ctx.fillStyle = '#7BA7BC';
-  ctx.fillRect(hx, bodyY, W, 22);
-  ctx.fillStyle = '#BDD5E5';
-  ctx.fillRect(hx, bodyY + 22, W, 22);
-  ctx.textAlign = 'center';
-  var yStart = min.getFullYear(), yEnd = max.getFullYear();
-  ctx.font = expFont(13, true);
-  ctx.fillStyle = '#ffffff';
-  for(var yy = yStart; yy <= yEnd; yy++){
-    var ysD = new Date(Math.max(new Date(yy, 0, 1).getTime(), min.getTime()));
-    var yeD = new Date(Math.min(new Date(yy + 1, 0, 1).getTime(), max.getTime()));
-    var yx1 = hx + X(ysD), yx2 = hx + X(yeD);
-    ctx.fillText(String(yy), (yx1 + yx2) / 2, bodyY + 11);
-    if(yy > yStart){
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(yx1, bodyY); ctx.lineTo(yx1, bodyY + 22); ctx.stroke();
-    }
-  }
-  var monthXs = [];
-  ctx.font = expFont(11, false);
-  ctx.fillStyle = '#374151';
-  var cur = new Date(min.getFullYear(), min.getMonth(), 1);
-  var endM = new Date(max.getFullYear(), max.getMonth(), 1);
-  var monAb = MON_ABBR[lang] || MON_ABBR.zh;
-  while(cur <= endM){
-    var mx1 = hx + X(cur);
-    var nM = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-    var mx2 = hx + X(nM > max ? max : nM);
-    monthXs.push(mx1);
-    var mName = lang === 'zh' ? (cur.getMonth() + 1) + '月' : monAb[cur.getMonth() + 1];
-    ctx.fillText(mName, (mx1 + mx2) / 2, bodyY + 33);
-    cur = nM;
-  }
-  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
-  monthXs.forEach(function(mx){
-    ctx.beginPath(); ctx.moveTo(mx, bodyY + 22); ctx.lineTo(mx, bodyY + 44); ctx.stroke();
+  /* ---- 右侧双层日期表头（与屏幕一致：年/月、年月/周、年月/日） ---- */
+  var HSx = headSegs(min, max, state.view, pxDay);
+  ctx.fillStyle = '#7BA7BC'; ctx.fillRect(hx, bodyY, W, 22);
+  ctx.fillStyle = '#BDD5E5'; ctx.fillRect(hx, bodyY + 22, W, 22);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = expFont(12, true);
+  HSx.top.forEach(function(g, i){
+    ctx.fillStyle = '#ffffff'; ctx.fillText(g.t, hx + g.x + g.w / 2, bodyY + 11);
+    if(i > 0){ ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(hx + g.x, bodyY); ctx.lineTo(hx + g.x, bodyY + 22); ctx.stroke(); }
   });
+  ctx.font = expFont(state.view === 'day' ? 9 : 11, false);
+  var monthXs = [];
+  HSx.bot.forEach(function(g){
+    if(g.off){ ctx.fillStyle = '#d6e3ec'; ctx.fillRect(hx + g.x, bodyY + 22, g.w, 22); }
+    ctx.fillStyle = g.off ? '#6b7280' : '#1f2937'; ctx.fillText(g.t, hx + g.x + g.w / 2, bodyY + 33);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx + g.x, bodyY + 22); ctx.lineTo(hx + g.x, bodyY + 44); ctx.stroke();
+  });
+  (function(){ var c0 = new Date(min.getFullYear(), min.getMonth(), 1); while(c0 <= max){ monthXs.push(hx + X(c0)); c0 = new Date(c0.getFullYear(), c0.getMonth() + 1, 1); } })();
   ctx.textBaseline = 'alphabetic';
   /* 表头内日分隔线（日/周视图） */
-  if(state.view !== 'month'){
-    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
-    for(var di = 0; di <= days; di++){
-      var dx = hx + di * pxDay;
-      ctx.beginPath(); ctx.moveTo(dx, bodyY); ctx.lineTo(dx, bodyY + HEAD_H); ctx.stroke();
-    }
-  }
+  /* 日分隔已由表头分段白线绘制 */
   /* 表头/主体分界 + 表-轴分界 */
   ctx.strokeStyle = '#e5e7eb';
   ctx.beginPath(); ctx.moveTo(0, bodyY + HEAD_H - .5); ctx.lineTo(cssW, bodyY + HEAD_H - .5); ctx.stroke();
