@@ -398,6 +398,7 @@ header #themeBtns{display:flex}header #themeBtns button{height:100%;padding:0 9p
 .ribbon .rb-tabs .rb-tab{border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;background:transparent;padding:5px 16px;font-size:13px;margin-bottom:-1px;color:var(--tx2,#475569)}
 .ribbon .rb-tabs .rb-tab:hover{color:var(--accent);border-color:transparent;background:rgba(37,99,235,.06)}
 .ribbon .rb-tabs .rb-tab.on{background:var(--card);border-color:var(--line);color:var(--accent);font-weight:600}
+.ribbon .rb-box>#btnColors,.ribbon .rb-box>#btnTxtStyle{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .ribbon .rb-qat{margin-left:auto;display:inline-flex;gap:4px;margin-bottom:3px}.ribbon .rb-qat button{padding:2px 10px;font-size:12px}
 .ribbon .rb-tabs .rb-fold{margin-left:6px;margin-bottom:3px;border:none;background:transparent;padding:2px 8px;font-size:14px;color:var(--tx3)}
 .ribbon .rb-body{padding:6px 12px 2px;min-height:62px}
@@ -428,7 +429,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.3</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.4</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -5703,13 +5704,13 @@ function v4ExpPlan(){
   var TX = {
     zh:{ file:"文件", task:"任务", res:"资源", rep:"报表", proj:"项目", view:"视图", fmt:"格式",
       gUndo:"撤销", gIns:"插入", gSched:"日程", gTask:"任务", gFont:"字体", gOem:"客户", gResView:"资源视图", gRepView:"报表与分析", gOut:"输出", gImp:"导入", gExp:"导出", gProj:"排程", gBase:"基线",
-      gViews:"任务视图", gZoom:"缩放", gData:"数据", gShow:"显示", gCols:"列", fold:"折叠功能区（双击页签也可）", unfold:"展开功能区" },
+      gViews:"任务视图", gZoom:"缩放", gData:"数据", gShow:"显示", gCols:"列", gTxt:"格式", gBar:"条形图样式", fold:"折叠功能区（双击页签也可）", unfold:"展开功能区" },
     en:{ file:"File", task:"Task", res:"Resource", rep:"Report", proj:"Project", view:"View", fmt:"Format",
       gUndo:"Undo", gIns:"Insert", gSched:"Schedule", gTask:"Tasks", gFont:"Font", gOem:"Customer", gResView:"Resource views", gRepView:"Reports & analysis", gOut:"Output", gImp:"Import", gExp:"Export", gProj:"Scheduling", gBase:"Baseline",
-      gViews:"Task views", gZoom:"Zoom", gData:"Data", gShow:"Show/Hide", gCols:"Columns", fold:"Collapse the ribbon (or double-click a tab)", unfold:"Expand the ribbon" },
+      gViews:"Task views", gZoom:"Zoom", gData:"Data", gShow:"Show/Hide", gCols:"Columns", gTxt:"Format", gBar:"Bar styles", fold:"Collapse the ribbon (or double-click a tab)", unfold:"Expand the ribbon" },
     de:{ file:"Datei", task:"Vorgang", res:"Ressource", rep:"Bericht", proj:"Projekt", view:"Ansicht", fmt:"Format",
       gUndo:"Rückgängig", gIns:"Einfügen", gSched:"Terminplan", gTask:"Vorgänge", gFont:"Schriftart", gOem:"Kunde", gResView:"Ressourcenansichten", gRepView:"Berichte & Analyse", gOut:"Ausgabe", gImp:"Import", gExp:"Export", gProj:"Planung", gBase:"Basisplan",
-      gViews:"Vorgangsansichten", gZoom:"Zoom", gData:"Daten", gShow:"Anzeigen", gCols:"Spalten", fold:"Menüband reduzieren (oder Doppelklick auf Register)", unfold:"Menüband erweitern" } };
+      gViews:"Vorgangsansichten", gZoom:"Zoom", gData:"Daten", gShow:"Anzeigen", gCols:"Spalten", gTxt:"Format", gBar:"Balkenarten", fold:"Menüband reduzieren (oder Doppelklick auf Register)", unfold:"Menüband erweitern" } };
   function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
   var KEY = "gantt-ribbon-v4", proxies = [];
   function $(s){ return document.querySelector(s); }
@@ -5729,7 +5730,7 @@ function v4ExpPlan(){
       ["rep", [["gRepView", [proxy("rep"), proxy("evm"), proxy("wbs"), proxy("net")]], ["gOut", ["#btnPreview"]]]],
       ["proj", [["gProj", ["#ddSched"]], ["gBase", ["#ddBase"]]]],
       ["view", [["gViews", ["#paneBtns"]], ["gZoom", [zoomBox]], ["gData", ["#fltTxt", "#ddFlt"]]]],
-      ["fmt", [["gCols", ["#btnCols"]], ["gShow", ["#ddShow"]]]]
+      ["fmt", [["gTxt", ["#btnTxtStyle"]], ["gBar", ["#btnColors"]], ["gCols", ["#btnCols"]], ["gShow", ["#ddShow"]]]]
     ];
     var used = [], tabs = document.createElement("div"), body = document.createElement("div"), stash = document.createElement("div");
     tabs.className = "rb-tabs"; body.className = "rb-body"; stash.className = "rb-stash"; stash.style.display = "none";
