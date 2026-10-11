@@ -1,0 +1,27 @@
+services:
+  mpp2xml:
+    build: .
+    container_name: mpp2xml
+    restart: unless-stopped
+    environment:
+      - ALLOW_ORIGINS=https://astemo6.github.io
+      - MAX_MB=30
+      - RATE_PER_MIN=20
+    ports:
+      - "127.0.0.1:18790:8080"
+    mem_limit: 900m
+  caddy:
+    image: caddy:2-alpine
+    container_name: mpp2xml-caddy
+    restart: unless-stopped
+    environment:
+      - DOMAIN=mpp.45-92-159-155.sslip.io
+    ports:
+      - "80:80"
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [mpp2xml]
+volumes:
+  caddy_data:
