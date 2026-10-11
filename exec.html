@@ -28,6 +28,8 @@ header button:hover{background:var(--steel3)}
 .toolbar button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .toolbar button.primary:hover{background:#1d4ed8}
 .toolbar .sep{width:1px;height:20px;background:var(--line)}
+.toolbar .tb-break{flex-basis:100%;height:0;border-top:1px dashed var(--line2);margin:0 -16px}
+.toolbar .tb-lab{font-size:12px;color:var(--tx3);margin-right:2px}
 .toolbar select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--tx1);background:#fff;cursor:pointer;max-width:220px}
 .toolbar select:hover{border-color:var(--accent)}
 .toolbar .ck{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--tx1);cursor:pointer;user-select:none;white-space:nowrap}
@@ -60,6 +62,9 @@ header button:hover{background:var(--steel3)}
 .trow .c-end{width:86px;justify-content:center;flex-shrink:0;color:var(--tx2)}
 .trow .c-float{width:64px;justify-content:center;flex-shrink:0;color:var(--tx2)}
 .trow .c-pred{width:84px;flex-shrink:0}
+.trow .c-mode{width:84px;flex-shrink:0}
+.table-head .c-mode{width:84px;text-align:center;flex-shrink:0}
+.trow>div.c-mode{padding-top:3px;padding-bottom:3px}
 .trow .c-cons{width:220px;flex-shrink:0;gap:2px}
 .table-head .c-pred{width:84px;text-align:center;flex-shrink:0}
 .table-head .c-cons{width:220px;text-align:center;flex-shrink:0}
@@ -184,7 +189,8 @@ body.resizing .col-resize{display:block}
 .pv-x{background:#e5e7eb;color:#1f2937;border:none;border-radius:6px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;padding:0;flex-shrink:0}
 .pv-x:hover{background:#d1d5db}
 #pvImg{display:block;max-width:calc(90vw - 32px);max-height:calc(85vh - 62px);border:1px solid #e5e7eb;border-radius:6px}
-.dep-line{stroke:#94a3b8;stroke-width:1.5;fill:none}
+.dep-line{stroke:#475569;stroke-width:1.2;fill:none;stroke-linejoin:miter}
+.dep-arr{fill:#475569}
 @media(max-width:768px){.table-pane{width:300px;min-width:260px}}
 /* ===== 手机端补充适配（仅小屏生效，不改桌面端布局与配色；不动 viewport，不拦截浏览器原生缩放） ===== */
 @media (max-width:768px){
@@ -249,11 +255,12 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
   <label class="ck"><input type="checkbox" id="ckResWarn" checked><span data-i18n="resWarn">资源预警</span></label>
   <span class="sep"></span>
   <button id="btnCal" data-i18n="workCal">工作日历</button>
-  <span class="sep"></span>
+  <div class="tb-break"></div>
+  <span class="tb-lab" data-i18n="tbOut">导出 / 导入</span>
+  <button id="btnPreview" data-i18n="preview">预览</button>
   <button id="btnPDF" data-i18n="exportPDF">导出 PDF</button>
   <button id="btnJPG" data-i18n="exportJPG">导出 JPG</button>
   <button id="btnXls" data-i18n="expXls">导出 Excel</button>
-  <button id="btnPreview" data-i18n="preview">预览</button>
   <span class="sep"></span>
   <button id="btnExport" data-i18n="exportJSON">导出JSON</button>
   <button id="btnImport" data-i18n="importJSON">导入JSON</button>
@@ -342,9 +349,9 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 "use strict";
 /* ============ I18N ============ */
 var I18N = {
-zh:{consASAP:"尽早开始",consALAP:"尽晚开始",consSNET:"不得早于...开始",consSNLT:"不得晚于...开始",consFNET:"不得早于...完成",consFNLT:"不得晚于...完成",consMSO:"必须开始于",consMFO:"必须完成于",cPred:"前置任务",cCons:"约束",fCons:"约束类型",fConsDate:"约束日期",predPh:"如 3,4SS+2",managedRename:"这是从②客户节点同步来的行，名称请到②客户节点页修改",delSel:"🗑 删除",delSelTip:"删除选中的任务/分组（也可按 Delete 键，或点行尾 🗑）",delPick:"请先单击选中要删除的行",delAsk:"删除「{0}」？",weekdayNames:["一","二","三","四","五","六","日"],appTitle:"执行层计划",backToPlan:"← 里程碑计划",addTask:"+ 新增任务",addGroup:"+ 新增分组",addMs:"+ 里程碑",fromPlan:"从计划导入",syncBack:"回写里程碑计划",syncBackOk:"已同步到里程碑计划",syncBackEmpty:"没有可同步的里程碑",syncBackFail:"计划数据读取失败",importSub:"导入细项",vDay:"日",vWeek:"周",vMonth:"月",workCal:"工作日历",showPhase:"阶段",oemPlaceholder:"请选择主机厂",exportJSON:"导出JSON",importJSON:"导入JSON",exportCSV:"导出CSV",preview:"预览",exportPDF:"导出 PDF",exportJPG:"导出 JPG",expXls:"导出 Excel",expPreviewTitle:"导出预览",expDate:"日期",legendPhase:"阶段区间",legendTask:"任务",today:"今天",cName:"任务名称",cOwner:"负责人",cDur:"工期",cProg:"进度",cStart:"开始",cEnd:"结束",calTitle:"工作日历 · 自然语言导入",calPh:"例如：2026年春节2月15日到2月23日放假，2月14日、2月28日调休上班",calParse:"解析并导入",calReset:"恢复默认",calHint:"支持：X月X日、X月X日至X月X日、放假/调休/补班/上班等关键词，年份缺省为当年。",calModeNL:"自然语言",calModeText:"文本格式",calHintText:"一行一条：2026-10-01~2026-10-07,国庆 表示放假区间；补班 2026-10-10 表示调休上班。",calPhText:"2026-10-01~2026-10-07,国庆\n补班 2026-10-10",del:"删除",cancel:"取消",ok:"确定",importSubT:"导入细项",subTarget:"目标任务",subContent:"细项内容（一行一条，可含负责人、工期，用逗号分隔）",subFile:"或从 CSV 文件导入",editTask:"编辑任务",newTask:"新增任务",newGroup:"新增分组",newMs:"新增里程碑",fName:"名称",fType:"类型",tTask:"任务",tMs:"里程碑",tGroup:"分组",fGroup:"所属分组",fStart:"开始日期",fDur:"工期（工作日）",fDeps:"前置任务（ID，可带类型与滞后）",fDepsHint:"格式：ID+类型+滞后天数，如 3FS,5SS+2d；-2d 表示提前 2 个工作日；默认 FS（完成→开始）。类型：FS 完成→开始，SS 开始→开始，FF 完成→完成，SF 开始→完成",fDeadline:"期限",deadlineWarn:"结束日期晚于期限",criticalPath:"关键路径",floatCol:"总浮时",fOwner:"负责人",fOutput:"输出成果",fProg:"进度%",fRemarks:"备注",fColor:"颜色",needName:"请填写名称",fromPlanOk:"已从计划导入",noPlan:"未找到计划数据",calApplied:"日历已更新",cycleWarn:"检测到循环依赖，已忽略",importOk:"导入成功",subOk:"细项导入成功",topGroup:"顶级",planGroupMs:"客户里程碑",planGroupRec:"推荐任务",planGroupSup:"供应商节点",planGroupCustom:"自定义任务",saveBaseline:"保存基线",showBaseline:"基线对比",baselineConfirm:"覆盖已有基线？",baselineSaved:"基线已保存",varianceCol:"偏差",manualSched:"手动排程",resWarn:"资源预警",resWarnTip:"该负责人当日有多个并行任务",colSettings:"显示列 ▾",colFixed:"固定列",colReset:"双击表头右边缘恢复默认宽度",oemAutoImport:"已导入{0}的里程碑",oemNoData:"里程碑计划中没有该 OEM 的数据",oemImportConfirm:"切换 OEM 将重新导入里程碑，当前任务会被替换，继续？",tplBtn:"模板",barLbl:"条形标注",blName:"名称",blStart:"开始日期",blEnd:"完成日期",blNone:"不显示",managedDel:"「客户里程碑」「推荐任务」「供应商节点」跟随②客户节点自动同步，请到②客户节点页取消勾选（或清空日期），这里会自动消失。",grpDelAsk:"删除这个分组及其下 {0} 行？",tplConfirm:"插入模板任务到当前计划？",tplOk:"模板已插入",expXml:"导出 XML",impXml:"导入 XML",impXmlConfirm:"导入将替换当前任务，继续？"},
-en:{consASAP:"As Soon As Possible",consALAP:"As Late As Possible",consSNET:"Start No Earlier Than",consSNLT:"Start No Later Than",consFNET:"Finish No Earlier Than",consFNLT:"Finish No Later Than",consMSO:"Must Start On",consMFO:"Must Finish On",cPred:"Predecessors",cCons:"Constraint",fCons:"Constraint type",fConsDate:"Constraint date",predPh:"e.g. 3,4SS+2",managedRename:"This row is synced from ② Customer Milestones; rename it there",delSel:"🗑 Delete",delSelTip:"Delete the selected task/group (or press Delete, or click 🗑 at the row end)",delPick:"Click a row to select it first",delAsk:"Delete \"{0}\"?",weekdayNames:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],appTitle:"Execution Plan",backToPlan:"← Milestone Plan",addTask:"+ Add Task",addGroup:"+ Add Group",addMs:"+ Milestone",fromPlan:"Import from Plan",syncBack:"Write Back to Plan",syncBackOk:"Synced to milestone plan",syncBackEmpty:"No linked milestones to sync",syncBackFail:"Failed to read plan data",importSub:"Import Sub-items",vDay:"Day",vWeek:"Week",vMonth:"Month",workCal:"Work Calendar",showPhase:"Phases",oemPlaceholder:"Select OEM",exportJSON:"Export JSON",importJSON:"Import JSON",exportCSV:"Export CSV",preview:"Preview",exportPDF:"Export PDF",exportJPG:"Export JPG",expXls:"Export Excel",expPreviewTitle:"Export Preview",expDate:"Date",legendPhase:"Phase",legendTask:"Task",today:"Today",cName:"Task",cOwner:"Owner",cDur:"Dur.",cProg:"Prog.",cStart:"Start",cEnd:"End",calTitle:"Work Calendar · Natural Language Import",calPh:"e.g. Spring Festival 2026-02-15 to 2026-02-23 off, 02-14 and 02-28 work",calParse:"Parse & Import",calReset:"Reset",calHint:"Supports date ranges and keywords like off/work. Year defaults to current.",calModeNL:"Natural language",calModeText:"Text format",calHintText:"One per line: 2026-10-01~2026-10-07,National Day = holiday range; Make-up 2026-10-10 = workday.",calPhText:"2026-10-01~2026-10-07,National Day\nMake-up 2026-10-10",del:"Delete",cancel:"Cancel",ok:"OK",importSubT:"Import Sub-items",subTarget:"Target Task",subContent:"One per line, optional owner,duration comma-separated",subFile:"Or import from CSV file",editTask:"Edit Task",newTask:"New Task",newGroup:"New Group",newMs:"New Milestone",fName:"Name",fType:"Type",tTask:"Task",tMs:"Milestone",tGroup:"Group",fGroup:"Group",fStart:"Start Date",fDur:"Duration (workdays)",fDeps:"Predecessors (IDs, types & lag)",fDepsHint:"Format: ID+type+lag workdays, e.g. 3FS,5SS+2d; -2d = 2 workdays early; default FS (finish-to-start). Types: FS finish→start, SS start→start, FF finish→finish, SF start→finish",fDeadline:"Deadline",deadlineWarn:"End date is later than the deadline",criticalPath:"Critical Path",floatCol:"Total Float",fOwner:"Owner",fOutput:"Deliverable",fProg:"Progress %",fRemarks:"Remarks",fColor:"Color",needName:"Name required",fromPlanOk:"Imported from plan",noPlan:"No plan data found",calApplied:"Calendar updated",cycleWarn:"Circular dependency detected and ignored",importOk:"Import OK",subOk:"Sub-items imported",topGroup:"Top",planGroupMs:"Customer Milestones",planGroupRec:"Recommended Tasks",planGroupSup:"Supplier Nodes",planGroupCustom:"Custom Tasks",saveBaseline:"Save Baseline",showBaseline:"Baseline Compare",baselineConfirm:"Overwrite existing baseline?",baselineSaved:"Baseline saved",varianceCol:"Variance",manualSched:"Manual scheduling",resWarn:"Resource Alert",resWarnTip:"Owner has overlapping tasks on this day",colSettings:"Columns ▾",colFixed:"Fixed",colReset:"Double-click header edge to reset width",oemAutoImport:"Milestones imported for {0}",oemNoData:"No milestone data for this OEM",oemImportConfirm:"Switching OEM will re-import milestones and replace current tasks. Continue?",tplBtn:"Templates",barLbl:"Bar label",blName:"Name",blStart:"Start date",blEnd:"Finish date",blNone:"None",managedDel:"Customer milestones, recommended tasks and supplier nodes are synced from ② Customer Milestones. Untick them (or clear the dates) there and they disappear here.",grpDelAsk:"Delete this group and its {0} rows?",tplConfirm:"Insert template tasks into the current plan?",tplOk:"Template inserted",expXml:"Export XML",impXml:"Import XML",impXmlConfirm:"Import will replace current tasks. Continue?"},
-de:{consASAP:"So früh wie möglich",consALAP:"So spät wie möglich",consSNET:"Anfang nicht früher als",consSNLT:"Anfang nicht später als",consFNET:"Ende nicht früher als",consFNLT:"Ende nicht später als",consMSO:"Muss anfangen am",consMFO:"Muss enden am",cPred:"Vorgänger",cCons:"Einschränkung",fCons:"Einschränkungsart",fConsDate:"Einschränkungsdatum",predPh:"z.B. 3,4SS+2",managedRename:"Diese Zeile wird aus ② Kundenmeilensteine synchronisiert; dort umbenennen",delSel:"🗑 Löschen",delSelTip:"Ausgewählte Aufgabe/Gruppe löschen (oder Entf-Taste, oder 🗑 am Zeilenende)",delPick:"Bitte zuerst eine Zeile anklicken",delAsk:"\"{0}\" löschen?",weekdayNames:["Mo","Di","Mi","Do","Fr","Sa","So"],appTitle:"Ausführungsplan",backToPlan:"← Meilensteinplan",addTask:"+ Aufgabe",addGroup:"+ Gruppe",addMs:"+ Meilenstein",fromPlan:"Aus Plan importieren",syncBack:"In Plan zurückschreiben",syncBackOk:"Mit Meilensteinplan synchronisiert",syncBackEmpty:"Keine verknüpften Meilensteine",syncBackFail:"Plandaten konnten nicht gelesen werden",importSub:"Unterpunkte importieren",vDay:"Tag",vWeek:"Woche",vMonth:"Monat",workCal:"Arbeitskalender",showPhase:"Phasen",oemPlaceholder:"OEM wählen",exportJSON:"JSON exportieren",importJSON:"JSON importieren",exportCSV:"CSV exportieren",preview:"Vorschau",exportPDF:"PDF exportieren",exportJPG:"JPG exportieren",expXls:"Excel-Export",expPreviewTitle:"Exportvorschau",expDate:"Datum",legendPhase:"Phasen",legendTask:"Aufgabe",today:"Heute",cName:"Aufgabe",cOwner:"Eigner",cDur:"Dauer",cProg:"Fort.",cStart:"Start",cEnd:"End",calTitle:"Arbeitskalender · Import in natürlicher Sprache",calPh:"z.B. Frühlingsfest 2026-02-15 bis 2026-02-23 frei",calParse:"Parsen & importieren",calReset:"Zurücksetzen",calHint:"Datumsbereiche und Schlüsselwörter werden unterstützt.",calModeNL:"Natürliche Sprache",calModeText:"Textformat",calHintText:"Eine Zeile pro Eintrag: 2026-10-01~2026-10-07,Feiertag = Ferienbereich; Ausgleich 2026-10-10 = Arbeitstag.",calPhText:"2026-10-01~2026-10-07,Feiertag\nAusgleich 2026-10-10",del:"Löschen",cancel:"Abbrechen",ok:"OK",importSubT:"Unterpunkte importieren",subTarget:"Zielaufgabe",subContent:"Eins pro Zeile, optional Eigner,Dauer",subFile:"Oder aus CSV-Datei importieren",editTask:"Aufgabe bearbeiten",newTask:"Neue Aufgabe",newGroup:"Neue Gruppe",newMs:"Neuer Meilenstein",fName:"Name",fType:"Typ",tTask:"Aufgabe",tMs:"Meilenstein",tGroup:"Gruppe",fGroup:"Gruppe",fStart:"Startdatum",fDur:"Dauer (Arbeitstage)",fDeps:"Vorgänger (IDs, Typen & Versatz)",fDepsHint:"Format: ID+Typ+Versatztage, z.B. 3FS,5SS+2d; -2d = 2 Arbeitstage früher; Standard FS (Ende→Start). Typen: FS Ende→Start, SS Start→Start, FF Ende→Ende, SF Start→Ende",fDeadline:"Frist",deadlineWarn:"Enddatum liegt nach der Frist",criticalPath:"Kritischer Pfad",floatCol:"Gesamtpuffer",fOwner:"Eigner",fOutput:"Ergebnis",fProg:"Fortschritt %",fRemarks:"Bemerkungen",fColor:"Farbe",needName:"Name erforderlich",fromPlanOk:"Aus Plan importiert",noPlan:"Keine Plandaten",calApplied:"Kalender aktualisiert",cycleWarn:"Zirkuläre Abhängigkeit ignoriert",importOk:"Import OK",subOk:"Unterpunkte importiert",topGroup:"Oberste",planGroupMs:"Kundenmeilensteine",planGroupRec:"Empfohlene Aufgaben",planGroupSup:"Lieferantenknoten",planGroupCustom:"Eigene Aufgaben",saveBaseline:"Basisplan speichern",showBaseline:"Basisvergleich",baselineConfirm:"Bestehende Basis überschreiben?",baselineSaved:"Basisplan gespeichert",varianceCol:"Abweichung",manualSched:"Manuelle Planung",resWarn:"Ressourcenwarnung",resWarnTip:"Verantwortlicher hat überlappende Aufgaben",colSettings:"Spalten",colFixed:"Fest",colReset:"Doppelklick auf Kopfrand setzt Breite zurück",oemAutoImport:"Meilensteine für {0} importiert",oemNoData:"Keine Meilensteindaten für diesen OEM",oemImportConfirm:"OEM-Wechsel importiert Meilensteine neu und ersetzt aktuelle Aufgaben. Fortfahren?",tplBtn:"Vorlagen",barLbl:"Balkenbeschriftung",blName:"Name",blStart:"Startdatum",blEnd:"Enddatum",blNone:"Keine",managedDel:"Kundenmeilensteine, empfohlene Aufgaben und Lieferantenknoten werden aus ② Kundenmeilensteine synchronisiert. Dort abwählen (oder Datum löschen), dann verschwinden sie hier.",grpDelAsk:"Diese Gruppe und ihre {0} Zeilen löschen?",tplConfirm:"Vorlagenaufgaben in den aktuellen Plan einfügen?",tplOk:"Vorlage eingefügt",expXml:"XML-Export",impXml:"XML-Import",impXmlConfirm:"Der Import ersetzt die aktuellen Aufgaben. Fortfahren?"}};
+zh:{cMode:"任务模式",modeAuto:"自动计划",modeManual:"手动计划",tbOut:"导出 / 导入",msPinnedDeps:"客户里程碑是客户给定的日期（📌固定），不会被前置任务推移；如需调整请在②客户节点修改",unpinnedByDeps:"已取消📌固定，开始日期改由前置任务自动推算",consASAP:"尽早开始",consALAP:"尽晚开始",consSNET:"不得早于...开始",consSNLT:"不得晚于...开始",consFNET:"不得早于...完成",consFNLT:"不得晚于...完成",consMSO:"必须开始于",consMFO:"必须完成于",cPred:"前置任务",cCons:"约束",fCons:"约束类型",fConsDate:"约束日期",predPh:"如 3,4SS+2",managedRename:"这是从②客户节点同步来的行，名称请到②客户节点页修改",delSel:"🗑 删除",delSelTip:"删除选中的任务/分组（也可按 Delete 键，或点行尾 🗑）",delPick:"请先单击选中要删除的行",delAsk:"删除「{0}」？",weekdayNames:["一","二","三","四","五","六","日"],appTitle:"执行层计划",backToPlan:"← 里程碑计划",addTask:"+ 新增任务",addGroup:"+ 新增分组",addMs:"+ 里程碑",fromPlan:"从计划导入",syncBack:"回写里程碑计划",syncBackOk:"已同步到里程碑计划",syncBackEmpty:"没有可同步的里程碑",syncBackFail:"计划数据读取失败",importSub:"导入细项",vDay:"日",vWeek:"周",vMonth:"月",workCal:"工作日历",showPhase:"阶段",oemPlaceholder:"请选择主机厂",exportJSON:"导出JSON",importJSON:"导入JSON",exportCSV:"导出CSV",preview:"预览",exportPDF:"导出 PDF",exportJPG:"导出 JPG",expXls:"导出 Excel",expPreviewTitle:"导出预览",expDate:"日期",legendPhase:"阶段区间",legendTask:"任务",today:"今天",cName:"任务名称",cOwner:"负责人",cDur:"工期",cProg:"进度",cStart:"开始",cEnd:"结束",calTitle:"工作日历 · 自然语言导入",calPh:"例如：2026年春节2月15日到2月23日放假，2月14日、2月28日调休上班",calParse:"解析并导入",calReset:"恢复默认",calHint:"支持：X月X日、X月X日至X月X日、放假/调休/补班/上班等关键词，年份缺省为当年。",calModeNL:"自然语言",calModeText:"文本格式",calHintText:"一行一条：2026-10-01~2026-10-07,国庆 表示放假区间；补班 2026-10-10 表示调休上班。",calPhText:"2026-10-01~2026-10-07,国庆\n补班 2026-10-10",del:"删除",cancel:"取消",ok:"确定",importSubT:"导入细项",subTarget:"目标任务",subContent:"细项内容（一行一条，可含负责人、工期，用逗号分隔）",subFile:"或从 CSV 文件导入",editTask:"编辑任务",newTask:"新增任务",newGroup:"新增分组",newMs:"新增里程碑",fName:"名称",fType:"类型",tTask:"任务",tMs:"里程碑",tGroup:"分组",fGroup:"所属分组",fStart:"开始日期",fDur:"工期（工作日）",fDeps:"前置任务（ID，可带类型与滞后）",fDepsHint:"格式：ID+类型+滞后天数，如 3FS,5SS+2d；-2d 表示提前 2 个工作日；默认 FS（完成→开始）。类型：FS 完成→开始，SS 开始→开始，FF 完成→完成，SF 开始→完成",fDeadline:"期限",deadlineWarn:"结束日期晚于期限",criticalPath:"关键路径",floatCol:"总浮时",fOwner:"负责人",fOutput:"输出成果",fProg:"进度%",fRemarks:"备注",fColor:"颜色",needName:"请填写名称",fromPlanOk:"已从计划导入",noPlan:"未找到计划数据",calApplied:"日历已更新",cycleWarn:"检测到循环依赖，已忽略",importOk:"导入成功",subOk:"细项导入成功",topGroup:"顶级",planGroupMs:"客户里程碑",planGroupRec:"推荐任务",planGroupSup:"供应商节点",planGroupCustom:"自定义任务",saveBaseline:"保存基线",showBaseline:"基线对比",baselineConfirm:"覆盖已有基线？",baselineSaved:"基线已保存",varianceCol:"偏差",manualSched:"手动排程",resWarn:"资源预警",resWarnTip:"该负责人当日有多个并行任务",colSettings:"显示列 ▾",colFixed:"固定列",colReset:"双击表头右边缘恢复默认宽度",oemAutoImport:"已导入{0}的里程碑",oemNoData:"里程碑计划中没有该 OEM 的数据",oemImportConfirm:"切换 OEM 将重新导入里程碑，当前任务会被替换，继续？",tplBtn:"模板",barLbl:"条形标注",blName:"名称",blStart:"开始日期",blEnd:"完成日期",blNone:"不显示",managedDel:"「客户里程碑」「推荐任务」「供应商节点」跟随②客户节点自动同步，请到②客户节点页取消勾选（或清空日期），这里会自动消失。",grpDelAsk:"删除这个分组及其下 {0} 行？",tplConfirm:"插入模板任务到当前计划？",tplOk:"模板已插入",expXml:"导出 XML",impXml:"导入 XML",impXmlConfirm:"导入将替换当前任务，继续？"},
+en:{cMode:"Task Mode",modeAuto:"Auto Scheduled",modeManual:"Manually Scheduled",tbOut:"Export / Import",msPinnedDeps:"Customer milestones are fixed customer dates (📌) and are not moved by predecessors; change them in ② Customer Milestones",unpinnedByDeps:"Unpinned: the start date is now driven by the predecessors",consASAP:"As Soon As Possible",consALAP:"As Late As Possible",consSNET:"Start No Earlier Than",consSNLT:"Start No Later Than",consFNET:"Finish No Earlier Than",consFNLT:"Finish No Later Than",consMSO:"Must Start On",consMFO:"Must Finish On",cPred:"Predecessors",cCons:"Constraint",fCons:"Constraint type",fConsDate:"Constraint date",predPh:"e.g. 3,4SS+2",managedRename:"This row is synced from ② Customer Milestones; rename it there",delSel:"🗑 Delete",delSelTip:"Delete the selected task/group (or press Delete, or click 🗑 at the row end)",delPick:"Click a row to select it first",delAsk:"Delete \"{0}\"?",weekdayNames:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],appTitle:"Execution Plan",backToPlan:"← Milestone Plan",addTask:"+ Add Task",addGroup:"+ Add Group",addMs:"+ Milestone",fromPlan:"Import from Plan",syncBack:"Write Back to Plan",syncBackOk:"Synced to milestone plan",syncBackEmpty:"No linked milestones to sync",syncBackFail:"Failed to read plan data",importSub:"Import Sub-items",vDay:"Day",vWeek:"Week",vMonth:"Month",workCal:"Work Calendar",showPhase:"Phases",oemPlaceholder:"Select OEM",exportJSON:"Export JSON",importJSON:"Import JSON",exportCSV:"Export CSV",preview:"Preview",exportPDF:"Export PDF",exportJPG:"Export JPG",expXls:"Export Excel",expPreviewTitle:"Export Preview",expDate:"Date",legendPhase:"Phase",legendTask:"Task",today:"Today",cName:"Task",cOwner:"Owner",cDur:"Dur.",cProg:"Prog.",cStart:"Start",cEnd:"End",calTitle:"Work Calendar · Natural Language Import",calPh:"e.g. Spring Festival 2026-02-15 to 2026-02-23 off, 02-14 and 02-28 work",calParse:"Parse & Import",calReset:"Reset",calHint:"Supports date ranges and keywords like off/work. Year defaults to current.",calModeNL:"Natural language",calModeText:"Text format",calHintText:"One per line: 2026-10-01~2026-10-07,National Day = holiday range; Make-up 2026-10-10 = workday.",calPhText:"2026-10-01~2026-10-07,National Day\nMake-up 2026-10-10",del:"Delete",cancel:"Cancel",ok:"OK",importSubT:"Import Sub-items",subTarget:"Target Task",subContent:"One per line, optional owner,duration comma-separated",subFile:"Or import from CSV file",editTask:"Edit Task",newTask:"New Task",newGroup:"New Group",newMs:"New Milestone",fName:"Name",fType:"Type",tTask:"Task",tMs:"Milestone",tGroup:"Group",fGroup:"Group",fStart:"Start Date",fDur:"Duration (workdays)",fDeps:"Predecessors (IDs, types & lag)",fDepsHint:"Format: ID+type+lag workdays, e.g. 3FS,5SS+2d; -2d = 2 workdays early; default FS (finish-to-start). Types: FS finish→start, SS start→start, FF finish→finish, SF start→finish",fDeadline:"Deadline",deadlineWarn:"End date is later than the deadline",criticalPath:"Critical Path",floatCol:"Total Float",fOwner:"Owner",fOutput:"Deliverable",fProg:"Progress %",fRemarks:"Remarks",fColor:"Color",needName:"Name required",fromPlanOk:"Imported from plan",noPlan:"No plan data found",calApplied:"Calendar updated",cycleWarn:"Circular dependency detected and ignored",importOk:"Import OK",subOk:"Sub-items imported",topGroup:"Top",planGroupMs:"Customer Milestones",planGroupRec:"Recommended Tasks",planGroupSup:"Supplier Nodes",planGroupCustom:"Custom Tasks",saveBaseline:"Save Baseline",showBaseline:"Baseline Compare",baselineConfirm:"Overwrite existing baseline?",baselineSaved:"Baseline saved",varianceCol:"Variance",manualSched:"Manual scheduling",resWarn:"Resource Alert",resWarnTip:"Owner has overlapping tasks on this day",colSettings:"Columns ▾",colFixed:"Fixed",colReset:"Double-click header edge to reset width",oemAutoImport:"Milestones imported for {0}",oemNoData:"No milestone data for this OEM",oemImportConfirm:"Switching OEM will re-import milestones and replace current tasks. Continue?",tplBtn:"Templates",barLbl:"Bar label",blName:"Name",blStart:"Start date",blEnd:"Finish date",blNone:"None",managedDel:"Customer milestones, recommended tasks and supplier nodes are synced from ② Customer Milestones. Untick them (or clear the dates) there and they disappear here.",grpDelAsk:"Delete this group and its {0} rows?",tplConfirm:"Insert template tasks into the current plan?",tplOk:"Template inserted",expXml:"Export XML",impXml:"Import XML",impXmlConfirm:"Import will replace current tasks. Continue?"},
+de:{cMode:"Vorgangsmodus",modeAuto:"Automatisch geplant",modeManual:"Manuell geplant",tbOut:"Export / Import",msPinnedDeps:"Kundenmeilensteine sind feste Kundentermine (📌) und werden nicht durch Vorgänger verschoben; in ② Kundenmeilensteine ändern",unpinnedByDeps:"Fixierung aufgehoben: Start wird jetzt aus den Vorgängern berechnet",consASAP:"So früh wie möglich",consALAP:"So spät wie möglich",consSNET:"Anfang nicht früher als",consSNLT:"Anfang nicht später als",consFNET:"Ende nicht früher als",consFNLT:"Ende nicht später als",consMSO:"Muss anfangen am",consMFO:"Muss enden am",cPred:"Vorgänger",cCons:"Einschränkung",fCons:"Einschränkungsart",fConsDate:"Einschränkungsdatum",predPh:"z.B. 3,4SS+2",managedRename:"Diese Zeile wird aus ② Kundenmeilensteine synchronisiert; dort umbenennen",delSel:"🗑 Löschen",delSelTip:"Ausgewählte Aufgabe/Gruppe löschen (oder Entf-Taste, oder 🗑 am Zeilenende)",delPick:"Bitte zuerst eine Zeile anklicken",delAsk:"\"{0}\" löschen?",weekdayNames:["Mo","Di","Mi","Do","Fr","Sa","So"],appTitle:"Ausführungsplan",backToPlan:"← Meilensteinplan",addTask:"+ Aufgabe",addGroup:"+ Gruppe",addMs:"+ Meilenstein",fromPlan:"Aus Plan importieren",syncBack:"In Plan zurückschreiben",syncBackOk:"Mit Meilensteinplan synchronisiert",syncBackEmpty:"Keine verknüpften Meilensteine",syncBackFail:"Plandaten konnten nicht gelesen werden",importSub:"Unterpunkte importieren",vDay:"Tag",vWeek:"Woche",vMonth:"Monat",workCal:"Arbeitskalender",showPhase:"Phasen",oemPlaceholder:"OEM wählen",exportJSON:"JSON exportieren",importJSON:"JSON importieren",exportCSV:"CSV exportieren",preview:"Vorschau",exportPDF:"PDF exportieren",exportJPG:"JPG exportieren",expXls:"Excel-Export",expPreviewTitle:"Exportvorschau",expDate:"Datum",legendPhase:"Phasen",legendTask:"Aufgabe",today:"Heute",cName:"Aufgabe",cOwner:"Eigner",cDur:"Dauer",cProg:"Fort.",cStart:"Start",cEnd:"End",calTitle:"Arbeitskalender · Import in natürlicher Sprache",calPh:"z.B. Frühlingsfest 2026-02-15 bis 2026-02-23 frei",calParse:"Parsen & importieren",calReset:"Zurücksetzen",calHint:"Datumsbereiche und Schlüsselwörter werden unterstützt.",calModeNL:"Natürliche Sprache",calModeText:"Textformat",calHintText:"Eine Zeile pro Eintrag: 2026-10-01~2026-10-07,Feiertag = Ferienbereich; Ausgleich 2026-10-10 = Arbeitstag.",calPhText:"2026-10-01~2026-10-07,Feiertag\nAusgleich 2026-10-10",del:"Löschen",cancel:"Abbrechen",ok:"OK",importSubT:"Unterpunkte importieren",subTarget:"Zielaufgabe",subContent:"Eins pro Zeile, optional Eigner,Dauer",subFile:"Oder aus CSV-Datei importieren",editTask:"Aufgabe bearbeiten",newTask:"Neue Aufgabe",newGroup:"Neue Gruppe",newMs:"Neuer Meilenstein",fName:"Name",fType:"Typ",tTask:"Aufgabe",tMs:"Meilenstein",tGroup:"Gruppe",fGroup:"Gruppe",fStart:"Startdatum",fDur:"Dauer (Arbeitstage)",fDeps:"Vorgänger (IDs, Typen & Versatz)",fDepsHint:"Format: ID+Typ+Versatztage, z.B. 3FS,5SS+2d; -2d = 2 Arbeitstage früher; Standard FS (Ende→Start). Typen: FS Ende→Start, SS Start→Start, FF Ende→Ende, SF Start→Ende",fDeadline:"Frist",deadlineWarn:"Enddatum liegt nach der Frist",criticalPath:"Kritischer Pfad",floatCol:"Gesamtpuffer",fOwner:"Eigner",fOutput:"Ergebnis",fProg:"Fortschritt %",fRemarks:"Bemerkungen",fColor:"Farbe",needName:"Name erforderlich",fromPlanOk:"Aus Plan importiert",noPlan:"Keine Plandaten",calApplied:"Kalender aktualisiert",cycleWarn:"Zirkuläre Abhängigkeit ignoriert",importOk:"Import OK",subOk:"Unterpunkte importiert",topGroup:"Oberste",planGroupMs:"Kundenmeilensteine",planGroupRec:"Empfohlene Aufgaben",planGroupSup:"Lieferantenknoten",planGroupCustom:"Eigene Aufgaben",saveBaseline:"Basisplan speichern",showBaseline:"Basisvergleich",baselineConfirm:"Bestehende Basis überschreiben?",baselineSaved:"Basisplan gespeichert",varianceCol:"Abweichung",manualSched:"Manuelle Planung",resWarn:"Ressourcenwarnung",resWarnTip:"Verantwortlicher hat überlappende Aufgaben",colSettings:"Spalten",colFixed:"Fest",colReset:"Doppelklick auf Kopfrand setzt Breite zurück",oemAutoImport:"Meilensteine für {0} importiert",oemNoData:"Keine Meilensteindaten für diesen OEM",oemImportConfirm:"OEM-Wechsel importiert Meilensteine neu und ersetzt aktuelle Aufgaben. Fortfahren?",tplBtn:"Vorlagen",barLbl:"Balkenbeschriftung",blName:"Name",blStart:"Startdatum",blEnd:"Enddatum",blNone:"Keine",managedDel:"Kundenmeilensteine, empfohlene Aufgaben und Lieferantenknoten werden aus ② Kundenmeilensteine synchronisiert. Dort abwählen (oder Datum löschen), dann verschwinden sie hier.",grpDelAsk:"Diese Gruppe und ihre {0} Zeilen löschen?",tplConfirm:"Vorlagenaufgaben in den aktuellen Plan einfügen?",tplOk:"Vorlage eingefügt",expXml:"XML-Export",impXml:"XML-Import",impXmlConfirm:"Der Import ersetzt die aktuellen Aufgaben. Fortfahren?"}};
 var lang = "zh";
 function tr(k){ return (I18N[lang] && I18N[lang][k]) || I18N.zh[k] || k; }
 function applyLang(){ if(typeof syncCalModeSel === "function" && document.getElementById("calModeSel")) setTimeout(syncCalModeSel, 0);
@@ -592,6 +599,7 @@ var state = { tasks:[], seq:1, view:"day", collapsed:{}, planOem:"", showPhase:t
 var COLS = [
   {key:'id',    cls:'c-id',    defW:36, fixed:true},
   {key:'name',  cls:'c-name',  defW:0,  fixed:true, i18n:'cName'},
+  {key:'mode',  cls:'c-mode',  defW:84, i18n:'cMode'},
   {key:'owner', cls:'c-owner', defW:64, i18n:'cOwner'},
   {key:'dur',   cls:'c-dur',   defW:52, i18n:'cDur'},
   {key:'prog',  cls:'c-prog',  defW:56, i18n:'cProg'},
@@ -1216,12 +1224,20 @@ function consCell(t){
 function cellEdit(t, f, v){
   if(f === "start"){ if(v) userSetStart(t, v); }
   else if(f === "end"){ if(v) userSetEnd(t, v); }
-  else if(f === "pred"){ t.deps = parseDepsText(v).filter(function(d){ return d.id !== t.id && byId(d.id); }); }
+  else if(f === "pred"){
+    t.deps = parseDepsText(v).filter(function(d){ return d.id !== t.id && byId(d.id); });
+    if(t.deps.length && t.manual){
+      if(String(t.source || "").indexOf("ms:") === 0) toast(tr("msPinnedDeps"));
+      else { t.manual = false; if(t.cons !== "ASAP" && t.cons !== "ALAP" && !consNeedsDate(t.cons)) t.cons = "ASAP"; if(consNeedsDate(t.cons)) { t.cons = "ASAP"; t.consDate = ""; } toast(tr("unpinnedByDeps")); }
+    }
+    if(t.deps.length && !t.manual && (t.cons === "SNET" || t.cons === "MSO") && t.consDate === t.start){ t.cons = "ASAP"; t.consDate = ""; }
+  }
   else if(f === "cons"){
     t.cons = v;
     if(consNeedsDate(v)) t.consDate = consOnFinish(v) ? taskEnd(t) : t.start;
   }
   else if(f === "consDate"){ if(v) t.consDate = v; }
+  else if(f === "mode"){ t.manual = v === "manual"; }
   render();
 }
 function renderTable(){
@@ -1246,13 +1262,14 @@ function renderTable(){
     html += '<div class="' + cls + '" data-id="' + t.id + '">'
       + '<div class="c-id">' + (t.type === "group" ? "" : (_rn[t.id] || "")) + "</div>"
       + '<div class="c-name">' + nm + ((isManaged(t.source) || /^grp:(ms|rec|sup|custom)/.test(String(t.source || ""))) ? "" : '<span class="row-del" title="' + esc(tr("del")) + '">🗑</span>') + "</div>"
+      + (colVis("mode") ? '<div class="c-mode">' + (t.type === "group" ? "" : '<select class="cell-in" data-f="mode"' + (String(t.source || "").indexOf("ms:") === 0 ? ' disabled title="' + esc(tr("msPinnedDeps")) + '"' : "") + '><option value="auto"' + (t.manual ? "" : " selected") + ">" + esc(tr("modeAuto")) + '</option><option value="manual"' + (t.manual ? " selected" : "") + ">" + esc(tr("modeManual")) + "</option></select>") + "</div>" : "")
       + (colVis("owner") ? '<div class="c-owner">' + ow + "</div>" : "")
       + (colVis("dur") ? '<div class="c-dur">' + (t.type === "group" ? "" : t.type === "milestone" ? "◆" : t.dur) + "</div>" : "")
       + (colVis("prog") ? '<div class="c-prog">' + prog + "</div>" : "")
       + (colVis("start") ? '<div class="c-start">' + (t.type === "group" ? "<b>" + (grpSpan(t).s || "") + "</b>" : (locked ? (t.start || "") : '<input type="date" class="cell-in" data-f="start" value="' + (t.start || "") + '">')) + "</div>" : "")
       + (colVis("end") ? '<div class="c-end">' + (t.type === "group" ? "<b>" + (grpSpan(t).e || "") + "</b>" : (locked ? taskEnd(t) : '<input type="date" class="cell-in" data-f="end" value="' + taskEnd(t) + '">')) + "</div>" : "")
       + (colVis("pred") ? '<div class="c-pred">' + (t.type === "group" ? "" : '<input class="cell-in" data-f="pred" value="' + esc(depsToText(t.deps)) + '" placeholder="' + esc(tr("predPh")) + '">') + "</div>" : "")
-      + (colVis("cons") ? '<div class="c-cons">' + (t.type === "group" ? "—" : (t.manual ? '<span title="' + esc(tr("manualSched")) + '">📌</span>' : consCell(t))) + "</div>" : "")
+      + (colVis("cons") ? '<div class="c-cons">' + (t.type === "group" ? "—" : (t.manual ? '<span style="color:var(--tx3)" title="' + esc(tr("manualSched")) + '">—</span>' : consCell(t))) + "</div>" : "")
       + (colVis("var") ? '<div class="c-var">' + vv + "</div>" : "")
       + (colVis("float") ? '<div class="c-float' + (crit ? " crit" : "") + '">' + fv + "</div>" : "")
       + (colVis("output") ? '<div class="c-output" title="' + esc(t.output || "") + '">' + (t.type === "group" ? "" : esc(t.output || "")) + "</div>" : "")
@@ -1406,6 +1423,71 @@ function extendRange(R, pxDay, minW){
   if(diffDays(min, max) + 1 < nd) max = addDays(min, nd - 1);
   return { min:min, max:max };
 }
+/* MS Project 风格依赖连线：直角折线 + 实心箭头。
+   a = 前置锚点 {x,y}，b = 后续锚点 {x,y}，toStart = 箭头指向后续条形的开始端（FS/SS），fromEnd = 从前置条形的完成端出发（FS/FF）
+   FS 有足够间隔时：水平出线 → 竖直落到后续条形上沿（箭头向下），与 MS Project 一致；其余情况走 U 形绕行 */
+function depRoute(a, b, fromEnd, toStart, rowH, half){
+  var g = 7, pts = [], dir;
+  var down = b.y >= a.y, edgeY = down ? b.y - half : b.y + half;
+  var x0 = a.x, y0 = a.y;
+  if(fromEnd && toStart && b.x + 6 >= x0 + g){
+    var xv = Math.max(b.x + 6, x0 + g);
+    pts = [[x0, y0], [xv, y0], [xv, edgeY]]; dir = down ? "d" : "u";
+  } else if(toStart){
+    var xs = fromEnd ? x0 + g : Math.min(x0, b.x) - g;
+    if(!fromEnd || xs < b.x - g){
+      var xx = Math.min(xs, b.x - g);
+      pts = [[x0, y0], [xx, y0], [xx, b.y], [b.x, b.y]];
+    } else {
+      var ym = down ? b.y - rowH / 2 : b.y + rowH / 2;
+      pts = [[x0, y0], [xs, y0], [xs, ym], [b.x - g, ym], [b.x - g, b.y], [b.x, b.y]];
+    }
+    dir = "r";
+  } else {
+    var xe = fromEnd ? Math.max(x0, b.x) + g : x0 - g;
+    if(fromEnd || xe > b.x + g){
+      var xr = Math.max(xe, b.x + g);
+      pts = [[x0, y0], [xr, y0], [xr, b.y], [b.x, b.y]];
+    } else {
+      var ym2 = down ? b.y - rowH / 2 : b.y + rowH / 2;
+      pts = [[x0, y0], [xe, y0], [xe, ym2], [b.x + g, ym2], [b.x + g, b.y], [b.x, b.y]];
+    }
+    dir = "l";
+  }
+  return { pts:pts, dir:dir };
+}
+function depArrow(x, y, dir, sz){
+  sz = sz || 4;
+  if(dir === "d") return [[x - sz, y - sz * 1.4], [x + sz, y - sz * 1.4], [x, y]];
+  if(dir === "u") return [[x - sz, y + sz * 1.4], [x + sz, y + sz * 1.4], [x, y]];
+  if(dir === "l") return [[x + sz * 1.4, y - sz], [x + sz * 1.4, y + sz], [x, y]];
+  return [[x - sz * 1.4, y - sz], [x - sz * 1.4, y + sz], [x, y]];
+}
+/* 条形左右端（像素）：普通任务按条形宽；里程碑按菱形半宽 */
+function depEnds(t, Xf, pxDay){
+  var s = parseD(t.start); if(!s) return null;
+  if(t.type === "milestone"){ var c = Xf(s); return { l:c - 8, r:c + 8, half:8 }; }
+  var e = parseD(taskEnd(t)) || s, l = Xf(s);
+  return { l:l, r:l + Math.max((diffDays(s, e) + 1) * pxDay - 4, 8), half:10 };
+}
+function depLinks(vis, Xf, pxDay, y0, rowH){
+  var out = [];
+  vis.forEach(function(t, ri){
+    if(t.type === "group") return;
+    var nd = normDeps(t.deps); if(!nd.length) return;
+    var te = depEnds(t, Xf, pxDay); if(!te) return;
+    nd.forEach(function(d){
+      var p = byId(d.id); if(!p || p.type === "group") return;
+      var pi = vis.indexOf(p); if(pi < 0) return;
+      var pe = depEnds(p, Xf, pxDay); if(!pe) return;
+      var fromEnd = d.type === "FS" || d.type === "FF" || !d.type, toStart = d.type === "FS" || d.type === "SS" || !d.type;
+      var a = { x:fromEnd ? pe.r : pe.l, y:y0 + pi * rowH + rowH / 2 };
+      var b = { x:toStart ? te.l : te.r, y:y0 + ri * rowH + rowH / 2 };
+      out.push(depRoute(a, b, fromEnd, toStart, rowH, te.half));
+    });
+  });
+  return out;
+}
 function renderGantt(){
   PX_DAY = state.view === "week" ? 10 : (state.view === "month" ? PX_MONTH / 30 : 28);
   var _gb = document.getElementById("ganttBody") || document.querySelector(".gantt-body");
@@ -1458,28 +1540,10 @@ function renderGantt(){
   }
   // 依赖线 SVG（按类型取锚点：FS 完成→开始 / SS 开始→开始 / FF 完成→完成 / SF 开始→完成）
   var depSvg = "";
-  vis.forEach(function(t, ri){
-    if(t.type === "group") return;
-    var nd = normDeps(t.deps);
-    if(!nd.length) return;
-    var s = parseD(t.start); if(!s) return;
-    var te = parseD(taskEnd(t));
-    var y1 = BAND_H + ri * ROW_H + ROW_H / 2;
-    nd.forEach(function(d){
-      var p = byId(d.id); if(!p) return;
-      var pi = vis.indexOf(p); if(pi < 0) return;
-      var ps = parseD(p.start), pe = ps ? parseD(taskEnd(p)) : null;
-      if(!ps) return;
-      var x1, x2;
-      switch(d.type){
-        case "SS": x1 = X(ps, min); x2 = X(s, min); break;
-        case "FF": x1 = X(pe || ps, min); x2 = X(te || s, min); break;
-        case "SF": x1 = X(ps, min); x2 = X(te || s, min); break;
-        default: x1 = X(pe ? addDays(pe, 1) : ps, min); x2 = X(s, min);
-      }
-      var y2 = y1, ym = BAND_H + pi * ROW_H + ROW_H / 2;
-      depSvg += '<path class="dep-line" d="M' + x1 + ',' + ym + ' C' + (x1+20) + ',' + ym + ' ' + (x2-20) + ',' + y2 + ' ' + x2 + ',' + y2 + '"/>';
-    });
+  depLinks(vis, function(d){ return X(d, min); }, PX_DAY, BAND_H, ROW_H).forEach(function(L){
+    var last = L.pts[L.pts.length - 1];
+    depSvg += '<polyline class="dep-line" points="' + L.pts.map(function(p){ return p[0] + "," + p[1]; }).join(" ") + '"/>';
+    depSvg += '<polygon class="dep-arr" points="' + depArrow(last[0], last[1], L.dir).map(function(p){ return p[0] + "," + p[1]; }).join(" ") + '"/>';
   });
   if(depSvg) html += '<svg class="g-dep" style="left:0;top:0" width="' + W + '" height="' + (BAND_H + vis.length * ROW_H) + '">' + depSvg + "</svg>";
   // 色带行占位：任务行整体下移
@@ -1946,415 +2010,220 @@ function fitText(ctx, text, maxW){ /* 超宽截断加省略号 */
 function exportFileBase(){
   return planProjectName() + '_' + fmtD(new Date()).replace(/-/g, '');
 }
-/* 把执行页甘特图（左侧任务表：任务名称/负责人/工期/进度/开始/结束 + 右侧时间轴：任务条/里程碑菱形/阶段色带/依赖线）绘制到 canvas */
+/* 导出/预览：版式与「客户节点」页一致——标题 + 左右 Logo + 分隔线；左侧名称栏 + 右侧按月压缩的时间轴（年/月双层表头、阶段色带、
+   虚线月网格、今天虚线）；底部居中图例 + 左侧制作者/日期（取客户节点页的导出设置） */
 function renderExportCanvas(cb){
-  var vis = visibleTasks();
-  var rows = vis.length;
-  var pxDay = state.view === 'week' ? 10 : (state.view === 'month' ? PX_MONTH / 30 : 28);
-  var R = extendRange(dateRange(), pxDay, 0), min = R.min, max = R.max;
-  var days = diffDays(min, max) + 1;
-  var W = days * pxDay;
-  var bands = phaseAnchors();
-  var BAND_H = bands.length ? 30 : 0;
-  var bmap = baselineMap();
-  var TABLE_W = 608 + (colVis('output') ? 120 : 0) + (colVis('remarks') ? 120 : 0) + (colVis('pred') ? 72 : 0) + (colVis('cons') ? 120 : 0), HEAD_H = 44, ROW_H = 34;
-  var TITLE_H = 80, LEGEND_H = 44, FOOT_H = 26;
-  var bodyH = HEAD_H + BAND_H + rows * ROW_H;
-  var cssW = TABLE_W + W, cssH = TITLE_H + bodyH + LEGEND_H + FOOT_H;
-  var scale = exportScale(cssW, cssH);
-  var c = document.createElement('canvas');
-  c.width = Math.round(cssW * scale);
-  c.height = Math.round(cssH * scale);
-  var ctx = c.getContext('2d');
-  ctx.scale(scale, scale);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, cssW, cssH);
-  function X(d){ return diffDays(min, d) * pxDay; }
-  var hx = TABLE_W;               /* 时间轴原点 x */
-  var bodyY = TITLE_H;            /* 表头区顶部 */
-  var bandY = TITLE_H + HEAD_H; /* 阶段色带行顶部 */
-  var rowY0 = bandY + BAND_H;   /* 任务行起始 y */
-  var bodyBot = rowY0 + rows * ROW_H;
-  var sys = state.planOem ? OEM_PHASE_SYS[state.planOem] : '';
-  /* 列显隐与页面一致：隐藏列不画；TABLE_W 不变，名称列吸收余宽 */
-  var EXP_W = { id:36, owner:64, dur:52, prog:56, start:86, end:86, pred:72, cons:120, var:52, float:56, output:120, remarks:120 };
-  var NAME_W = TABLE_W - 36;
-  COLS.forEach(function(c){ if(!c.fixed && colVis(c.key)) NAME_W -= EXP_W[c.key]; });
-  NAME_W = Math.max(NAME_W, 40);
-  var CX = { id:18, name:36 };
-  var cxAcc = 36 + NAME_W;
-  COLS.forEach(function(c){
-    if(c.fixed || !colVis(c.key)) return;
-    CX[c.key] = cxAcc; cxAcc += EXP_W[c.key];
-  });
-  var today = new Date(); today.setHours(0, 0, 0, 0);
-
-  /* ---- 标题（优先取计划页项目名） ---- */
   var plan = null;
   try{ plan = JSON.parse(localStorage.getItem('gantt-tool-v1')); }catch(e){}
-  var title = (plan && plan.projectName) || tr('appTitle');
-  ctx.fillStyle = '#111827';
-  ctx.textAlign = 'center';
-  ctx.font = expFont(24, true);
-  ctx.fillText(title, cssW / 2, TITLE_H - 32);
+  plan = plan || {};
+  function loadImg(src, done){ if(!src){ done(null); return; } var im = new Image(); im.onload = function(){ done(im); }; im.onerror = function(){ done(null); }; im.src = src; }
+  loadImg(plan.logoLeft, function(imgL){ loadImg(plan.logoRight, function(imgR){ drawPlanStyleExport(cb, plan, imgL, imgR); }); });
+}
+function drawPlanStyleExport(cb, plan, imgL, imgR){
+  var vis = visibleTasks();
+  var R0 = dateRange(), min = R0.min, max = R0.max;
+  var bands = phaseAnchors();
+  var sys = state.planOem ? OEM_PHASE_SYS[state.planOem] : '';
+  var mc = document.createElement('canvas').getContext('2d');
+  function tw(t, f){ mc.font = f; return mc.measureText(String(t)).width; }
+  /* 左侧名称栏宽度跟随最长名称（与客户节点页同规则：150–340） */
+  var gm = 0;
+  vis.forEach(function(t){ gm = Math.max(gm, tw(t.name, expFont(12, t.type === 'group')) + (t.type === 'group' ? 0 : 14)); });
+  if(bands.length) gm = Math.max(gm, tw(sys === 'vda' ? 'VDA-MLA' : tr('legendPhase'), expFont(13, false)));
+  var GUT = Math.min(340, Math.max(150, Math.ceil(gm) + 30));
+  var cssW = Math.max(1200, Math.min(1800, GUT + 1100));
+  var CHW = cssW - GUT - 24;
+  var days = Math.max(diffDays(min, max), 1), pxDay = CHW / days;
+  /* 最右侧标注留白（与屏幕规则一致） */
+  var R1 = extendRange({ min:min, max:max }, pxDay, CHW);
+  if(R1.max > max){ max = R1.max; days = Math.max(diffDays(min, max), 1); pxDay = CHW / days; }
+  function X(d){ return GUT + diffDays(min, d) * pxDay; }
+  var TITLE_H = 80, HEAD_H = 44, BAND_H = bands.length && state.showPhase !== false ? 48 : 0, ROW_H = 30, LEGEND_H = 44, FOOT_H = 26;
+  var bodyY = TITLE_H, bandY = bodyY + HEAD_H, rowY0 = bandY + BAND_H;
+  var bodyBot = rowY0 + vis.length * ROW_H;
+  var cssH = bodyBot + 10 + LEGEND_H + FOOT_H;
+  var scale = exportScale(cssW, cssH);
+  var c = document.createElement('canvas');
+  c.width = Math.round(cssW * scale); c.height = Math.round(cssH * scale);
+  var ctx = c.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cssW, cssH);
+
+  /* ---- 标题 + Logo + 分隔线 ---- */
+  var title = (plan.projectName || '').trim() || tr('appTitle');
+  ctx.fillStyle = '#111827'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = expFont(24, true); ctx.fillText(title, cssW / 2, 48);
+  [[imgL, false], [imgR, true]].forEach(function(x){
+    var img = x[0]; if(!img || !img.naturalWidth) return;
+    var s = 38 / img.naturalHeight, dw = img.naturalWidth * s, dh = 38;
+    if(dw > 150){ s = 150 / img.naturalWidth; dw = 150; dh = img.naturalHeight * s; }
+    ctx.drawImage(img, x[1] ? cssW - 24 - dw : 24, Math.round((66 - dh) / 2), Math.round(dw), Math.round(dh));
+  });
   ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(24, TITLE_H - 14); ctx.lineTo(cssW - 24, TITLE_H - 14); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(24, 66); ctx.lineTo(cssW - 24, 66); ctx.stroke();
 
-  /* ---- 左侧任务表表头（钢蓝，MS Project 风格） ---- */
-  ctx.fillStyle = '#1e3a52';
-  ctx.fillRect(0, bodyY, TABLE_W, HEAD_H);
-  ctx.font = expFont(11, true);
-  ctx.fillStyle = '#ffffff';
-  ctx.textBaseline = 'middle';
-  var heads = [
-    { t:'ID', x:0, w:36, ctr:true },
-    { t:tr('cName'), x:CX.name, w:NAME_W, ctr:false }
-  ];
-  COLS.forEach(function(c){
-    if(c.fixed || !colVis(c.key)) return;
-    heads.push({ t:tr(c.i18n), x:CX[c.key], w:EXP_W[c.key], ctr:c.key !== 'owner' && c.key !== 'output' && c.key !== 'remarks' });
-  });
-  heads.forEach(function(hd){
-    ctx.textAlign = hd.ctr ? 'center' : 'left';
-    ctx.fillText(hd.t, hd.ctr ? hd.x + hd.w / 2 : hd.x + 6, bodyY + HEAD_H / 2);
-  });
-
-  /* ---- 右侧双层日期表头（与屏幕一致：年/月、年月/周、年月/日） ---- */
-  var HSx = headSegs(min, max, state.view, pxDay);
-  ctx.fillStyle = '#7BA7BC'; ctx.fillRect(hx, bodyY, W, 22);
-  ctx.fillStyle = '#BDD5E5'; ctx.fillRect(hx, bodyY + 22, W, 22);
+  /* ---- 年 / 月双层表头 ---- */
+  ctx.fillStyle = '#7BA7BC'; ctx.fillRect(0, bodyY, cssW, 22);
+  ctx.fillStyle = '#BDD5E5'; ctx.fillRect(0, bodyY + 22, cssW, 22);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = expFont(12, true);
-  HSx.top.forEach(function(g, i){
-    ctx.fillStyle = '#ffffff'; ctx.fillText(g.t, hx + g.x + g.w / 2, bodyY + 11);
-    if(i > 0){ ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(hx + g.x, bodyY); ctx.lineTo(hx + g.x, bodyY + 22); ctx.stroke(); }
-  });
-  ctx.font = expFont(state.view === 'day' ? 9 : 11, false);
-  var monthXs = [];
-  HSx.bot.forEach(function(g){
-    if(g.off){ ctx.fillStyle = '#d6e3ec'; ctx.fillRect(hx + g.x, bodyY + 22, g.w, 22); }
-    ctx.fillStyle = g.off ? '#6b7280' : '#1f2937'; ctx.fillText(g.t, hx + g.x + g.w / 2, bodyY + 33);
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx + g.x, bodyY + 22); ctx.lineTo(hx + g.x, bodyY + 44); ctx.stroke();
-  });
-  (function(){ var c0 = new Date(min.getFullYear(), min.getMonth(), 1); while(c0 <= max){ monthXs.push(hx + X(c0)); c0 = new Date(c0.getFullYear(), c0.getMonth() + 1, 1); } })();
-  ctx.textBaseline = 'alphabetic';
-  /* 表头内日分隔线（日/周视图） */
-  /* 日分隔已由表头分段白线绘制 */
-  /* 表头/主体分界 + 表-轴分界 */
-  ctx.strokeStyle = '#e5e7eb';
-  ctx.beginPath(); ctx.moveTo(0, bodyY + HEAD_H - .5); ctx.lineTo(cssW, bodyY + HEAD_H - .5); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(TABLE_W - .5, bodyY); ctx.lineTo(TABLE_W - .5, bodyBot); ctx.stroke();
-
-  /* ---- 周末/节假日底纹 ---- */
-  for(var j = 0; j < days; j++){
-    var dd = addDays(min, j), ss = fmtD(dd), xx = hx + j * pxDay;
-    if(holName(ss)){ ctx.fillStyle = '#fef2f2'; ctx.fillRect(xx, bodyY + HEAD_H, pxDay, bodyBot - bodyY - HEAD_H); }
-    else if(dd.getDay() === 0 || dd.getDay() === 6){ ctx.fillStyle = '#f3f4f6'; ctx.fillRect(xx, bodyY + HEAD_H, pxDay, bodyBot - bodyY - HEAD_H); }
+  ctx.font = expFont(13, true); ctx.fillStyle = '#ffffff';
+  for(var yy = min.getFullYear(); yy <= max.getFullYear(); yy++){
+    var ysD = new Date(Math.max(new Date(yy, 0, 1).getTime(), min.getTime()));
+    var yeD = new Date(Math.min(new Date(yy + 1, 0, 1).getTime(), max.getTime()));
+    var yx1 = X(ysD), yx2 = X(yeD);
+    if(yx2 - yx1 > 30) ctx.fillText(String(yy), (yx1 + yx2) / 2, bodyY + 11);
+    if(yy > min.getFullYear()){ ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(yx1, bodyY); ctx.lineTo(yx1, bodyY + 22); ctx.stroke(); }
   }
-  /* ---- 竖向网格线（日视图按日，其余按月界） ---- */
-  ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
-  ctx.setLineDash([4, 3]);
-  if(state.view === 'day'){
-    for(var gi = 0; gi <= days; gi++){
-      var gx = hx + gi * pxDay;
-      ctx.beginPath(); ctx.moveTo(gx, bodyY + HEAD_H); ctx.lineTo(gx, bodyBot); ctx.stroke();
-    }
-  } else {
-    monthXs.forEach(function(mx){
-      ctx.beginPath(); ctx.moveTo(mx, bodyY + HEAD_H); ctx.lineTo(mx, bodyBot); ctx.stroke();
-    });
+  var monthXs = [], cur = new Date(min.getFullYear(), min.getMonth(), 1);
+  ctx.font = expFont(11, false);
+  while(cur <= max){
+    var nM = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    var mx1 = Math.max(X(cur), GUT), mx2 = X(nM > max ? max : nM);
+    if(X(cur) >= GUT) monthXs.push(X(cur));
+    if(mx2 - mx1 >= 12){ ctx.fillStyle = '#374151'; ctx.fillText(String(cur.getMonth() + 1), (mx1 + mx2) / 2, bodyY + 33); }
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(cur), bodyY + 22); ctx.lineTo(X(cur), bodyY + 44); ctx.stroke();
+    cur = nM;
   }
-  ctx.setLineDash([]);
+  /* 名称栏表头 */
+  ctx.fillStyle = '#7BA7BC'; ctx.fillRect(0, bodyY, GUT, 22);
+  ctx.fillStyle = '#BDD5E5'; ctx.fillRect(0, bodyY + 22, GUT, 22);
+  ctx.fillStyle = '#1f2937'; ctx.font = expFont(12, true); ctx.fillText(tr('cName'), GUT / 2, bodyY + 33);
 
-  /* ---- 阶段色带行（从里程碑计划导入后显示） ---- */
-  if(bands.length){
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(0, bandY, TABLE_W, BAND_H);
+  /* ---- 阶段色带（与客户节点页同样式） ---- */
+  if(BAND_H){
+    ctx.fillStyle = '#eef2f7'; ctx.fillRect(0, bandY, GUT, BAND_H);
+    ctx.fillStyle = '#1f2937'; ctx.font = expFont(13, false); ctx.textAlign = 'center';
+    ctx.fillText(sys === 'vda' ? 'VDA-MLA' : tr('legendPhase'), GUT / 2, bandY + BAND_H / 2);
     for(var bi = 0; bi < bands.length; bi++){
       var ba = bands[bi], bb = bands[bi + 1];
-      var bx1 = hx + X(ba.d), bx2 = bb ? hx + X(bb.d) : hx + X(max);
-      var bw = bx2 - bx1;
+      var bx1 = Math.max(X(ba.d), GUT), bx2 = bb ? X(bb.d) : X(max), bw = bx2 - bx1;
       if(bw <= 0) continue;
-      var vda = sys === 'vda';
+      var vda = sys === 'vda', meta = (PHASE_NAMES[sys] || {})[ba.pid] || {};
       ctx.fillStyle = vda ? VDA_COL[Math.min(bi, VDA_COL.length - 1)] : bandShade(bi, bands.length);
-      ctx.fillRect(bx1, bandY, Math.max(bw, 2), BAND_H);
-      var meta = PHASE_NAMES[sys] ? PHASE_NAMES[sys][ba.pid] : null;
-      var nm = vda ? (VDA_EN[ba.pid] || '') : (meta ? (meta[lang] || meta.zh) : '');
-      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.save();
-      ctx.beginPath(); ctx.rect(bx1, bandY, Math.max(bw, 2), BAND_H); ctx.clip();
-      ctx.fillStyle = vda ? '#1f2937' : '#1e3a52';
-      ctx.font = expFont(vda ? 11 : 10, true);
-      var pw = ctx.measureText(ba.pid).width;
-      ctx.fillText(ba.pid, bx1 + 5, bandY + BAND_H / 2);
-      if(nm){ ctx.font = expFont(vda ? 11 : 10, false); ctx.fillText(fitText(ctx, nm, Math.max(bw - pw - 14, 0)), bx1 + 5 + pw + 4, bandY + BAND_H / 2); }
+      ctx.fillRect(bx1, bandY + 4, bw, BAND_H - 8);
+      var nm = vda ? (VDA_EN[ba.pid] || '') : (meta[lang] || meta.zh || '');
+      ctx.save(); ctx.beginPath(); ctx.rect(bx1, bandY, bw, BAND_H); ctx.clip();
+      ctx.textAlign = 'left'; ctx.fillStyle = '#1f2937';
+      ctx.font = expFont(12, true); var pw = ctx.measureText(ba.pid).width;
+      if(bw > 14){ ctx.fillText(ba.pid, bx1 + 6, bandY + BAND_H / 2);
+        ctx.font = expFont(12, false); if(nm) ctx.fillText(fitText(ctx, ' ' + nm, bw - pw - 12), bx1 + 6 + pw, bandY + BAND_H / 2); }
       ctx.restore();
     }
-    ctx.textBaseline = 'alphabetic';
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.beginPath(); ctx.moveTo(0, bandY + BAND_H - .5); ctx.lineTo(cssW, bandY + BAND_H - .5); ctx.stroke();
   }
 
-  /* ---- 任务行：表格单元格 + 时间轴任务条/里程碑菱形 ---- */
+  /* ---- 行底色 + 名称栏 ---- */
   vis.forEach(function(t, ri){
-    var ry = rowY0 + ri * ROW_H;
-    var isGroup = t.type === 'group';
-    var cy = ry + ROW_H / 2;
-    if(isGroup){
-      ctx.fillStyle = '#e8eef5';
-      ctx.fillRect(0, ry, cssW, ROW_H);
-    }
-    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, ry + ROW_H - .5); ctx.lineTo(cssW, ry + ROW_H - .5); ctx.stroke();
-    ctx.textBaseline = 'middle';
-    /* ID */
-    ctx.font = expFont(12, false);
-    ctx.fillStyle = '#6b7280';
-    ctx.textAlign = 'center';
-    if(!isGroup) ctx.fillText(rowNo(t.id), CX.id, cy);
-    /* 任务名称 */
-    ctx.textAlign = 'left';
-    if(isGroup){
-      ctx.font = expFont(12, true);
-      ctx.fillStyle = '#1f2937';
-      ctx.fillText(fitText(ctx, (state.collapsed[t.id] ? '▶ ' : '▼ ') + t.name, NAME_W - 12), CX.name + 6, cy);
-    } else if(t.type === 'milestone'){
-      ctx.save();
-      ctx.translate(CX.name + 11, cy);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = '#dc2626';
-      ctx.fillRect(-5, -5, 10, 10);
-      ctx.restore();
-      ctx.font = expFont(12, false);
-      ctx.fillStyle = '#1f2937';
-      ctx.fillText(fitText(ctx, t.name, NAME_W - 26), CX.name + 20, cy);
-    } else {
-      ctx.font = expFont(12, false);
-      ctx.fillStyle = '#1f2937';
-      ctx.fillText(fitText(ctx, (t.manual ? '📌 ' : '') + t.name, NAME_W - 12), CX.name + 6, cy);
-    }
-    /* 负责人 */
-    if(colVis('owner')){
-      ctx.font = expFont(12, false);
-      ctx.fillStyle = '#4b5563';
-      ctx.fillText(fitText(ctx, t.owner || '', EXP_W.owner - 12), CX.owner + 6, cy);
-    }
-    /* 工期 */
-    if(colVis('dur')){
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#4b5563';
-      ctx.fillText(isGroup ? '' : (t.type === 'milestone' ? '◆' : String(t.dur)), CX.dur + EXP_W.dur / 2, cy);
-    }
-    /* 进度条 */
-    if(colVis('prog') && !isGroup){
-      var px = CX.prog + 6, pw = EXP_W.prog - 12;
-      ctx.fillStyle = '#e5e7eb';
-      rr(ctx, px, cy - 4, pw, 8, 4); ctx.fill();
-      if(t.progress > 0){
-        ctx.fillStyle = '#2563eb';
-        rr(ctx, px, cy - 4, Math.max(pw * t.progress / 100, 2), 8, 4); ctx.fill();
-      }
-    }
-    /* 开始/结束/偏差/总浮时 */
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#4b5563';
-    if(colVis('start')) ctx.fillText(t.start || '', CX.start + EXP_W.start / 2, cy);
-    if(colVis('end')) ctx.fillText(isGroup ? '' : taskEnd(t), CX.end + EXP_W.end / 2, cy);
-    if(colVis('pred')) ctx.fillText(isGroup ? '' : fitText(ctx, depsToText(t.deps), EXP_W.pred - 8), CX.pred + EXP_W.pred / 2, cy);
-    if(colVis('cons')) ctx.fillText(isGroup ? '' : fitText(ctx, t.manual ? '📌' : tr('cons' + (t.cons || 'ASAP')) + (consNeedsDate(t.cons) && t.consDate ? ' ' + t.consDate.slice(5) : ''), EXP_W.cons - 8), CX.cons + EXP_W.cons / 2, cy);
-    if(colVis('var')) ctx.fillText(isGroup ? '' : (function(){ var v = varianceOf(t, bmap); return v === null ? '—' : fmtVar(v); })(), CX.var + EXP_W.var / 2, cy);
-    var fv = isGroup ? '' : (floatMap[t.id] === undefined ? '—' : String(floatMap[t.id]));
-    var isCrit = state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
-    ctx.fillStyle = isCrit ? '#dc2626' : '#4b5563';
-    if(isCrit){ ctx.font = expFont(12, true); }
-    if(colVis('float')) ctx.fillText(fv, CX.float + EXP_W.float / 2, cy);
-    if(isCrit){ ctx.font = expFont(12, false); }
-    ctx.textAlign = 'left'; ctx.fillStyle = '#4b5563';
-    if(colVis('output') && !isGroup) ctx.fillText(fitText(ctx, t.output || '', EXP_W.output - 12), CX.output + 6, cy);
-    if(colVis('remarks') && !isGroup) ctx.fillText(fitText(ctx, t.remarks || '', EXP_W.remarks - 12), CX.remarks + 6, cy);
-    ctx.textBaseline = 'alphabetic';
-    /* 时间轴内容 */
-    if(!isGroup){
-      var s = parseD(t.start);
-      if(s){
-        if(t.type === 'milestone'){
-          var mx = hx + X(s);
-          ctx.save();
-          ctx.translate(mx, ry + 17);
-          ctx.rotate(Math.PI / 4);
-          ctx.fillStyle = t.color || '#dc2626';
-          ctx.fillRect(-8, -8, 16, 16);
-          if(state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0){
-            ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 2;
-            ctx.strokeRect(-8, -8, 16, 16);
-          }
-          ctx.restore();
-          var _ml = barLblMode() === 'name' ? t.name : barDateText(t);
-          if(_ml){ ctx.font = expFont(11, false); ctx.fillStyle = '#374151'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(_ml, mx + 14, ry + 17); ctx.textBaseline = 'alphabetic'; }
-        } else {
-          var e = parseD(taskEnd(t));
-          var bx = hx + X(s);
-          var bw = Math.max((diffDays(s, e) + 1) * pxDay - 4, 8);
-          var by = ry + 7, bh = 20;
-          ctx.fillStyle = t.color || '#2563eb';
-          rr(ctx, bx, by, bw, bh, 4); ctx.fill();
-          if(t.progress > 0){
-            ctx.save();
-            rr(ctx, bx, by, bw, bh, 4); ctx.clip();
-            ctx.fillStyle = 'rgba(255,255,255,.35)';
-            ctx.fillRect(bx, by, bw * t.progress / 100, bh);
-            ctx.restore();
-          }
-          if(state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0){
-            ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 2;
-            rr(ctx, bx, by, bw, bh, 4); ctx.stroke();
-          }
-          ctx.font = expFont(11, false);
-          ctx.fillStyle = '#ffffff';
-          ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-          ctx.save();
-          ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
-          if(barLblMode() === 'name') ctx.fillText(fitText(ctx, t.name + ' ' + t.progress + '%', Math.max(bw - 10, 0)), bx + 6, by + bh / 2);
-          ctx.restore();
-          var _bd = barDateText(t);
-          if(_bd){ ctx.fillStyle = '#374151'; ctx.fillText(_bd, bx + bw + 6, by + bh / 2); }
-          ctx.textBaseline = 'alphabetic';
-        }
-        /* 基线灰条（基线对比开启时与任务条同步绘制：任务=灰条，里程碑=灰菱形） */
-        if(state.showBaseline){
-          var bb = bmap[t.id];
-          if(bb && bb.start){
-            var bsd = parseD(bb.start);
-            if(bsd){
-              if(t.type === 'milestone'){
-                ctx.save();
-                ctx.translate(hx + X(bsd), ry + 29);
-                ctx.rotate(Math.PI / 4);
-                ctx.fillStyle = '#9ca3af';
-                ctx.fillRect(-4, -4, 8, 8);
-                ctx.restore();
-              } else {
-                var bed = parseD(bb.end) || bsd;
-                var bbw = Math.max((diffDays(bsd, bed) + 1) * pxDay - 4, 4);
-                ctx.fillStyle = '#9ca3af';
-                rr(ctx, hx + X(bsd), ry + 28, bbw, 5, 2); ctx.fill();
-              }
-            }
-          }
-        }
-      }
-    }
+    var y = rowY0 + ri * ROW_H;
+    if(t.type === 'group'){ ctx.fillStyle = '#eef2f7'; ctx.fillRect(0, y, cssW, ROW_H); }
+    ctx.strokeStyle = '#eef0f3'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, y + ROW_H - .5); ctx.lineTo(cssW, y + ROW_H - .5); ctx.stroke();
+    var depth = 0, g = t.group ? byId(t.group) : null; while(g){ depth++; g = g.group ? byId(g.group) : null; }
+    ctx.textAlign = 'left'; ctx.fillStyle = t.type === 'group' ? '#1e3a52' : '#374151';
+    ctx.font = expFont(12, t.type === 'group');
+    var ix = 12 + depth * 14;
+    ctx.fillText(fitText(ctx, (t.type === 'milestone' ? '◆ ' : '') + t.name, GUT - ix - 8), ix, y + ROW_H / 2);
+  });
+  ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(GUT - .5, bodyY); ctx.lineTo(GUT - .5, bodyBot); ctx.stroke();
+
+  /* ---- 虚线月网格 ---- */
+  ctx.strokeStyle = '#e5e7eb'; ctx.setLineDash([4, 3]);
+  monthXs.forEach(function(mx){ ctx.beginPath(); ctx.moveTo(mx, rowY0); ctx.lineTo(mx, bodyBot); ctx.stroke(); });
+  ctx.setLineDash([]);
+
+  /* ---- 依赖线（MS Project 直角折线 + 箭头） ---- */
+  ctx.strokeStyle = '#64748b'; ctx.fillStyle = '#64748b'; ctx.lineWidth = 1;
+  depLinks(vis, X, pxDay, rowY0, ROW_H).forEach(function(L){
+    ctx.beginPath(); L.pts.forEach(function(p, i){ if(i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }); ctx.stroke();
+    var last = L.pts[L.pts.length - 1], ar = depArrow(last[0], last[1], L.dir, 3.5);
+    ctx.beginPath(); ctx.moveTo(ar[0][0], ar[0][1]); ctx.lineTo(ar[1][0], ar[1][1]); ctx.lineTo(ar[2][0], ar[2][1]); ctx.closePath(); ctx.fill();
   });
 
-  /* ---- 依赖线（前置 → 本任务，贝塞尔曲线） ---- */
-  ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5;
+  /* ---- 条形 / 菱形 / 分组摘要条 ---- */
+  var mode = barLblMode(), bmap = baselineMap();
   vis.forEach(function(t, ri){
-    if(t.type === 'group') return;
-    var nd = normDeps(t.deps);
-    if(!nd.length) return;
+    var y = rowY0 + ri * ROW_H, cy = y + ROW_H / 2;
+    if(t.type === 'group'){
+      var sp = grpSpan(t), gs = parseD(sp.s), ge = parseD(sp.e);
+      if(!gs || !ge) return;
+      var gx1 = X(gs), gx2 = X(ge) + pxDay;
+      ctx.fillStyle = '#1e3a52'; ctx.fillRect(gx1, cy - 3, Math.max(gx2 - gx1, 2), 5);
+      [gx1, gx2].forEach(function(xx){ ctx.beginPath(); ctx.moveTo(xx - 4, cy - 3); ctx.lineTo(xx + 4, cy - 3); ctx.lineTo(xx, cy + 5); ctx.closePath(); ctx.fill(); });
+      return;
+    }
     var s = parseD(t.start); if(!s) return;
-    var te = parseD(taskEnd(t));
-    var y2 = rowY0 + ri * ROW_H + ROW_H / 2;
-    var x2 = hx + X(s);
-    nd.forEach(function(d){
-      var p = byId(d.id); if(!p || p.type === 'group') return;
-      var pi = vis.indexOf(p); if(pi < 0) return;
-      var ps = parseD(p.start), pe = ps ? parseD(taskEnd(p)) : null;
-      if(!ps) return;
-      var y1 = rowY0 + pi * ROW_H + ROW_H / 2;
-      var x1, x2;
-      switch(d.type){
-        case 'SS': x1 = hx + X(ps); x2 = hx + X(s); break;
-        case 'FF': x1 = hx + X(pe || ps); x2 = hx + X(te || s); break;
-        case 'SF': x1 = hx + X(ps); x2 = hx + X(te || s); break;
-        default: x1 = hx + X(pe ? addDays(pe, 1) : ps); x2 = hx + X(s);
-      }
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.bezierCurveTo(x1 + 20, y1, x2 - 20, y2, x2, y2);
-      ctx.stroke();
-    });
+    var crit = state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
+    if(state.showBaseline && bmap[t.id] && parseD(bmap[t.id].start)){
+      var b1 = parseD(bmap[t.id].start), b2 = parseD(bmap[t.id].end) || b1;
+      ctx.fillStyle = '#9ca3af'; ctx.fillRect(X(b1), cy + 6, Math.max((diffDays(b1, b2) + 1) * pxDay, 3), 3);
+    }
+    var lbl = '', lx;
+    if(t.type === 'milestone'){
+      var mx = X(s), r = 6.5;
+      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = t.color || '#dc2626'; ctx.fillRect(-r, -r, r * 2, r * 2);
+      ctx.strokeStyle = crit ? '#7f1d1d' : 'rgba(0,0,0,.25)'; ctx.lineWidth = crit ? 2 : 1; ctx.strokeRect(-r, -r, r * 2, r * 2);
+      ctx.restore();
+      lbl = mode === 'name' ? t.name : barDateText(t); lx = mx + 12;
+    } else {
+      var e = parseD(taskEnd(t)) || s;
+      var bx = X(s), bw = Math.max((diffDays(s, e) + 1) * pxDay, 4);
+      ctx.fillStyle = t.color || '#2563eb'; rr(ctx, bx, cy - 7, bw, 14, 3); ctx.fill();
+      if(t.progress > 0){ ctx.fillStyle = 'rgba(255,255,255,.35)'; rr(ctx, bx, cy - 7, bw * Math.min(t.progress, 100) / 100, 14, 3); ctx.fill(); }
+      if(crit){ ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 1.5; rr(ctx, bx, cy - 7, bw, 14, 3); ctx.stroke(); }
+      lbl = mode === 'name' ? '' : barDateText(t); lx = bx + bw + 6;
+    }
+    if(lbl){ ctx.fillStyle = '#374151'; ctx.font = expFont(11, false); ctx.textAlign = 'left'; ctx.fillText(lbl, lx, cy); }
   });
 
-  /* ---- 今天线 ---- */
+  /* ---- 今天线 + Today 标签 ---- */
+  var today = new Date(); today.setHours(0, 0, 0, 0);
   if(today >= min && today <= max){
-    var tx = hx + X(today);
-    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
-    ctx.setLineDash([5, 3]);
-    ctx.beginPath(); ctx.moveTo(tx, bodyY + HEAD_H); ctx.lineTo(tx, bodyBot); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.font = expFont(10, true);
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(tr('today'), Math.min(Math.max(tx, hx + 24), cssW - 24), bodyY + 11);
-    ctx.textBaseline = 'alphabetic';
+    var tx = X(today);
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
+    ctx.beginPath(); ctx.moveTo(tx, bodyY + 22); ctx.lineTo(tx, bodyBot); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#ffffff'; ctx.font = expFont(11, true); ctx.textAlign = 'left'; ctx.fillText(tr('today'), tx + 6, bodyY + 11);
   }
 
-  /* ---- 图例（按实际内容动态生成） ---- */
-  var items = [], hasMs = false, hasRec = false, hasSup = false, hasCustom = false, hasOther = false, otherColor = '#2563eb';
+  /* ---- 图例（按内容生成，居中） ---- */
+  var items = [], has = {};
   vis.forEach(function(t){
     if(t.type === 'group') return;
     var src = String(t.source || '');
-    if(t.type === 'milestone'){
-      if(src.indexOf('sup:') === 0) hasSup = true; else hasMs = true;
-    } else if(src.indexOf('rec:') === 0) hasRec = true;
-    else if(src === 'custom') hasCustom = true;
-    else { hasOther = true; otherColor = t.color || otherColor; }
+    if(t.type === 'milestone') has[src.indexOf('sup:') === 0 ? 'sup' : 'ms'] = 1;
+    else if(src.indexOf('rec:') === 0) has.rec = 1; else has.task = t.color || '#2563eb';
   });
-  if(hasMs) items.push({ c:'#dc2626', t:tr('planGroupMs'), diamond:true });
-  if(bands.length) items.push({ c:'#bfdbfe', t:tr('legendPhase'), border:'#60a5fa' });
-  if(state.showBaseline && vis.some(function(t){ return bmap[t.id]; })) items.push({ c:'#9ca3af', t:tr('showBaseline') });
-  if(hasRec) items.push({ c:'#2563eb', t:tr('planGroupRec') });
-  if(hasSup) items.push({ c:'#9333ea', t:tr('planGroupSup'), diamond:true });
-  if(hasCustom) items.push({ c:'#16a34a', t:tr('planGroupCustom') });
-  if(hasOther) items.push({ c:otherColor, t:tr('legendTask') });
-  if(state.showCrit && vis.some(function(t){ return floatMap[t.id] !== undefined && floatMap[t.id] <= 0; })) items.push({ c:'#ffffff', t:tr('criticalPath'), border:'#7f1d1d' });
-  if(items.length){
-    var legendY = TITLE_H + bodyH + 22;
-    ctx.font = expFont(12, false);
-    var gap = 26, widths = [], total = 0;
-    items.forEach(function(it){
-      var tw = ctx.measureText(it.t).width;
-      widths.push(tw); total += 22 + tw + gap;
-    });
-    total -= gap;
-    var lx = Math.max((cssW - total) / 2, 8), ly = legendY;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    items.forEach(function(it, i){
-      if(it.diamond){
-        ctx.save();
-        ctx.translate(lx + 7, ly);
-        ctx.rotate(Math.PI / 4);
-        ctx.fillStyle = it.c;
-        ctx.fillRect(-6, -6, 12, 12);
-        ctx.restore();
-      } else if(it.border){
-        ctx.fillStyle = it.c;
-        ctx.fillRect(lx, ly - 6, 14, 12);
-        ctx.strokeStyle = it.border; ctx.lineWidth = 1;
-        ctx.strokeRect(lx, ly - 6, 14, 12);
-      } else {
-        ctx.fillStyle = it.c;
-        ctx.fillRect(lx, ly - 6, 14, 12);
-      }
-      ctx.fillStyle = '#374151';
-      ctx.fillText(it.t, lx + 22, ly);
-      lx += 22 + widths[i] + gap;
-    });
-    ctx.textBaseline = 'alphabetic';
-  }
+  if(has.ms) items.push({ c:'#dc2626', t:tr('planGroupMs'), diamond:true });
+  if(BAND_H) items.push({ c:'#bfdbfe', t:tr('legendPhase'), border:'#60a5fa' });
+  if(has.sup) items.push({ c:'#9333ea', t:tr('planGroupSup'), diamond:true });
+  if(has.rec) items.push({ c:'#2563eb', t:tr('planGroupRec') });
+  if(has.task) items.push({ c:has.task, t:tr('legendTask') });
+  if(state.showBaseline) items.push({ c:'#9ca3af', t:tr('showBaseline') });
+  if(state.showCrit) items.push({ c:'#ffffff', t:tr('criticalPath'), border:'#7f1d1d' });
+  var legendY = bodyBot + 10 + 22;
+  ctx.font = expFont(12, false);
+  var gap = 26, widths = [], total = 0;
+  items.forEach(function(it){ var w = ctx.measureText(it.t).width; widths.push(w); total += 22 + w + gap; });
+  total -= gap;
+  var lx2 = Math.max((cssW - total) / 2, 8);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  items.forEach(function(it, i){
+    if(it.diamond){ ctx.save(); ctx.translate(lx2 + 7, legendY); ctx.rotate(Math.PI / 4); ctx.fillStyle = it.c; ctx.fillRect(-6, -6, 12, 12); ctx.restore(); }
+    else { ctx.fillStyle = it.c; ctx.fillRect(lx2, legendY - 6, 14, 12); if(it.border){ ctx.strokeStyle = it.border; ctx.lineWidth = 1; ctx.strokeRect(lx2, legendY - 6, 14, 12); } }
+    ctx.fillStyle = '#374151'; ctx.fillText(it.t, lx2 + 22, legendY);
+    lx2 += 22 + widths[i] + gap;
+  });
 
-  /* ---- 页脚：日期 ---- */
-  var footY = TITLE_H + bodyH + LEGEND_H + FOOT_H / 2;
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#6b7280';
-  ctx.font = expFont(11, false);
-  ctx.textBaseline = 'middle';
-  var dLab = tr('expDate') + ':';
-  ctx.fillText(dLab, 20, footY);
-  ctx.fillText(fmtD(new Date()), 20 + ctx.measureText(dLab).width + 6, footY);
+  /* ---- 制作者 / 日期（客户节点页的导出设置；未设置时显示日期） ---- */
+  var creator = String(plan.creatorName || '').trim();
+  var hasC = !!(plan.ckShowCreator && creator), hasD = !!plan.ckShowDate;
+  ctx.fillStyle = '#6b7280'; ctx.font = expFont(11, false);
+  var labW = 0;
+  if(hasC) labW = Math.max(labW, ctx.measureText(tr('expCreator') + ':').width);
+  if(hasD) labW = Math.max(labW, ctx.measureText(tr('expDate') + ':').width);
+  var vx = 20 + labW + 6, yC = hasC && hasD ? legendY - 9 : legendY, yD = hasC && hasD ? legendY + 9 : legendY;
+  if(hasC){ ctx.fillText(tr('expCreator') + ':', 20, yC); ctx.fillText(creator, vx, yC); }
+  if(hasD){ ctx.fillText(tr('expDate') + ':', 20, yD); ctx.fillText(fmtD(new Date()), vx, yD); }
   ctx.textBaseline = 'alphabetic';
-
   cb(c, cssW, cssH);
 }
 /* 极简 PDF：单页 + 单张 JPEG 图；页面按 CSS 尺寸（96dpi），图片按导出 DPI = 高分辨率（与计划页同一实现） */
@@ -2546,7 +2415,7 @@ function mergeFromPlan(p){
       if(t.type === "milestone" || !userMoved){ t.start = w.start; t.dur = w.dur; if(consNeedsDate(t.cons)) t.consDate = consOnFinish(t.cons) ? taskEnd(t) : w.start; }
       t.name = w.name;
       if(t.group !== g.id) t.group = g.id;
-      if(t.type === "milestone") t.manual = true; /* 客户节点是外部约束，不被依赖推移 */
+      if(t.type === "milestone" && String(t.source || "").indexOf("ms:") === 0) t.manual = true; /* 客户里程碑是外部约束，不被依赖推移；供应商节点设了前置后可自动排程 */
     } else {
       t = mkTask({ name:w.name, type:w.type, group:g.id, start:w.start, dur:w.dur, source:w.key, color:w.color, manual:w.type === "milestone" });
       var last = state.tasks.indexOf(g);
