@@ -431,6 +431,20 @@ html[data-theme=dark] .ribbon .rb-px.on{background:rgba(37,99,235,.2)}
 html[data-theme=dark] #taskList .trow.hl-row>div{background:rgba(250,204,21,.28) !important}
 .kt{width:100%;border-collapse:collapse;font-size:12px}.kt th{text-align:left;padding:10px 4px 4px;color:var(--tx3);font-weight:600;border-bottom:1px solid var(--line)}.kt td{padding:5px 4px;border-bottom:1px solid var(--line)}.kt td:first-child{width:170px;white-space:nowrap}
 .kt kbd{font-family:inherit;font-size:11px;background:rgba(100,116,139,.12);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.tctx{position:fixed;z-index:9999;background:var(--card,#fff);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 28px rgba(15,23,42,.2);padding:4px;min-width:250px;display:flex;flex-direction:column;font-size:12px;color:var(--tx1)}
+.tctx>button{display:flex;justify-content:space-between;gap:16px;align-items:center;text-align:left;background:transparent;border:0;padding:5px 10px;border-radius:5px;cursor:pointer;color:inherit;font-size:12px}
+.tctx>button:hover:not(:disabled){background:rgba(37,99,235,.08)}.tctx>button:disabled{color:var(--tx3);cursor:default}
+.tctx kbd{font-family:inherit;font-size:11px;color:var(--tx3)}
+.tctx-sep{height:1px;background:var(--line);margin:3px 2px}
+.tctx-mini{display:flex;align-items:center;gap:3px;padding:3px 3px 6px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+.tctx-mini select{height:26px;font-size:12px;max-width:110px}.tctx-mini .tm-s{max-width:56px}
+.tctx-mini button,.tctx-mini .tm-c{height:26px;min-width:26px;border:1px solid var(--line);border-radius:5px;background:transparent;cursor:pointer;color:inherit;font-size:12px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.tctx-mini button.on{background:rgba(37,99,235,.14);border-color:var(--accent)}
+.tctx-mini .tm-c{position:relative;flex-direction:column;gap:1px}.tctx-mini .tm-c i{display:block;width:14px;height:3px;border-radius:1px}.tctx-mini .tm-c input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;padding:0;border:0}
+.tctx-mini .tm-sep{width:1px;height:18px;background:var(--line);margin:0 2px}
+.tctx-pct{display:flex;align-items:center;gap:3px;padding:5px 10px 3px;border-top:1px solid var(--line);margin-top:3px}.tctx-pct span{color:var(--tx3);margin-right:4px}
+.tctx-pct button{flex:1;height:24px;border:1px solid var(--line);border-radius:4px;background:transparent;cursor:pointer;color:inherit;font-size:11px;padding:0}
+.tctx-pct button.on,.tctx-pct button:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 <style id="embedCss">
 html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
@@ -440,7 +454,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.6</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.7</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -5865,19 +5879,19 @@ function v4ExpPlan(){
          ["大纲",""],["Alt+Shift+→ / ←","降级 / 升级"],["Alt+Shift+-","折叠选中摘要任务"],["Alt+Shift++","展开选中摘要任务"],["Alt+Shift+*","展开全部"],
          ["日程",""],["Ctrl+F2","链接选中任务"],["Shift+F2","任务信息"],["Ctrl+Shift+F5","滚动到任务"],
          ["格式",""],["Ctrl+B / I / 5","粗体 / 斜体 / 删除线"],
-         ["视图",""],["Ctrl+F","查找"],["F3","清除筛选，显示全部任务"],["Ctrl+滚轮","缩放时间刻度"],["Alt+F/H/R/E/P/W/O","切换功能区页签"],["Alt+1 ~ 9","快速访问工具栏第 1~9 个命令"],["F1","本列表"]] },
+         ["视图",""],["Ctrl+F","查找"],["F3","清除筛选，显示全部任务"],["Ctrl+滚轮","缩放时间刻度"],["Alt+F/H/R/E/P/W/O","切换功能区页签"],["Alt+1 ~ 9","快速访问工具栏第 1~9 个命令"],["F1","本列表"],["右键","任务右键菜单（剪切/插入/删除/字体/完成%…）"]] },
     en:{ hl:"Highlight", none:"No highlight", gHelp:"Help", keys:"⌨ Shortcuts", keysT:"Keyboard shortcuts", cleared:"Showing all tasks", custom:"Custom filter criteria",
       K:[["Edit",""],["Insert","Insert new task below"],["Delete","Delete selected task"],["F2","Edit name"],["Ctrl+C / X / V","Copy / cut / paste rows"],["Ctrl+D","Fill down"],["Ctrl+Z / Ctrl+Y","Undo / redo"],["Ctrl+A","Select all tasks"],
          ["Outline",""],["Alt+Shift+→ / ←","Indent / outdent"],["Alt+Shift+-","Collapse selected summary"],["Alt+Shift++","Expand selected summary"],["Alt+Shift+*","Expand all"],
          ["Schedule",""],["Ctrl+F2","Link selected tasks"],["Shift+F2","Task information"],["Ctrl+Shift+F5","Scroll to task"],
          ["Format",""],["Ctrl+B / I / 5","Bold / italic / strikethrough"],
-         ["View",""],["Ctrl+F","Find"],["F3","Clear filter, show all tasks"],["Ctrl+wheel","Zoom timescale"],["Alt+F/H/R/E/P/W/O","Switch ribbon tab"],["Alt+1 ~ 9","Quick Access Toolbar command 1–9"],["F1","This list"]] },
+         ["View",""],["Ctrl+F","Find"],["F3","Clear filter, show all tasks"],["Ctrl+wheel","Zoom timescale"],["Alt+F/H/R/E/P/W/O","Switch ribbon tab"],["Alt+1 ~ 9","Quick Access Toolbar command 1–9"],["F1","This list"],["Right-click","Task shortcut menu (cut/insert/delete/font/% complete…)"]] },
     de:{ hl:"Hervorheben", none:"Keine Hervorhebung", gHelp:"Hilfe", keys:"⌨ Tastenkürzel", keysT:"Tastenkombinationen", cleared:"Alle Vorgänge angezeigt", custom:"Benutzerdef. Filterkriterien",
       K:[["Bearbeiten",""],["Einfg","Neuen Vorgang darunter einfügen"],["Entf","Vorgang löschen"],["F2","Name bearbeiten"],["Strg+C / X / V","Zeilen kopieren / ausschneiden / einfügen"],["Strg+D","Nach unten ausfüllen"],["Strg+Z / Strg+Y","Rückgängig / Wiederholen"],["Strg+A","Alle Vorgänge"],
          ["Gliederung",""],["Alt+Umschalt+→ / ←","Tiefer / höher stufen"],["Alt+Umschalt+-","Sammelvorgang reduzieren"],["Alt+Umschalt++","Sammelvorgang erweitern"],["Alt+Umschalt+*","Alle erweitern"],
          ["Terminplan",""],["Strg+F2","Vorgänge verknüpfen"],["Umschalt+F2","Vorgangsinformationen"],["Strg+Umschalt+F5","Zu Vorgang blättern"],
          ["Format",""],["Strg+B / I / 5","Fett / kursiv / durchgestrichen"],
-         ["Ansicht",""],["Strg+F","Suchen"],["F3","Filter löschen"],["Strg+Mausrad","Zeitskala zoomen"],["Alt+F/H/R/E/P/W/O","Menüband-Register wechseln"],["Alt+1 ~ 9","Schnellzugriff Befehl 1–9"],["F1","Diese Liste"]] } };
+         ["Ansicht",""],["Strg+F","Suchen"],["F3","Filter löschen"],["Strg+Mausrad","Zeitskala zoomen"],["Alt+F/H/R/E/P/W/O","Menüband-Register wechseln"],["Alt+1 ~ 9","Schnellzugriff Befehl 1–9"],["F1","Diese Liste"],["Rechtsklick","Kontextmenü (Ausschneiden/Einfügen/Löschen/Schrift/%…)"]] } };
   function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
   var HL = ["crit","ms","inc","done","pro","late","un","over"];
 
@@ -5924,6 +5938,81 @@ function v4ExpPlan(){
   var _rd = render; render = function(){ var x = _rd.apply(this, arguments); var s = document.getElementById("hlSel"); if(s && document.activeElement !== s){ s.innerHTML = hlOpts(); s.value = state.hlt || ""; } return x; };
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4Msp6 = { keysDlg:keysDlg, hlMatch:hlMatch };
+})();
+/* ===== v4.7：任务右键菜单 + 浮动迷你工具栏 —— 对标 MS Project（表格行 / 甘特条形右键） ===== */
+(function(){
+  var TX = {
+    zh:{ cut:"剪切", copy:"复制", paste:"粘贴", ins:"插入任务", del:"删除任务", edit:"编辑名称", info:"任务信息…", ind:"降级", outd:"升级", link:"链接任务", unlink:"取消链接",
+      inact:"停用 / 启用任务", man:"手动计划", auto:"自动计划", fill:"向下填充", tl:"添加到日程表", txt:"文本样式…", font:"字体…", pct:"完成", ot:"按日程标记", scroll:"滚动到任务" },
+    en:{ cut:"Cut", copy:"Copy", paste:"Paste", ins:"Insert Task", del:"Delete Task", edit:"Edit name", info:"Information…", ind:"Indent", outd:"Outdent", link:"Link Tasks", unlink:"Unlink Tasks",
+      inact:"Inactivate / activate", man:"Manually Schedule", auto:"Auto Schedule", fill:"Fill Down", tl:"Add to Timeline", txt:"Text Styles…", font:"Font…", pct:"Complete", ot:"Mark on Track", scroll:"Scroll to Task" },
+    de:{ cut:"Ausschneiden", copy:"Kopieren", paste:"Einfügen", ins:"Vorgang einfügen", del:"Vorgang löschen", edit:"Name bearbeiten", info:"Informationen…", ind:"Tiefer stufen", outd:"Höher stufen", link:"Vorgänge verknüpfen", unlink:"Verknüpfung lösen",
+      inact:"Deaktivieren / aktivieren", man:"Manuell planen", auto:"Automatisch planen", fill:"Nach unten ausfüllen", tl:"Zur Zeitachse hinzufügen", txt:"Textarten…", font:"Schriftart…", pct:"Abgeschlossen", ot:"Als planmäßig markieren", scroll:"Zu Vorgang blättern" } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+  var CTRL = /Mac/.test(navigator.platform) ? "⌘" : "Ctrl";
+  function key(k, o){ o = o || {}; var ev = new KeyboardEvent("keydown", { key:k, code:o.code || "", ctrlKey:!!o.ctrl, shiftKey:!!o.shift, altKey:!!o.alt, bubbles:true, cancelable:true }); document.body.dispatchEvent(ev); }
+  function clk(sel){ var el = document.querySelector(sel); if(el && !el.disabled) el.click(); }
+  function close(){ document.querySelectorAll(".tctx").forEach(function(m){ m.remove(); }); }
+  function selectRow(id){
+    var cur = window.__v4SelList ? window.__v4SelList() : (selId ? [selId] : []); if(cur.indexOf(id) >= 0) return;
+    var r = document.querySelector('#taskList .trow[data-id="' + String(id).replace(/"/g, "") + '"]'); var c = r && (r.querySelector(".c-id") || r.firstElementChild);
+    if(c){ c.dispatchEvent(new MouseEvent("mousedown", { bubbles:true })); c.dispatchEvent(new MouseEvent("mouseup", { bubbles:true })); c.click(); }
+    if(selId !== id){ selId = id; render(); }
+  }
+  function mini(){
+    var fb = document.getElementById("fmtBar"), w = document.createElement("div"); w.className = "tctx-mini"; if(!fb) return w;
+    var f = fb.querySelector(".fm-f"), s = fb.querySelector(".fm-s");
+    function proxySel(orig, cls){ var x = document.createElement("select"); x.className = cls; x.innerHTML = orig.innerHTML; x.value = orig.value; x.title = orig.title;
+      x.onchange = function(){ orig.value = x.value; orig.dispatchEvent(new Event("change", { bubbles:true })); if(x.value !== "__more") close(); }; return x; }
+    if(f) w.appendChild(proxySel(f, "tm-f")); if(s) w.appendChild(proxySel(s, "tm-s"));
+    [["fm-b","<b>B</b>"],["fm-i","<i>I</i>"],["fm-k","<s>S</s>"]].forEach(function(p){ var o = fb.querySelector("." + p[0]); if(!o) return; var b = document.createElement("button"); b.type = "button"; b.innerHTML = p[1]; b.title = o.title; if(o.classList.contains("on")) b.classList.add("on");
+      b.onclick = function(){ o.click(); b.classList.toggle("on", o.classList.contains("on")); }; w.appendChild(b); });
+    var ci = fb.querySelector(".fm-c input"); if(ci){ var lb = document.createElement("label"); lb.className = "tm-c"; lb.title = (fb.querySelector(".fm-c") || {}).title || ""; lb.innerHTML = '<span style="font-weight:700;font-family:serif">A</span><i></i><input type="color">';
+      var inp = lb.querySelector("input"); inp.value = ci.value || "#1f2937"; lb.querySelector("i").style.background = inp.value;
+      inp.oninput = function(){ ci.value = inp.value; lb.querySelector("i").style.background = inp.value; ci.dispatchEvent(new Event("input", { bubbles:true })); };
+      inp.onchange = function(){ ci.value = inp.value; ci.dispatchEvent(new Event("change", { bubbles:true })); }; w.appendChild(lb); }
+    var sp = document.createElement("span"); sp.className = "tm-sep"; w.appendChild(sp);
+    [["ind","→",function(){ key("ArrowRight", { alt:1, shift:1 }); }],["outd","←",function(){ key("ArrowLeft", { alt:1, shift:1 }); }],["link","🔗",function(){ key("F2", { ctrl:1 }); }]].forEach(function(p){
+      var b = document.createElement("button"); b.type = "button"; b.textContent = p[1]; b.title = L(p[0]); b.onclick = function(){ close(); p[2](); }; w.appendChild(b); });
+    return w;
+  }
+  function open(x, y, t){
+    close(); var m = document.createElement("div"); m.className = "tctx";
+    m.appendChild(mini());
+    var grp = t && t.type === "group", pseudo = t && (t._gb || String(t.id).indexOf("gb:") === 0);
+    var items = [
+      ["cut", CTRL + "+X", function(){ key("x", { ctrl:1 }); }, pseudo], ["copy", CTRL + "+C", function(){ key("c", { ctrl:1 }); }, pseudo], ["paste", CTRL + "+V", function(){ key("v", { ctrl:1 }); }],
+      "-", ["ins", "Insert", function(){ key("Insert"); }], ["del", "Delete", function(){ key("Delete"); }, pseudo],
+      "-", ["edit", "F2", function(){ key("F2"); }, pseudo], ["info", "Shift+F2", function(){ key("F2", { shift:1 }); }, pseudo], ["txt", "", function(){ clk("#btnTxtStyle"); }],
+      "-", ["outd", "Alt+Shift+←", function(){ key("ArrowLeft", { alt:1, shift:1 }); }, pseudo], ["ind", "Alt+Shift+→", function(){ key("ArrowRight", { alt:1, shift:1 }); }, pseudo],
+      ["link", CTRL + "+F2", function(){ key("F2", { ctrl:1 }); }, pseudo], ["unlink", "", function(){ clk(".ms-unlink"); }, pseudo],
+      "-", ["man", "", function(){ clk('#modeBtns [data-tm="manual"]'); }, pseudo], ["auto", "", function(){ clk('#modeBtns [data-tm="auto"]'); }, pseudo],
+      ["inact", "", function(){ clk(".m2-in"); }, pseudo || grp], ["ot", "", function(){ clk(".m2-ot"); }, pseudo || grp], ["tl", "", function(){ clk(".m2-tl"); }, pseudo],
+      ["fill", CTRL + "+D", function(){ key("d", { ctrl:1 }); }, pseudo], ["scroll", CTRL + "+Shift+F5", function(){ var sc = document.querySelector("#mspView .ms-scroll"); if(sc) sc.click(); }]
+    ];
+    items.forEach(function(it){ if(it === "-"){ var s = document.createElement("div"); s.className = "tctx-sep"; m.appendChild(s); return; }
+      var b = document.createElement("button"); b.type = "button"; b.innerHTML = "<span></span><kbd></kbd>"; b.firstChild.textContent = L(it[0]); b.lastChild.textContent = it[1];
+      if(it[3]) b.disabled = true; else b.onclick = function(){ close(); setTimeout(it[2], 0); }; m.appendChild(b); });
+    /* 完成%（0/25/50/75/100） */
+    if(!pseudo && !grp){ var pr = document.createElement("div"); pr.className = "tctx-pct"; pr.innerHTML = "<span></span>"; pr.firstChild.textContent = L("pct");
+      [0,25,50,75,100].forEach(function(p){ var b = document.createElement("button"); b.type = "button"; b.textContent = p + "%"; if((+t.progress || 0) === p) b.classList.add("on");
+        b.onclick = function(){ close(); var o = document.querySelectorAll(".ms-pct button")[[0,25,50,75,100].indexOf(p)]; if(o) o.click(); }; pr.appendChild(b); });
+      m.appendChild(pr); }
+    document.body.appendChild(m);
+    var r = m.getBoundingClientRect(), L0 = x, T0 = y;
+    if(L0 + r.width > innerWidth - 4) L0 = Math.max(4, innerWidth - r.width - 4); if(T0 + r.height > innerHeight - 4) T0 = Math.max(4, innerHeight - r.height - 4);
+    m.style.left = L0 + "px"; m.style.top = T0 + "px";
+  }
+  document.addEventListener("contextmenu", function(e){
+    var row = e.target.closest("#taskList .trow[data-id]"), bar = !row && e.target.closest("#ganttInner [data-id], #ganttBody [data-id], .g-body [data-id]");
+    var el = row || bar; if(!el) return; if(e.target.closest("input,textarea,select") && !e.ctrlKey) return; /* 编辑框内保留浏览器菜单 */
+    var id = el.dataset.id, t = byId(id); if(!t) return; e.preventDefault();
+    selectRow(id); open(e.clientX, e.clientY, byId(id));
+  });
+  document.addEventListener("mousedown", function(e){ if(!e.target.closest(".tctx")) close(); }, true);
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") close(); });
+  window.addEventListener("scroll", close, true); window.addEventListener("resize", close);
+  window.__v4Ctx = { open:open, close:close };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
