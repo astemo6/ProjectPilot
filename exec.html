@@ -345,6 +345,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
     <select id="calModeSel" title="Calendar"></select>
     <button id="calModeNL" data-i18n="calModeNL">自然语言</button>
     <button id="calModeText" data-i18n="calModeText">文本格式</button>
+    <button id="calMgrBtn" data-i18n="calMgr">日历管理</button>
   </div>
   <textarea id="calInput" data-i18n-ph="calPh" placeholder="例如：2026年春节2月15日到2月23日放假，2月14日、2月28日调休上班"></textarea>
   <div class="row">
@@ -458,8 +459,8 @@ var MAKEUP_2026 = ["2026-01-04","2026-02-14","2026-02-28","2026-05-09","2026-09-
 var cal = WORKCAL.load(); /* 工作日历持久化（gantt-workcal-v1，计划页共用） */
 function resetCal(){ var d = WORKCAL.defaults(cal.mode); cal.holidays = d.holidays; cal.makeup = d.makeup; }
 var _tcal = "", _tcalCache = {};
-function isWorkday(d){ /* _tcal：当前正在排程任务的任务日历（"" = 项目日历） */
-  if(_tcal){ var c = _tcalCache[_tcal]; if(!c || c._base !== cal){ c = _tcalCache[_tcal] = Object.assign({}, cal, { mode:_tcal }); c._base = cal; } return WORKCAL.isWork(fmtD(d), c); }
+function isWorkday(d){ /* _tcal：当前正在排程任务的任务日历（"" = 项目日历；c:id = 自定义日历；state.projCal = 项目改用的自定义日历） */
+  if(_tcal || (typeof state !== "undefined" && state && state.projCal)) return keyWork(_tcal, d);
   return WORKCAL.isWork(fmtD(d), cal);
 }
 function withCal(t, fn){ var o = _tcal; _tcal = (t && t.cal) || ""; try{ return fn(); } finally{ _tcal = o; } }
@@ -1251,7 +1252,7 @@ function renderResSheet(){
       else if(c.k === "otRate" || c.k === "rate") h += '<td><input class="num" data-k="' + c.k + '" value="' + (+v || 0).toFixed(2) + (r.type === "material" ? "" : "/h") + '"></td>';
       else if(c.k === "perUse") h += '<td><input class="num" data-k="perUse" value="' + (+v || 0).toFixed(2) + '"></td>';
       else if(c.k === "accrue") h += '<td><select data-k="accrue">' + [["pro","acPro"],["start","acStart"],["end","acEnd"]].map(function(x){ return '<option value="' + x[0] + '"' + ((v || "pro") === x[0] ? " selected" : "") + ">" + esc(tr(x[1])) + "</option>"; }).join("") + "</select></td>";
-      else if(c.k === "cal") h += r.type === "material" ? "<td></td>" : '<td><select data-k="cal">' + ["", "CN", "WE", "OFF"].map(function(x){ return '<option value="' + x + '"' + ((v || "") === x ? " selected" : "") + ">" + esc(x ? WORKCAL.LABEL[lang === "en" || lang === "de" ? lang : "zh"][x] : tr("projCal")) + "</option>"; }).join("") + "</select></td>";
+      else if(c.k === "cal") h += r.type === "material" ? "<td></td>" : '<td><select data-k="cal">' + calOptsHtml(v || "", true) + "</select></td>";
       else if(c.k === "vac" || c.k === "rates") h += '<td><input data-k="' + c.k + '" value="' + esc(v || "") + '" placeholder="' + esc(tr(c.k === "vac" ? "rsVacPh" : "rsRatesPh")) + '"' + (c.k === "vac" && r.type === "material" ? " disabled" : "") + "></td>";
       else if(c.k === "matLabel") h += '<td><input data-k="matLabel" value="' + esc(v || "") + '"' + (r.type === "material" ? "" : " disabled") + "></td>";
       else h += '<td' + (c.k === "name" ? ' class="nm"' : "") + '><input data-k="' + c.k + '" value="' + esc(v || "") + '"></td>';
@@ -2225,7 +2226,7 @@ function openModal(id){
     + '<div class="frow"><label>' + tr("fDeps") + '</label><input id="fDepsText" value="' + esc(depsToText(t.deps)) + '" placeholder="3FS,5SS+2d">'
     + '<div style="margin-top:6px;max-height:120px;overflow:auto">' + (depOpts || "—") + "</div>"
     + '<div class="hint" data-i18n="fDepsHint" style="font-size:11px;color:var(--tx3);margin-top:4px">' + tr("fDepsHint") + "</div></div>"
-    + '<div class="frow2"><div class="frow"><label>' + tr("fTaskCal") + '</label><select id="fTaskCal">' + ["", "CN", "WE", "OFF"].map(function(k){ return '<option value="' + k + '"' + ((t.cal || "") === k ? " selected" : "") + ">" + esc(k ? WORKCAL.LABEL[lang === "en" || lang === "de" ? lang : "zh"][k] : tr("projCal")) + "</option>"; }).join("") + "</select></div>"
+    + '<div class="frow2"><div class="frow"><label>' + tr("fTaskCal") + '</label><select id="fTaskCal">' + calOptsHtml(t.cal || "", true) + "</select></div>"
     + '<div class="frow"><label>' + tr("fSplit") + '</label><input id="fSplit" value="' + esc(splitsText(t)) + '" placeholder="3+2, 6+1"></div></div>'
     + '<div class="hint" style="font-size:11px;color:var(--tx3);margin:-4px 0 8px">' + esc(tr("fSplitHint")) + "</div>"
     + '<div class="frow2"><div class="frow"><label>' + tr("fOwner") + '</label><input id="fOwner" value="' + esc(t.owner||"") + '"></div>'
@@ -2446,6 +2447,37 @@ function exportXML(){
   L.push(xmlTag("SaveVersion", "14"));
   L.push(xmlTag("Name", planProjectName()));
   L.push(xmlTag("CreationDate", isoDT(new Date())));
+  var I = state.info || {};
+  if(I.title) L.push(xmlTag("Title", I.title)); if(I.author) L.push(xmlTag("Author", I.author)); if(I.company) L.push(xmlTag("Company", I.company)); if(I.manager) L.push(xmlTag("Manager", I.manager));
+  L.push(xmlTag("ScheduleFromStart", 1));
+  if(parseD(state.statusDate)) L.push(xmlTag("StatusDate", state.statusDate + "T17:00:00"));
+  L.push(xmlTag("CalendarUID", 1)); L.push(xmlTag("DefaultStartTime", "08:00:00")); L.push(xmlTag("DefaultFinishTime", "17:00:00"));
+  L.push(xmlTag("MinutesPerDay", 480)); L.push(xmlTag("MinutesPerWeek", 2400)); L.push(xmlTag("DaysPerMonth", 20));
+  /* 自定义字段定义 */
+  var usedF = Object.keys(MSPDI_FIELD_R).filter(function(k){ return ts.some(function(t){ return t[k] !== undefined && t[k] !== ""; }); });
+  if(usedF.length){ L.push("<ExtendedAttributes>"); usedF.forEach(function(k){ var fn = k.replace("text", "Text").replace("num", "Number"); L.push("<ExtendedAttribute>" + xmlTag("FieldID", MSPDI_FIELD_R[k]) + xmlTag("FieldName", fn) + ((state.fieldAlias || {})[k] ? xmlTag("Alias", state.fieldAlias[k]) : "") + "</ExtendedAttribute>"); }); L.push("</ExtendedAttributes>"); }
+  /* 日历：1 = 项目日历；预置/自定义日历按需编号；资源日历 = 派生日历（休假为例外） */
+  var calUid = {}, calXml = [], nextCal = 2;
+  calXml.push(mspdiCalendarXML(1, state.projCal ? calLabel(state.projCal) : "Standard", state.projCal || cal.mode, null)); calUid[""] = 1; if(state.projCal) calUid[state.projCal] = 1;
+  function calRef(k){
+    if(!k) return 1; if(calUid[k] != null) return calUid[k];
+    var u = calUid[k] = nextCal++, c = k.indexOf("c:") === 0 ? calById(k.slice(2)) : null;
+    if(c && c.base && c.base.indexOf("c:") === 0){ var bu = calRef(c.base); calXml.push(mspdiCalendarXML(u, c.name, k, bu)); }
+    else calXml.push(mspdiCalendarXML(u, calLabel(k), k, null));
+    return u;
+  }
+  calList().forEach(function(c){ calRef("c:" + c.id); });
+  ts.forEach(function(t){ if(t.cal) calRef(t.cal); });
+  var resCalUid = {};
+  resList().forEach(function(r){
+    if(r.type === "material" || (!r.cal && !r.vac)) return;
+    var bu = calRef(r.cal || ""), u = nextCal++, vac = {}; Object.keys(vacSet(r)).forEach(function(k){ vac[k] = 1; });
+    var x = "<Calendar>" + xmlTag("UID", u) + xmlTag("Name", r.name) + xmlTag("IsBaseCalendar", 0) + xmlTag("BaseCalendarUID", bu) + "<WeekDays>";
+    exportCalRanges(vac).forEach(function(rg){ x += "<WeekDay>" + xmlTag("DayType", 0) + xmlTag("DayWorking", 0) + "<TimePeriod>" + xmlTag("FromDate", rg[0] + "T00:00:00") + xmlTag("ToDate", rg[1] + "T23:59:00") + "</TimePeriod></WeekDay>"; });
+    calXml.push(x + "</WeekDays></Calendar>"); resCalUid[r.name] = u;
+  });
+  L.push("<Calendars>"); calXml.forEach(function(x){ L.push(x); }); L.push("</Calendars>");
+  var splitOut = {};
   L.push("<Tasks>");
   ts.forEach(function(t){
     var uid = uidOf[t.id];
@@ -2470,8 +2502,15 @@ function exportXML(){
       L.push(xmlTag("Priority", t.priority == null ? 500 : +t.priority)); if(t.type === "task"){ L.push(xmlTag("Type", { FU:0, FD:1, FW:2 }[t.ttype || "FU"])); L.push(xmlTag("EffortDriven", t.effort === false ? 0 : 1)); }
       if(t.remarks) L.push(xmlTag("Notes", t.remarks)); }
     if(t.type === "milestone") L.push(xmlTag("Milestone", "1"));
-    if(s) L.push(xmlTag("Start", HM() && !isG ? fmtD(s) + "T" + off2clk(t.startH, false) + ":00" : isoDT(s)));
-    if(e){ var _ep = !isG && HM() ? endPos(t) : null; L.push(xmlTag("Finish", _ep ? fmtD(_ep.d) + "T" + off2clk(_ep.h, true) + ":00" : isoDT(e))); }
+    if(s) L.push(xmlTag("Start", HM() && !isG ? fmtD(s) + "T" + off2clk(t.startH, false) + ":00" : fmtD(s) + "T08:00:00"));
+    if(e){ var _ep = !isG && HM() ? endPos(t) : null; L.push(xmlTag("Finish", _ep ? fmtD(_ep.d) + "T" + off2clk(_ep.h, true) + ":00" : fmtD(e) + (t.type === "milestone" ? "T08:00:00" : "T17:00:00"))); }
+    if(!isG){
+      if(t.cal) L.push(xmlTag("CalendarUID", calRef(t.cal)));
+      if(t.ignoreRC) L.push(xmlTag("IgnoreResourceCalendar", 1));
+      if(parseD(t.deadline)) L.push(xmlTag("Deadline", t.deadline + "T17:00:00"));
+      if(+t.lvl > 0){ L.push(xmlTag("LevelingDelay", Math.round(+t.lvl * 4800))); L.push(xmlTag("LevelingDelayFormat", 7)); }
+      var _sg = splitGaps(t); if(_sg.length) splitOut[uid] = splitPeriods(t);
+    }
     L.push(xmlTag("Duration", "PT" + durH + "H0M0S"));
     var _ct = { ASAP:0, ALAP:1, MSO:2, MFO:3, SNET:4, SNLT:5, FNET:6, FNLT:7 }[t.cons || "ASAP"];
     L.push(xmlTag("ConstraintType", _ct == null ? 0 : _ct));
@@ -2483,10 +2522,19 @@ function exportXML(){
       L.push(xmlTag("PredecessorUID", pu));
       L.push(xmlTag("Type", MSPDI_DEP[d.type] != null ? MSPDI_DEP[d.type] : 1));
       L.push(xmlTag("CrossProject", "0"));
-      L.push(xmlTag("LinkLag", (+d.lag || 0) * 480)); /* 滞后工作日 → 分钟 */
+      L.push(xmlTag("LinkLag", Math.round((+d.lag || 0) * 4800))); /* 滞后工作日 → 十分之一分钟（MSPDI 规范） */
       L.push(xmlTag("LagFormat", "7"));
       L.push("</PredecessorLink>");
     });
+    if(!isG){
+      Object.keys(MSPDI_FIELD_R).forEach(function(k){ if(t[k] !== undefined && t[k] !== "") L.push("<ExtendedAttribute>" + xmlTag("FieldID", MSPDI_FIELD_R[k]) + xmlTag("Value", t[k]) + "</ExtendedAttribute>"); });
+      for(var bn = 0; bn <= 10; bn++){
+        var bl = bn ? (state.baselines || {})[bn] : state.baseline; if(!bl) continue;
+        var bb = null; bl.forEach(function(x){ if(x && x.id === t.id) bb = x; }); if(!bb || !parseD(bb.start)) continue;
+        L.push("<Baseline>" + xmlTag("Number", bn) + xmlTag("Start", bb.start + "T08:00:00") + xmlTag("Finish", (bb.end || bb.start) + (t.type === "milestone" ? "T08:00:00" : "T17:00:00"))
+          + xmlTag("Duration", "PT" + Math.round((+bb.dur || 0) * 8 * 100) / 100 + "H0M0S") + xmlTag("DurationFormat", 7) + xmlTag("Cost", +bb.cost || 0) + "</Baseline>");
+      }
+    }
     L.push("</Task>");
   });
   L.push("</Tasks>");
@@ -2498,7 +2546,9 @@ function exportXML(){
     L.push("<Resource>" + xmlTag("UID", i + 1) + xmlTag("ID", i + 1) + xmlTag("Name", r.name) + xmlTag("Type", r.type === "material" ? 0 : 1)
       + (r.initials ? xmlTag("Initials", r.initials) : "") + (r.group ? xmlTag("Group", r.group) : "") + (r.type === "material" && r.matLabel ? xmlTag("MaterialLabel", r.matLabel) : "")
       + xmlTag("MaxUnits", ((r.maxUnits == null ? 100 : r.maxUnits) / 100).toFixed(2)) + xmlTag("StandardRate", +r.rate || 0) + xmlTag("StandardRateFormat", r.type === "material" ? 7 : 2)
-      + xmlTag("OvertimeRate", +r.otRate || 0) + xmlTag("CostPerUse", +r.perUse || 0) + "</Resource>");
+      + xmlTag("OvertimeRate", +r.otRate || 0) + xmlTag("CostPerUse", +r.perUse || 0)
+      + xmlTag("AccrueAt", { start:1, end:2 }[r.accrue] || 3) + (resCalUid[r.name] ? xmlTag("CalendarUID", resCalUid[r.name]) : r.type !== "material" ? xmlTag("CalendarUID", calRef(r.cal || "")) : "")
+      + (r.notes ? xmlTag("Notes", r.notes) : "") + mspdiRatesXML(r) + "</Resource>");
   });
   L.push("</Resources>");
   L.push("<Assignments>");
@@ -2512,9 +2562,11 @@ function exportXML(){
     });
   });
   L.push("</Assignments>");
+  if(Object.keys(splitOut).length) L.push("<!--HarkSplits " + JSON.stringify(splitOut).replace(/--/g, "- -") + "-->");
   L.push("</Project>");
   dlURL(URL.createObjectURL(new Blob([L.join("\n")], { type:"application/xml" })), planProjectName() + "_" + fmtD(new Date()).replace(/-/g, "") + ".xml");
 }
+function byIdIn(list, id){ var r = null; list.forEach(function(it){ if(it.t.id === id) r = it.t; }); return r; }
 function xmlTagText(parent, tag){
   var els = parent.getElementsByTagName(tag);
   return els.length ? String(els[0].textContent || "").trim() : "";
@@ -2532,6 +2584,21 @@ function importXMLText(text, asSub){
       if(!taskEls.length){ toast("No tasks found in XML"); return; }
       if(!asSub && !confirm(tr("impXmlConfirm"))) return;
       var uidMap = {}, imported = [], stack = [];
+      /* 项目级：每日分钟数、日历、项目信息、自定义字段别名、拆分扩展 */
+      var projEl = doc.documentElement, minPerDay = +xmlKidText(projEl, "MinutesPerDay") || 480, hpd = minPerDay / 60;
+      if(!asSub){ state.cals = []; delete state.projCal; state.fieldAlias = {}; }
+      var calMap = importMSPDICalendars(doc, text), projCalKey = calMap[xmlKidText(projEl, "CalendarUID")] || "";
+      if(projCalKey){ var _pc = calById(projCalKey.slice(2)); if(_pc) _pc._res = false; }
+      if(!asSub){
+        if(projCalKey) state.projCal = projCalKey;
+        var I0 = state.info = {};
+        [["Title","title"],["Manager","manager"],["Company","company"],["Author","author"]].forEach(function(k){ var v = xmlKidText(projEl, k[0]); if(v) I0[k[1]] = v; });
+        if(!I0.title && xmlKidText(projEl, "Name")) I0.title = xmlKidText(projEl, "Name").replace(/\.(xml|mpp)$/i, "");
+        var _sd = xmlKidText(projEl, "StatusDate").slice(0, 10); if(parseD(_sd)) state.statusDate = _sd;
+        xmlKids(xmlKid(projEl, "ExtendedAttributes"), "ExtendedAttribute").forEach(function(a){ var k = MSPDI_FIELD[xmlKidText(a, "FieldID")], al = xmlKidText(a, "Alias"); if(k && al) state.fieldAlias[k] = al; });
+      }
+      var splitExt = {}; try{ var _hs = String(text).match(/<!--\s*HarkSplits\s+([\s\S]*?)-->/); if(_hs) splitExt = JSON.parse(_hs[1]); }catch(eS){}
+      var baseSnaps = {};
       Array.prototype.forEach.call(taskEls, function(el){
         var name = xmlTagText(el, "Name");
         if(!name) return;
@@ -2555,9 +2622,9 @@ function importXMLText(text, asSub){
         var dur = 0;
         if(s && fi) dur = workdaysBetween(s, fi) + 1;
         var dm = xmlTagText(el, "Duration").match(/PT\s*(?:(\d+)H)?(?:(\d+)M)?/);
-        if(dm){ var _hrs = (+dm[1] || 0) + (+dm[2] || 0) / 60; if(HM()) dur = Math.round(_hrs / 8 * 1000) / 1000; else { var dd = Math.round(_hrs / 8); if(dd > dur) dur = dd; } }
+        if(dm){ var _hrs = mspdiHours(xmlTagText(el, "Duration")) || 0; if(HM()) dur = Math.round(_hrs / hpd * 1000) / 1000; else dur = Math.round(_hrs / hpd); }
         if(!s) s = new Date();
-        if(HM() ? (ms || !(dur > 0)) : (!fi || fi <= s)){ ms = true; dur = 0; }
+        if(ms || !(dur > 0)){ ms = true; dur = 0; }
         var t = mkTask({ name:name, type: ms ? "milestone" : "task", start:fmtD(s), dur: ms ? 0 : dur, owner:"", deps:[] });
         t.source = "xml"; t.group = parentId;
         if(HM()){ var _st = xmlTagText(el, "Start"); if(/T\d/.test(_st)) t.startH = clk2off(_st.slice(11, 16)); }
@@ -2576,6 +2643,18 @@ function importXMLText(text, asSub){
         var _cmap = ["ASAP","ALAP","MSO","MFO","SNET","SNLT","FNET","FNLT"][+_cty];
         if(_cty !== "" && _cmap){ t.cons = _cmap; t.consDate = consNeedsDate(_cmap) ? (_cd || (consOnFinish(_cmap) ? taskEnd(t) : t.start)) : ""; }
         else t.cons = ""; /* 无约束信息：排程时按旧规则迁移（保留原开始日） */
+        /* 任务日历 / 忽略资源日历 / 期限 / 平衡延迟 / 自定义字段 / 基线 / 拆分 */
+        var _cu = xmlKidText(el, "CalendarUID"); if(_cu && _cu !== "-1" && calMap[_cu] && calMap[_cu] !== projCalKey){ t.cal = calMap[_cu]; var _tc = calById(t.cal.slice(2)); if(_tc) _tc._res = false; }
+        var _ir = xmlKidText(el, "IgnoreResourceCalendar"); if(_ir === "1" || _ir === "true") t.ignoreRC = true;
+        var _dl = xmlKidText(el, "Deadline").slice(0, 10); if(parseD(_dl)) t.deadline = _dl;
+        var _ld = +xmlKidText(el, "LevelingDelay"); if(_ld > 0){ var _lv = mspdiTenthsToDays(_ld, xmlKidText(el, "LevelingDelayFormat"), minPerDay); if(_lv > 0){ t.lvl = _lv; t.lvlFrom = fmtD(withCal(t, function(){ return subWorkdays(parseD(t.start), _lv); })); } }
+        xmlKids(el, "ExtendedAttribute").forEach(function(a){ var k = MSPDI_FIELD[xmlKidText(a, "FieldID")]; if(!k) return; var v = xmlKidText(a, "Value"); t[k] = k.indexOf("num") === 0 ? (isNaN(parseFloat(v)) ? "" : parseFloat(v)) : v; });
+        xmlKids(el, "Baseline").forEach(function(b){
+          var n = +xmlKidText(b, "Number") || 0, bs = xmlKidText(b, "Start").slice(0, 10), bf = xmlKidText(b, "Finish").slice(0, 10); if(!parseD(bs)) return;
+          var bh = mspdiHours(xmlKidText(b, "Duration")), bc = parseFloat(xmlKidText(b, "Cost"));
+          (baseSnaps[n] = baseSnaps[n] || []).push({ id:t.id, start:bs, end:parseD(bf) ? (ms ? bs : bf) : bs, cost:isNaN(bc) ? 0 : bc, dur:bh == null ? 0 : Math.round(bh / hpd * 1000) / 1000 });
+        });
+        if(uid && splitExt[uid] && !ms){ var _sp = periodsToSplits(t, splitExt[uid]); if(_sp.length) t.splits = _sp; }
         if(uid) uidMap[uid] = t.id;
         imported.push({ t:t, el:el });
       });
@@ -2585,8 +2664,16 @@ function importXMLText(text, asSub){
         var nm = xmlTagText(rEl, "Name"); if(!nm) return;
         var mu = parseFloat(xmlTagText(rEl, "MaxUnits"));
         resU[xmlTagText(rEl, "UID")] = nm;
-        newRes.push(mkRes({ name:nm, type:xmlTagText(rEl, "Type") === "0" ? "material" : "work", initials:xmlTagText(rEl, "Initials"), group:xmlTagText(rEl, "Group"),
-          matLabel:xmlTagText(rEl, "MaterialLabel"), maxUnits:isNaN(mu) ? 100 : Math.round(mu * 100), rate:+xmlTagText(rEl, "StandardRate") || 0, otRate:+xmlTagText(rEl, "OvertimeRate") || 0, perUse:+xmlTagText(rEl, "CostPerUse") || 0 }));
+        var _nr = mkRes({ name:nm, type:xmlTagText(rEl, "Type") === "0" ? "material" : "work", initials:xmlTagText(rEl, "Initials"), group:xmlTagText(rEl, "Group"),
+          matLabel:xmlTagText(rEl, "MaterialLabel"), maxUnits:isNaN(mu) ? 100 : Math.round(mu * 100), rate:+xmlKidText(rEl, "StandardRate") || 0, otRate:+xmlKidText(rEl, "OvertimeRate") || 0, perUse:+xmlKidText(rEl, "CostPerUse") || 0 });
+        /* 资源日历（个人日历 → 例外即休假）、费率表 A 的分时费率、成本累算 */
+        var _rc = calMap[xmlKidText(rEl, "CalendarUID")]; if(_rc){ _rc = simplifyCalKey(_rc); if(_rc && _rc !== projCalKey) _nr.cal = _rc; }
+        var _acc = { "1":"start", "2":"end", "3":"pro" }[xmlKidText(rEl, "AccrueAt")]; if(_acc && _acc !== "pro") _nr.accrue = _acc;
+        var _rl = []; xmlKids(xmlKid(rEl, "Rates"), "Rate").forEach(function(ra){ if((+xmlKidText(ra, "RateTable") || 0) !== 0) return; var fr = xmlKidText(ra, "RatesFrom").slice(0, 10), v = parseFloat(xmlKidText(ra, "StandardRate")); if(!isNaN(v) && parseD(fr)) _rl.push({ d:fr, v:v, o:parseFloat(xmlKidText(ra, "OvertimeRate")) }); });
+        _rl.sort(function(a, b){ return a.d < b.d ? -1 : 1; });
+        if(_rl.length > 1 || (_rl.length && _rl[0].d > "1985-01-01")){ if(_rl[0].d <= "1985-01-01"){ _nr.rate = _rl[0].v; if(!isNaN(_rl[0].o)) _nr.otRate = _rl[0].o; _rl.shift(); } _nr.rates = _rl.map(function(x){ return x.d + "=" + x.v; }).join(", "); }
+        var _rn = xmlKidText(rEl, "Notes"); if(_rn) _nr.notes = _rn;
+        newRes.push(_nr);
       });
       var asgBy = {};
       Array.prototype.forEach.call(doc.getElementsByTagName("Assignment"), function(aEl){
@@ -2602,12 +2689,16 @@ function importXMLText(text, asSub){
           var pid = uidMap[xmlTagText(lEl, "PredecessorUID")];
           var ty = MSPDI_DEP_R[xmlTagText(lEl, "Type")];
           if(!pid || !ty || imported.some(function(x){ return x.sum && x.t.id === pid; })) return;
-          var lag = Math.round((parseInt(xmlTagText(lEl, "LinkLag"), 10) || 0) / 480); /* 分钟 → 工作日 */
+          var _lf = +xmlTagText(lEl, "LagFormat") || 7, _ll = parseInt(xmlTagText(lEl, "LinkLag"), 10) || 0;
+          var lag = (_lf === 19 || _lf === 20) ? 0 : mspdiTenthsToDays(_ll, _lf, minPerDay); /* MSPDI LinkLag = 十分之一分钟 → 工作日 */
+          if(_lf === 19 || _lf === 20){ var _pt = byIdIn(imported, pid); if(_pt){ lag = (+_pt.dur || 0) * _ll / 1000; lag = HM() ? Math.round(lag * 1000) / 1000 : Math.round(lag); } }
           it.t.deps.push({ id:pid, type:ty, lag:lag });
         });
       });
       state.tasks = imported.map(function(it){ return it.t; });
       state.collapsed = {};
+      if(!asSub){ state.baseline = undefined; state.baselines = {}; state.baseDates = {}; Object.keys(baseSnaps).forEach(function(n){ n = +n; if(n === 0) state.baseline = baseSnaps[0]; else if(n <= 10) state.baselines[n] = baseSnaps[n]; state.baseDates[n] = fmtD(new Date()); }); }
+      pruneCals(); _tcalCache = {}; if(typeof syncCalModeSel === "function") try{ syncCalModeSel(); }catch(eC){}
       var _p = null; try{ _p = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e2){}
       if(_p && _p.oem && !asSub){
         mergeFromPlan(_p); /* 合并版：导入 XML 后保留客户节点行 */
@@ -3146,8 +3237,9 @@ function updateCalSummary(){
 function syncCalModeSel(){
   var sel = document.getElementById("calModeSel"); if(!sel) return;
   var L = WORKCAL.LABEL[lang] || WORKCAL.LABEL.zh;
-  sel.innerHTML = ["CN","WE","OFF"].map(function(k){ return '<option value="' + k + '">' + L[k] + "</option>"; }).join("");
-  sel.value = cal.mode;
+  sel.innerHTML = ["CN","WE","OFF"].map(function(k){ return '<option value="' + k + '">' + L[k] + "</option>"; }).join("")
+    + calList().map(function(c){ return '<option value="c:' + esc(c.id) + '">' + esc(c.name) + "</option>"; }).join("");
+  sel.value = state.projCal && calById(state.projCal.slice(2)) ? state.projCal : cal.mode;
 }
 var calMode = "nl";
 function setCalMode(m){
@@ -3328,7 +3420,10 @@ function init(){
   document.getElementById("calModeText").addEventListener("click", function(){ setCalMode("text"); });
   setCalMode("nl");
   syncCalModeSel();
+  document.getElementById("calMgrBtn").addEventListener("click", function(){ openCalMgr(); });
   document.getElementById("calModeSel").addEventListener("change", function(){
+    if(this.value.indexOf("c:") === 0){ state.projCal = this.value; save(); render(); toast(tr("calApplied")); return; }
+    delete state.projCal;
     cal.mode = this.value; resetCal(); updateCalSummary(); save(); render(); toast(tr("calApplied"));
     if(calMode === "text") document.getElementById("calInput").value = calToText();
   });
@@ -3471,7 +3566,7 @@ function vacSet(r){
   return (_vacCache[key] = c);
 }
 var _resCalCache = {};
-function resCalWork(r, d){ if(!r.cal) return true; var c = _resCalCache[r.cal]; if(!c || c._base !== cal){ c = _resCalCache[r.cal] = Object.assign({}, cal, { mode:r.cal }); c._base = cal; } return WORKCAL.isWork(fmtD(d), c); }
+function resCalWork(r, d){ if(!r.cal) return true; if(String(r.cal).indexOf("c:") === 0) return keyWork(r.cal, d); var c = _resCalCache[r.cal]; if(!c || c._base !== cal){ c = _resCalCache[r.cal] = Object.assign({}, cal, { mode:r.cal }); c._base = cal; } return WORKCAL.isWork(fmtD(d), c); }
 var _isWorkday0 = isWorkday;
 isWorkday = function(d){
   if(!_isWorkday0(d)) return false;
@@ -3846,6 +3941,259 @@ renderNet = function(){
   });
 };
 I18N.zh.ignRC = "忽略资源日历"; I18N.en.ignRC = "Ignore resource calendars"; I18N.de.ignRC = "Ressourcenkalender ignorieren";
+
+/* ============ ⑦ 自定义日历（ProjectLibre「更改工作日历」）+ MSPDI 完整字段 ============ */
+/* state.cals = [{ id, name, base:"" | 日历键, week:[周日..周六 → 1 工作 / 0 休息 / null 继承], hol:{日期:名称}, mk:{日期:1} }]
+   日历键：""=项目日历；CN/WE/OFF=预置；"c:<id>"=自定义。state.projCal = 项目日历改用的自定义日历键。 */
+var P7T = {
+ zh:{calMgr:"日历管理",calNew:"+ 新建日历",calName:"日历名称",calBase:"基准日历",calNone:"无（只按下方星期）",calWeek:"工作日",calExc:"例外日期（放假区间 / 补班）",calDel:"删除日历",calDelAsk:"删除日历「{0}」？使用它的任务和资源改回项目日历。",calUsed:"使用中：{0} 个任务、{1} 个资源",calEmpty:"还没有自定义日历。导入 MPP/XML 时会自动带入文件里的日历，也可以手动新建。",calSaved:"日历已保存",calCopyOf:"日历",lagPct:"%"},
+ en:{calMgr:"Calendars",calNew:"+ New calendar",calName:"Calendar name",calBase:"Base calendar",calNone:"None (weekdays below only)",calWeek:"Working days",calExc:"Exceptions (holiday ranges / make-up days)",calDel:"Delete calendar",calDelAsk:"Delete calendar \"{0}\"? Tasks and resources using it revert to the project calendar.",calUsed:"In use: {0} tasks, {1} resources",calEmpty:"No custom calendars yet. MPP/XML imports bring in the file's calendars; you can also create one.",calSaved:"Calendar saved",calCopyOf:"Calendar",lagPct:"%"},
+ de:{calMgr:"Kalender",calNew:"+ Neuer Kalender",calName:"Kalendername",calBase:"Basiskalender",calNone:"Keiner (nur Wochentage)",calWeek:"Arbeitstage",calExc:"Ausnahmen (Ferien / Ausgleichstage)",calDel:"Kalender löschen",calDelAsk:"Kalender „{0}“ löschen? Vorgänge und Ressourcen nutzen dann den Projektkalender.",calUsed:"Verwendet: {0} Vorgänge, {1} Ressourcen",calEmpty:"Noch keine eigenen Kalender. MPP/XML-Importe übernehmen die Kalender der Datei.",calSaved:"Kalender gespeichert",calCopyOf:"Kalender",lagPct:"%"}};
+Object.keys(P7T).forEach(function(l){ if(I18N[l]) Object.assign(I18N[l], P7T[l]); });
+
+function calList(){ if(typeof state === "undefined" || !state) return []; if(!Array.isArray(state.cals)) state.cals = []; return state.cals; }
+function calById(id){ var c = null; calList().forEach(function(x){ if(x.id === id) c = x; }); return c; }
+function calLabel(k){
+  if(!k) return tr("projCal");
+  if(k.indexOf("c:") === 0){ var c = calById(k.slice(2)); return c ? c.name : k; }
+  return (WORKCAL.LABEL[lang === "en" || lang === "de" ? lang : "zh"] || {})[k] || k;
+}
+function calOptsHtml(cur, withProj){
+  var ks = (withProj ? [""] : []).concat(["CN", "WE", "OFF"]).concat(calList().map(function(c){ return "c:" + c.id; }));
+  cur = cur || "";
+  if(ks.indexOf(cur) < 0) ks.push(cur);
+  return ks.map(function(k){ return '<option value="' + esc(k) + '"' + (k === cur ? " selected" : "") + ">" + esc(calLabel(k)) + "</option>"; }).join("");
+}
+/* 自定义日历判定：本日历例外 → 本日历星期 → 基准日历（可链式） */
+function customWork(id, d, depth){
+  var c = calById(id), k = fmtD(d);
+  if(!c) return WORKCAL.isWork(k, cal);
+  if(c.mk && c.mk[k]) return true;
+  if(c.hol && c.hol[k]) return false;
+  var w = Array.isArray(c.week) ? c.week[d.getDay()] : null;
+  if(w === 0 || w === 1 || w === true || w === false) return !!w;
+  if(c.base && (depth || 0) < 8) return keyWork(c.base, d, (depth || 0) + 1);
+  var dd = d.getDay(); return dd !== 0 && dd !== 6;
+}
+var _presetCache = {};
+function keyWork(k, d, depth){
+  if(!k) return (typeof state !== "undefined" && state && state.projCal && state.projCal !== k) ? keyWork(state.projCal, d, depth) : WORKCAL.isWork(fmtD(d), cal);
+  if(k.indexOf("c:") === 0) return customWork(k.slice(2), d, depth);
+  var c = _presetCache[k]; if(!c || c._base !== cal){ c = _presetCache[k] = Object.assign({}, cal, { mode:k }); c._base = cal; }
+  return WORKCAL.isWork(fmtD(d), c);
+}
+function calHolName(k, d){
+  if(!k) k = (state && state.projCal) || "";
+  if(k.indexOf("c:") === 0){ var c = calById(k.slice(2)), s = fmtD(d); if(!c) return ""; if(c.mk && c.mk[s]) return ""; if(c.hol && c.hol[s]) return typeof c.hol[s] === "string" ? c.hol[s] : tr("calExc"); return c.base ? calHolName(c.base, d) : ""; }
+  return WORKCAL.holName(fmtD(d), cal);
+}
+function calExcText(c){
+  var lines = [], ks = Object.keys(c.hol || {}).sort();
+  ks.forEach(function(k){ var n = c.hol[k] === 1 || c.hol[k] === true ? "" : String(c.hol[k]); var p = lines[lines.length - 1];
+    if(p && fmtD(addDays(parseD(p.e), 1)) === k && p.n === n) p.e = k; else lines.push({ s:k, e:k, n:n }); });
+  var out = lines.map(function(l){ return (l.s === l.e ? l.s : l.s + "~" + l.e) + (l.n ? "," + l.n : ""); });
+  Object.keys(c.mk || {}).sort().forEach(function(k){ out.push("补班 " + k); });
+  return out.join("\n");
+}
+function calUsage(key){
+  var nt = 0, nr = 0;
+  state.tasks.forEach(function(t){ if(t.cal === key) nt++; });
+  resList().forEach(function(r){ if(r.cal === key) nr++; });
+  return { t:nt, r:nr };
+}
+function openCalMgr(selId){
+  var old = document.getElementById("calMgrBg"); if(old) old.remove();
+  var bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "calMgrBg";
+  var cs = calList(), cur = selId ? calById(selId) : cs[0];
+  var wd = tr("wdNames").split(","); /* 周一..周日 */
+  var h = '<div class="modal" style="max-width:620px"><div class="modal-h"><span>' + esc(tr("calMgr")) + '</span><button id="cmX">×</button></div><div class="modal-b">'
+    + '<div class="frow2"><div class="frow"><label>' + esc(tr("calMgr")) + '</label><select id="cmSel">' + cs.map(function(c){ return '<option value="' + esc(c.id) + '"' + (cur && c.id === cur.id ? " selected" : "") + ">" + esc(c.name) + "</option>"; }).join("") + '</select></div>'
+    + '<div class="frow"><label>&nbsp;</label><button id="cmNew">' + esc(tr("calNew")) + "</button></div></div>";
+  if(!cur) h += '<div class="hint" style="font-size:12px;color:#64748b">' + esc(tr("calEmpty")) + "</div>";
+  else {
+    var u = calUsage("c:" + cur.id);
+    h += '<div class="frow2"><div class="frow"><label>' + esc(tr("calName")) + '</label><input id="cmName" value="' + esc(cur.name) + '"></div>'
+      + '<div class="frow"><label>' + esc(tr("calBase")) + '</label><select id="cmBase"><option value="">' + esc(tr("calNone")) + "</option>"
+      + ["CN", "WE", "OFF"].concat(cs.filter(function(c){ return c.id !== cur.id; }).map(function(c){ return "c:" + c.id; })).map(function(k){ return '<option value="' + esc(k) + '"' + ((cur.base || "") === k ? " selected" : "") + ">" + esc(calLabel(k)) + "</option>"; }).join("") + "</select></div></div>"
+      + '<div class="frow"><label>' + esc(tr("calWeek")) + "</label><div>" + wd.map(function(n, i){ var day = (i + 1) % 7, v = Array.isArray(cur.week) ? cur.week[day] : null;
+          return '<label style="margin-right:8px;font-size:12px"><select class="cmWd" data-d="' + day + '" style="width:auto"><option value="">' + esc(n) + " · ↑</option><option value=\"1\"" + (v === 1 || v === true ? " selected" : "") + ">" + esc(n) + " ✓</option><option value=\"0\"" + (v === 0 || v === false ? " selected" : "") + ">" + esc(n) + " ✗</option></select></label>"; }).join("") + "</div></div>"
+      + '<div class="frow"><label>' + esc(tr("calExc")) + '</label><textarea id="cmExc" rows="7" placeholder="' + esc(tr("calPhText")) + '">' + esc(calExcText(cur)) + "</textarea></div>"
+      + '<div class="hint" style="font-size:12px;color:#64748b">' + esc(tr("calHintText")) + " · " + esc(tr("calUsed").replace("{0}", u.t).replace("{1}", u.r)) + "</div>";
+  }
+  h += '</div><div class="modal-f">' + (cur ? '<button id="cmDel" style="margin-right:auto;color:#dc2626">' + esc(tr("calDel")) + "</button>" : "")
+    + '<button id="cmCancel">' + esc(tr("cancel")) + "</button>" + (cur ? '<button id="cmOk" class="primary" style="background:var(--accent);color:#fff">' + esc(tr("ok")) + "</button>" : "") + "</div></div>";
+  bg.innerHTML = h; document.body.appendChild(bg);
+  function close(){ bg.remove(); }
+  function apply(){
+    if(!cur) return;
+    cur.name = document.getElementById("cmName").value.trim() || cur.name;
+    cur.base = document.getElementById("cmBase").value;
+    var w = [null, null, null, null, null, null, null];
+    Array.prototype.forEach.call(bg.querySelectorAll(".cmWd"), function(s){ w[+s.dataset.d] = s.value === "" ? null : +s.value; });
+    cur.week = w;
+    var r = parseCalText(document.getElementById("cmExc").value || "");
+    cur.hol = r.holidays; cur.mk = {}; r.makeup.forEach(function(k){ cur.mk[k] = 1; });
+    Object.keys(cur.hol).forEach(function(k){ if(cur.hol[k] === "节假日") cur.hol[k] = 1; });
+  }
+  bg.querySelector("#cmX").onclick = close; bg.querySelector("#cmCancel").onclick = close;
+  bg.querySelector("#cmSel").onchange = function(){ openCalMgr(this.value); };
+  bg.querySelector("#cmNew").onclick = function(){
+    apply();
+    state.seq = (state.seq || 1000) + 1;
+    var c = { id:"k" + state.seq, name:tr("calCopyOf") + " " + (calList().length + 1), base:"", week:[0, 1, 1, 1, 1, 1, 0], hol:{}, mk:{} };
+    calList().push(c); save(); openCalMgr(c.id);
+  };
+  if(cur){
+    bg.querySelector("#cmOk").onclick = function(){ apply(); close(); _tcalCache = {}; save(); syncCalModeSel(); render(); toast(tr("calSaved")); };
+    bg.querySelector("#cmDel").onclick = function(){
+      if(!confirm(tr("calDelAsk").replace("{0}", cur.name))) return;
+      var key = "c:" + cur.id;
+      state.tasks.forEach(function(t){ if(t.cal === key) t.cal = ""; });
+      resList().forEach(function(r){ if(r.cal === key) r.cal = ""; });
+      calList().forEach(function(c){ if(c.base === key) c.base = ""; });
+      if(state.projCal === key) delete state.projCal;
+      state.cals = calList().filter(function(c){ return c.id !== cur.id; });
+      save(); syncCalModeSel(); render(); openCalMgr();
+    };
+  }
+}
+
+/* ---------- MSPDI 辅助 ---------- */
+function xmlKids(el, tag){ var out = []; if(!el) return out; for(var n = el.firstChild; n; n = n.nextSibling){ if(n.nodeType === 1 && (n.localName || n.nodeName) === tag) out.push(n); } return out; }
+function xmlKid(el, tag){ return xmlKids(el, tag)[0] || null; }
+function xmlKidText(el, tag){ var k = xmlKid(el, tag); return k ? String(k.textContent || "").trim() : ""; }
+function mspdiHours(s){ var m = String(s || "").match(/^-?PT\s*(?:(\d+(?:\.\d+)?)H)?\s*(?:(\d+(?:\.\d+)?)M)?\s*(?:(\d+(?:\.\d+)?)S)?/); if(!m) return null; return (+m[1] || 0) + (+m[2] || 0) / 60 + (+m[3] || 0) / 3600; }
+var MSPDI_FIELD = { "188743731":"text1", "188743734":"text2", "188743737":"text3", "188743767":"num1", "188743768":"num2", "188743769":"num3" };
+var MSPDI_FIELD_R = { text1:"188743731", text2:"188743734", text3:"188743737", num1:"188743767", num2:"188743768", num3:"188743769" };
+/* 时长（十分之一分钟 + 格式）→ 工作日 */
+function mspdiTenthsToDays(v, fmt, minPerDay){
+  v = +v || 0; fmt = +fmt || 7;
+  var elapsed = { 4:1, 6:1, 8:1, 10:1, 12:1, 36:1, 38:1, 40:1, 42:1, 44:1 }[fmt];
+  var d = elapsed ? (v / 600 / 24) * 5 / 7 : v / (minPerDay * 10);
+  return HM() ? Math.round(d * 1000) / 1000 : Math.round(d);
+}
+/* MSPDI <Calendars> → state.cals；返回 {uid: 日历键} */
+function importMSPDICalendars(doc, text){
+  var ext = null; try{ var _m = String(text || "").match(/<!--\s*HarkCalendars\s+([\s\S]*?)-->/); if(_m) ext = JSON.parse(_m[1]); }catch(eX){}
+  var calsEl = doc.getElementsByTagName("Calendars")[0], map = {}, raw = [];
+  if(!calsEl) return map;
+  xmlKids(calsEl, "Calendar").forEach(function(cEl){
+    var uid = xmlKidText(cEl, "UID"); if(uid === "") return;
+    state.seq = (state.seq || 1000) + 1;
+    var c = { id:"k" + state.seq, name:xmlKidText(cEl, "Name") || ("Calendar " + uid), base:"", week:[null, null, null, null, null, null, null], hol:{}, mk:{} };
+    var isBase = xmlKidText(cEl, "IsBaseCalendar") === "1" || xmlKidText(cEl, "IsBaseCalendar") === "true";
+    var bu = xmlKidText(cEl, "BaseCalendarUID");
+    function addExc(from, to, working, name){
+      var a = parseD(String(from).slice(0, 10)), b = parseD(String(to || from).slice(0, 10)); if(!a || !b) return;
+      var g = 0; for(var d = new Date(a); d <= b && g++ < 3700; d = addDays(d, 1)){ var k = fmtD(d); if(working){ c.mk[k] = 1; delete c.hol[k]; } else { c.hol[k] = name || 1; delete c.mk[k]; } }
+    }
+    var hasWD0 = xmlKids(xmlKid(cEl, "WeekDays"), "WeekDay").some(function(w){ return xmlKidText(w, "DayType") === "0"; });
+    xmlKids(xmlKid(cEl, "WeekDays"), "WeekDay").forEach(function(w){
+      var dt = +xmlKidText(w, "DayType"), working = xmlKidText(w, "DayWorking") === "1" || xmlKidText(w, "DayWorking") === "true";
+      if(dt >= 1 && dt <= 7) c.week[dt - 1] = working ? 1 : 0;
+      else if(dt === 0){ var tp = xmlKid(w, "TimePeriod"); if(tp) addExc(xmlKidText(tp, "FromDate"), xmlKidText(tp, "ToDate"), working, ""); }
+    });
+    xmlKids(xmlKid(cEl, "Exceptions"), "Exception").forEach(function(x){
+      var tp = xmlKid(x, "TimePeriod"); if(!tp) return;
+      var working = xmlKidText(x, "DayWorking") === "1" || xmlKidText(x, "DayWorking") === "true";
+      if(ext && ext[uid] || hasWD0) return; /* WeekDays 里已有展开后的例外时以它为准 */
+      var ty = +xmlKidText(x, "Type") || 1, from = parseD(xmlKidText(tp, "FromDate").slice(0, 10)), to = parseD(xmlKidText(tp, "ToDate").slice(0, 10)), nm = xmlKidText(x, "Name");
+      if(ty === 1 || !from || !to) addExc(xmlKidText(tp, "FromDate"), xmlKidText(tp, "ToDate"), working, nm);
+      else if(ty === 7){ var per = +xmlKidText(x, "Period") || 1, g = 0; for(var d = new Date(from); d <= to && g++ < 3700; d = addDays(d, per)) addExc(fmtD(d), fmtD(d), working, nm); }
+      else if(ty === 2 || ty === 3 || ty === 4 || ty === 5 || ty === 6){ /* 其它周期规则：需服务器展开（导入 MPP 时自动处理）；直接 XML 时仅取首个日期 */ addExc(fmtD(from), fmtD(from), working, nm); }
+    });
+    if(ext && ext[uid]){ c.hol = {}; c.mk = {}; ext[uid].forEach(function(x){ addExc(x[0], x[1], !!x[2], x[3] || ""); }); } /* 服务器已展开周期性例外 */
+    if(isBase || bu === "" || bu === "-1"){ for(var i = 0; i < 7; i++) if(c.week[i] == null) c.week[i] = (i === 0 || i === 6) ? 0 : 1; }
+    raw.push({ c:c, bu:isBase ? "" : bu, isBase:isBase });
+    map[uid] = "c:" + c.id;
+  });
+  raw.forEach(function(r){ if(r.bu && map[r.bu]) r.c.base = map[r.bu]; });
+  calList();
+  raw.forEach(function(r){ r.c._res = !r.isBase; state.cals.push(r.c); });
+  return map;
+}
+/* 资源个人日历若与基准完全相同（无例外、无星期改动）→ 直接引用基准，避免日历列表膨胀 */
+function simplifyCalKey(k){
+  if(!k || k.indexOf("c:") !== 0) return k;
+  var c = calById(k.slice(2)); if(!c || !c._res) return k;
+  var plain = !Object.keys(c.hol || {}).length && !Object.keys(c.mk || {}).length && !(c.week || []).some(function(w){ return w != null; });
+  return plain ? (c.base || "") : k;
+}
+function pruneCals(){
+  var used = {}; function mark(k){ if(k && k.indexOf("c:") === 0 && !used[k]){ used[k] = 1; var c = calById(k.slice(2)); if(c && c.base) mark(c.base); } }
+  state.tasks.forEach(function(t){ mark(t.cal); }); resList().forEach(function(r){ mark(r.cal); }); mark(state.projCal);
+  calList().forEach(function(c){ if(!c._res) mark("c:" + c.id); });
+  state.cals = calList().filter(function(c){ return used["c:" + c.id]; });
+  state.cals.forEach(function(c){ delete c._res; });
+}
+/* 拆分：工作时段 [[开始,完成],...] → t.splits [{after, gap}]（工作日） */
+function periodsToSplits(t, periods){
+  if(!periods || periods.length < 2) return [];
+  var out = [], acc = 0;
+  withCal(t, function(){
+    for(var i = 0; i < periods.length - 1; i++){
+      var a = parseD(String(periods[i][0]).slice(0, 10)), b = parseD(String(periods[i][1]).slice(0, 10)), n = parseD(String(periods[i + 1][0]).slice(0, 10));
+      if(!a || !b || !n) return;
+      acc += Math.max(1, workdaysBetween(a, b) + 1);
+      var gap = 0; for(var d = addDays(b, 1); d < n; d = addDays(d, 1)) if(isWorkday(d)) gap++;
+      if(gap > 0) out.push({ after:acc, gap:gap });
+    }
+  });
+  return out;
+}
+function exportCalRanges(set){ /* {日期:x} → [[s,e,name]] 连续合并 */
+  var ks = Object.keys(set || {}).sort(), out = [];
+  ks.forEach(function(k){ var p = out[out.length - 1]; var n = typeof set[k] === "string" ? set[k] : ""; if(p && fmtD(addDays(parseD(p[1]), 1)) === k && p[2] === n) p[1] = k; else out.push([k, k, n]); });
+  return out;
+}
+/* 预置日历 / 自定义日历 → MSPDI <Calendar> 片段 */
+function mspdiCalendarXML(uid, name, key, baseUid){
+  var week = [], hol = {}, mk = {}, isBase = baseUid == null;
+  if(key && key.indexOf("c:") === 0){
+    var c = calById(key.slice(2)) || {};
+    week = (c.week || []).slice(); hol = c.hol || {}; mk = c.mk || {};
+    if(isBase){ for(var i = 0; i < 7; i++) if(week[i] == null) week[i] = c.base ? (keyWorkWeekday(c.base, i) ? 1 : 0) : (i === 0 || i === 6 ? 0 : 1);
+      if(c.base && c.base.indexOf("c:") !== 0 && c.base !== "OFF"){ var bc = presetSets(c.base); hol = Object.assign({}, bc.hol, hol); mk = Object.assign({}, bc.mk, mk); } }
+  } else {
+    var m = key || cal.mode;
+    for(var j = 0; j < 7; j++) week[j] = m === "OFF" ? 1 : (j === 0 || j === 6 ? 0 : 1);
+    var ps = presetSets(m); hol = ps.hol; mk = ps.mk;
+  }
+  var X = "<Calendar>" + xmlTag("UID", uid) + xmlTag("Name", name) + xmlTag("IsBaseCalendar", isBase ? 1 : 0) + (isBase ? "" : xmlTag("BaseCalendarUID", baseUid)) + "<WeekDays>";
+  var WT = "<WorkingTimes><WorkingTime><FromTime>08:00:00</FromTime><ToTime>12:00:00</ToTime></WorkingTime><WorkingTime><FromTime>13:00:00</FromTime><ToTime>17:00:00</ToTime></WorkingTime></WorkingTimes>";
+  for(var k = 0; k < 7; k++){ if(week[k] == null) continue; X += "<WeekDay>" + xmlTag("DayType", k + 1) + xmlTag("DayWorking", week[k] ? 1 : 0) + (week[k] ? WT : "") + "</WeekDay>"; }
+  exportCalRanges(hol).forEach(function(r){ X += "<WeekDay>" + xmlTag("DayType", 0) + xmlTag("DayWorking", 0) + "<TimePeriod>" + xmlTag("FromDate", r[0] + "T00:00:00") + xmlTag("ToDate", r[1] + "T23:59:00") + "</TimePeriod></WeekDay>"; });
+  exportCalRanges(mk).forEach(function(r){ X += "<WeekDay>" + xmlTag("DayType", 0) + xmlTag("DayWorking", 1) + "<TimePeriod>" + xmlTag("FromDate", r[0] + "T00:00:00") + xmlTag("ToDate", r[1] + "T23:59:00") + "</TimePeriod>" + WT + "</WeekDay>"; });
+  X += "</WeekDays>";
+  var ex = exportCalRanges(hol).map(function(r){ return [r, 0]; }).concat(exportCalRanges(mk).map(function(r){ return [r, 1]; }));
+  if(ex.length){ X += "<Exceptions>"; ex.forEach(function(e){ X += "<Exception><EnteredByOccurrences>0</EnteredByOccurrences><TimePeriod>" + xmlTag("FromDate", e[0][0] + "T00:00:00") + xmlTag("ToDate", e[0][1] + "T23:59:00") + "</TimePeriod><Occurrences>1</Occurrences>" + (e[0][2] ? xmlTag("Name", e[0][2]) : "") + "<Type>1</Type>" + xmlTag("DayWorking", e[1]) + (e[1] ? WT : "") + "</Exception>"; }); X += "</Exceptions>"; }
+  return X + "</Calendar>";
+}
+function keyWorkWeekday(k, wd){ if(k === "OFF") return true; if(k.indexOf("c:") === 0){ var c = calById(k.slice(2)); if(c && Array.isArray(c.week) && c.week[wd] != null) return !!c.week[wd]; return c && c.base ? keyWorkWeekday(c.base, wd) : (wd !== 0 && wd !== 6); } return wd !== 0 && wd !== 6; }
+function presetSets(m){ return m === "OFF" ? { hol:{}, mk:{} } : { hol:cal.holidays || {}, mk:cal.makeup || {} }; } /* 预置日历共用项目的放假/补班层 */
+function splitPeriods(t){ /* 拆分任务 → 工作时段 [[开始,完成],...]（日期） */
+  var gs = gapRanges(t), st = parseD(t.start); if(!st) return [];
+  return withCal(t, function(){
+    var out = [], cur = st;
+    gs.forEach(function(g){ var pe = addDays(g.s, -1), k = 0; while(!isWorkday(pe) && k++ < 400) pe = addDays(pe, -1); out.push([fmtD(cur), fmtD(pe)]); cur = nextWorkday(g.e); });
+    out.push([fmtD(cur), taskEnd(t)]);
+    return out;
+  });
+}
+function mspdiRatesXML(r){
+  var rl = rateList(r); if(!rl.length) return "";
+  var pts = [{ d:"1984-01-01", v:+r.rate || 0 }].concat(rl), x = "<Rates>";
+  pts.forEach(function(p, i){
+    var to = pts[i + 1] ? fmtD(addDays(parseD(pts[i + 1].d), -1)) + "T23:59:00" : "2049-12-31T23:59:00";
+    x += "<Rate>" + xmlTag("RatesFrom", p.d + "T00:00:00") + xmlTag("RatesTo", to) + xmlTag("RateTable", 0) + xmlTag("StandardRate", p.v) + xmlTag("StandardRateFormat", r.type === "material" ? 7 : 2)
+      + xmlTag("OvertimeRate", +r.otRate || 0) + xmlTag("OvertimeRateFormat", 2) + xmlTag("CostPerUse", +r.perUse || 0) + "</Rate>";
+  });
+  return x + "</Rates>";
+}
+/* 自定义字段别名（来自 MPP/XML）作为列名 */
+var _trP7 = tr;
+tr = function(k){ if(typeof state !== "undefined" && state && state.fieldAlias && state.fieldAlias[k]) return state.fieldAlias[k]; return _trP7(k); };
+
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
 })();
