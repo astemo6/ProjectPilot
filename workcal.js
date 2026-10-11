@@ -48,7 +48,7 @@
   }
   function norm(c) {
     if (!c || typeof c !== "object") return defaults("CN");
-    var mode = { CN: 1, DE: 1, WE: 1, OFF: 1 }[c.mode] ? c.mode : "CN";
+    var mode = { CN: 1, WE: 1, OFF: 1 }[c.mode] ? c.mode : "CN"; /* 德国日历已移除（2026-10-11），旧数据 DE → CN */
     var mk = c.makeup || {};
     if (Array.isArray(mk)) { var o = {}; mk.forEach(function (s) { o[s] = 1; }); mk = o; }
     return { mode: mode, holidays: c.holidays && typeof c.holidays === "object" ? c.holidays : {}, makeup: mk };
