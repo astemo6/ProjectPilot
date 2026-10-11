@@ -54,6 +54,13 @@ header button:hover{background:var(--steel3)}
 .toolbar .tb-lab{font-size:12px;color:var(--tx3);margin-right:2px}
 .toolbar select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--tx1);background:#fff;cursor:pointer;max-width:220px}
 .toolbar select:hover{border-color:var(--accent)}
+#fmtBar{display:inline-flex;align-items:center;gap:4px}#fmtBar select{padding:5px 4px}#fmtBar .fm-f{width:92px}#fmtBar .fm-s{width:58px}
+#fmtBar button{padding:5px 9px;min-width:30px}#fmtBar button.on{background:#dbeafe;border-color:var(--accent)}
+#fmtBar .fm-c{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:30px;height:28px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;box-sizing:border-box}
+#fmtBar .fm-a{font-weight:700;font-size:12px;line-height:12px;font-family:serif}#fmtBar .fm-cbar{width:16px;height:3px;margin-top:2px;border-radius:1px}
+#fmtBar .fm-c input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;padding:0;border:0}
+#fmtBar.dis{opacity:.55}
+.trow input,.trow select{font-family:inherit;font-weight:inherit;font-style:inherit}
 .toolbar .ck{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--tx1);cursor:pointer;user-select:none;white-space:nowrap}
 .toolbar .ck input{margin:0;accent-color:var(--accent);cursor:pointer}
 .viewbtns{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
@@ -762,6 +769,14 @@ const TPL_ANPQP = [
 var LS_KEY = "gantt-exec-v4";
 var CHART_COL_DEF = { task:"#2563eb", ms:"#dc2626", sum:"#111111", prog:"#1e3a8a", hy:"#7ba7bc", hm:"#bdd5e5", bg:"#eef1f5", wk:"#f3f4f6" };
 function CC(){ var c = state.chartColors || {}, r = {}; for(var k in CHART_COL_DEF) r[k] = /^#[0-9a-f]{6}$/i.test(c[k] || "") ? c[k] : CHART_COL_DEF[k]; return r; }
+var TS_FONTS = { "微软雅黑":'"Microsoft YaHei","PingFang SC",sans-serif', "宋体":'SimSun,"Songti SC",serif', "黑体":'SimHei,"Heiti SC",sans-serif', "楷体":'KaiTi,"Kaiti SC",serif', "仿宋":'FangSong,"STFangsong",serif', "Arial":'Arial,Helvetica,sans-serif', "Calibri":'Calibri,Carlito,sans-serif', "Segoe UI":'"Segoe UI",sans-serif', "Times New Roman":'"Times New Roman",Times,serif', "Courier New":'"Courier New",monospace' };
+/* 文本样式：类别默认（state.textStyle.task/ms/sum）+ 单个任务 t.ts；字段 f 字体 s 字号 b 粗体 i 斜体 c 颜色 */
+function tsEff(t){ var cat = t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task", d = (state.textStyle || {})[cat] || {}, o = t.ts || {}, r = {};
+  ["f","s","b","i","c"].forEach(function(k){ if(o[k] != null && o[k] !== "") r[k] = o[k]; else if(d[k] != null && d[k] !== "") r[k] = d[k]; }); return r; }
+function tsFont(t, sz, defBold, fixedSize){ var e = tsEff(t), b = e.b == null ? defBold : e.b, s = fixedSize || !e.s ? sz : Math.round(sz * e.s / 12);
+  var fam = e.f && TS_FONTS[e.f] ? TS_FONTS[e.f] : '-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+  return (e.i ? "italic " : "") + (b ? "700 " : "") + s + "px " + fam; }
+function tsCol(t, def){ return tsEff(t).c || def; }
 function tColor(t){ return t.color || CC()[t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task"]; }
 var COLORS = ["#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#dc2626","#4f46e5","#0d9488"];
 var state = { tasks:[], seq:1, view:"fit", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{}, colDefV4:true };
@@ -2192,7 +2207,7 @@ function renderGantt(){
       var mx = barGeom(t, function(d){ return X(d, min); }, PX_DAY).c - 8;
       html += '<div class="g-ms' + (crit ? " crit" : "") + '" data-id="' + t.id + '" style="left:' + mx + 'px;top:' + (y + 9) + 'px;background:' + tColor(t) + '" title="' + tip + '"></div>';
       var mlt = barLblMode() === "name" ? t.name : barDateText(t);
-      if(mlt) html += '<div class="g-side" style="left:' + (mx + 22) + 'px;top:' + y + 'px">' + esc(mlt) + "</div>";
+      if(mlt) html += '<div class="g-side" data-tid="' + t.id + '" style="left:' + (mx + 22) + 'px;top:' + y + 'px">' + esc(mlt) + "</div>";
     } else {
       var e = parseD(taskEnd(t));
       var _g = barGeom(t, function(d){ return X(d, min); }, PX_DAY), bx = _g.l, bw = _g.w;
@@ -2202,7 +2217,7 @@ function renderGantt(){
       gapRanges(t).forEach(function(g){ html += '<div class="g-gap" style="left:' + X(g.s, min) + 'px;top:' + (y + 5) + 'px;width:' + ((diffDays(g.s, g.e) + 1) * PX_DAY) + 'px"></div>'; });
       if(+t.lvl > 0){ var lvs = withCal(t, function(){ return subWorkdays(s, +t.lvl); }); html += '<div class="g-lvl" title="' + esc(tr("lvlTip").replace("{0}", t.lvl)) + '" style="left:' + X(lvs, min) + 'px;top:' + (y + 16) + 'px;width:' + Math.max(diffDays(lvs, s) * PX_DAY, 2) + 'px"></div>'; }
       var bdt = barDateText(t);
-      if(bdt) html += '<div class="g-side" style="left:' + (bx + bw + 6) + 'px;top:' + y + 'px">' + esc(bdt) + "</div>";
+      if(bdt) html += '<div class="g-side" data-tid="' + t.id + '" style="left:' + (bx + bw + 6) + 'px;top:' + y + 'px">' + esc(bdt) + "</div>";
     }
     // 基线灰条（基线对比开启时，画在任务条下方；里程碑画小灰菱形）
     if(state.showBaseline){
@@ -2850,7 +2865,7 @@ function drawMspExport(cb, plan, imgL){
   var FS = 11, FONT = expFont(FS, false), FONTB = expFont(FS, true);
   /* 页面：A3 横向比例；行多时加高 */
   var W = 1684, PAD = 18, HEAD = 64, THEAD = 34, FOOT = 62;
-  var nameW = 160; vis.forEach(function(t){ nameW = Math.max(nameW, tw(t.name, t.type === "group" ? FONTB : FONT) + 14 + depthOf(t) * 12); }); nameW = Math.min(nameW, 340);
+  var nameW = 160; vis.forEach(function(t){ nameW = Math.max(nameW, tw(t.name, tsFont(t, FS, t.type === "group")) + 14 + depthOf(t) * 12); }); nameW = Math.min(nameW, 340);
   var cols = [ ["id", 34, "center"], ["name", nameW, "left"], ["dur", 66, "left"], ["start", 84, "left"], ["fin", 84, "left"] ];
   var TBW = cols.reduce(function(a, c){ return a + c[1]; }, 0);
   var H0 = Math.round(W / 1.414), bodyAvail = H0 - PAD * 2 - HEAD - THEAD - FOOT;
@@ -2867,7 +2882,7 @@ function drawMspExport(cb, plan, imgL){
   ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
   function line(x1, y1, x2, y2, col, w){ ctx.strokeStyle = col; ctx.lineWidth = w || 1; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
   function txt(s, x, y, f, col, al){ ctx.font = f; ctx.fillStyle = col || "#111"; ctx.textAlign = al || "left"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y); }
-  function nameLbl(s, x, cy, f, xr){ ctx.font = f; var w = ctx.measureText(s).width; if(x - w > CX + 4) txt(s, x, cy, f, "#111", "right"); else txt(s, xr, cy, f, "#111", "left"); }
+  function nameLbl(s, x, cy, f, xr, col){ ctx.font = f; var w = ctx.measureText(s).width; if(x - w > CX + 4) txt(s, x, cy, f, col || "#111", "right"); else txt(s, xr, cy, f, col || "#111", "left"); }
   function clip(s, w, f){ s = String(s); ctx.font = f; if(ctx.measureText(s).width <= w) return s; while(s.length > 1 && ctx.measureText(s + "…").width > w) s = s.slice(0, -1); return s + "…"; }
   /* ---- 页眉：左 Logo，中间项目名称 ---- */
   if(imgL && imgL.naturalWidth){ var s1 = Math.min(44 / imgL.naturalHeight, 200 / imgL.naturalWidth); ctx.drawImage(imgL, X0 + 8, Y0 + (HEAD - imgL.naturalHeight * s1) / 2, imgL.naturalWidth * s1, imgL.naturalHeight * s1); }
@@ -2902,34 +2917,34 @@ function drawMspExport(cb, plan, imgL){
   }
   /* ---- 表体 ---- */
   vis.forEach(function(t, i){
-    var y = BY + i * ROW, cy = y + ROW / 2, grp = t.type === "group", f = grp ? FONTB : FONT, sp = span(t);
+    var y = BY + i * ROW, cy = y + ROW / 2, grp = t.type === "group", f = tsFont(t, FS, grp), sp = span(t);
     var vals = { id:grp ? "" : (rn[t.id] || ""), name:t.name, dur:durTxt(t), start:sp.s ? fmtD(sp.s) : "", fin:sp.e ? fmtD(sp.e) : "" };
     var x = X0;
     cols.forEach(function(cl){
       var pad = cl[0] === "name" ? 5 + depthOf(t) * 12 : 5;
-      txt(clip(vals[cl[0]], cl[1] - pad - 4, f), cl[2] === "center" ? x + cl[1] / 2 : x + pad, cy, f, grp ? "#111" : "#1f2937", cl[2]);
+      txt(clip(vals[cl[0]], cl[1] - pad - 4, f), cl[2] === "center" ? x + cl[1] / 2 : x + pad, cy, f, tsCol(t, grp ? "#111" : "#1f2937"), cl[2]);
       x += cl[1];
     });
     line(X0, y + ROW, CX, y + ROW, "#e5e7eb");
     if(!sp.s) return;
-    var bx = X(sp.s), bx2 = X(addDays(sp.e, 1)), lf = expFont(10, true);
+    var bx = X(sp.s), bx2 = X(addDays(sp.e, 1)), lf = tsFont(t, 10, true, true), lc = tsCol(t, "#111");
     if(grp){ /* 摘要：黑色细条 + 两端下勾 */
       ctx.fillStyle = tColor(t); ctx.fillRect(bx, cy - 3, Math.max(bx2 - bx, 2), 3);
       ctx.beginPath(); ctx.moveTo(bx, cy - 3); ctx.lineTo(bx + 4, cy - 3); ctx.lineTo(bx, cy + 4); ctx.closePath(); ctx.fill();
       ctx.beginPath(); ctx.moveTo(bx2, cy - 3); ctx.lineTo(bx2 - 4, cy - 3); ctx.lineTo(bx2, cy + 4); ctx.closePath(); ctx.fill();
-      nameLbl(t.name, bx - 6, cy, lf, bx2 + 6);
+      nameLbl(t.name, bx - 6, cy, lf, bx2 + 6, lc);
     } else if(t.type === "milestone"){
       var mx = X(sp.s);
       ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = tColor(t); ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); /* 与图例一致：里程碑统一红色 */
       var dt = fmtD(sp.s); ctx.font = expFont(10, true); var dw = ctx.measureText(dt).width;
-      nameLbl(t.name, mx - 9, cy, lf, mx + 9 + dw + 8);
+      nameLbl(t.name, mx - 9, cy, lf, mx + 9 + dw + 8, lc);
       txt(dt, mx + 9, cy, expFont(10, true), "#111", "left");
     } else {
       var bh = Math.max(6, Math.min(10, ROW - 8)), bw = Math.max(bx2 - bx, 2);
       ctx.fillStyle = tColor(t); ctx.fillRect(bx, cy - bh / 2, bw, bh);
       if(+t.progress > 0){ ctx.fillStyle = COL.prog; ctx.fillRect(bx, cy - 1.5, bw * Math.min(100, +t.progress) / 100, 3); }
       var de = fmtD(sp.e); ctx.font = expFont(10, true); var dw2 = ctx.measureText(de).width;
-      nameLbl(t.name, bx - 6, cy, lf, bx2 + 5 + dw2 + 8);
+      nameLbl(t.name, bx - 6, cy, lf, bx2 + 5 + dw2 + 8, lc);
       txt(de, bx2 + 5, cy, expFont(10, true), "#111", "left");
     }
   });
@@ -4707,6 +4722,170 @@ function v4ExpPlan(){
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4ExpInfo = openExpInfo;
+})();
+/* ===== v4：文本样式（字体 / 字号 / 粗细 / 斜体 / 颜色）——工具栏作用于选中任务；「显示 ▾ → 🔤 文本样式」设置各类别默认；导出 PDF/JPG 跟随 ===== */
+(function(){
+  var TX = {
+    zh:{ font:"字体", size:"字号", bold:"粗体", ital:"斜体", color:"文字颜色", def:"默认", need:"请先选中任务", t:"文本样式", task:"任务", ms:"里程碑", sum:"摘要（分组）", clr:"同时清除各任务单独设置的文本样式", reset:"恢复默认", ok:"确定", no:"取消", done:"已更新文本样式", clrSel:"清除选中任务的文本样式", hint:"单个任务：选中后用工具栏上的字体 / B / I / A 修改。PDF/JPG 导出跟随。" },
+    en:{ font:"Font", size:"Size", bold:"Bold", ital:"Italic", color:"Text color", def:"Default", need:"Select a task first", t:"Text styles", task:"Tasks", ms:"Milestones", sum:"Summary (groups)", clr:"Also clear per-task text styles", reset:"Reset", ok:"OK", no:"Cancel", done:"Text styles updated", clrSel:"Clear selected task's text style", hint:"Single task: select it and use the font / B / I / A tools in the toolbar. PDF/JPG export follows." },
+    de:{ font:"Schrift", size:"Größe", bold:"Fett", ital:"Kursiv", color:"Textfarbe", def:"Standard", need:"Bitte zuerst einen Vorgang wählen", t:"Textarten", task:"Vorgänge", ms:"Meilensteine", sum:"Sammelvorgänge", clr:"Einzelformate der Vorgänge entfernen", reset:"Standard", ok:"OK", no:"Abbrechen", done:"Textarten aktualisiert", clrSel:"Textformat des Vorgangs löschen", hint:"Einzelner Vorgang: auswählen und Schrift / B / I / A in der Symbolleiste nutzen. PDF/JPG-Export folgt." }
+  };
+  function L(k){ return (TX[lang] || TX.zh)[k]; }
+  var sizes = [10, 11, 12, 13, 14, 16];
+  function fontOpts(cur){ return '<option value="">' + L("def") + '</option>' + Object.keys(TS_FONTS).map(function(k){ return '<option value="' + esc(k) + '"' + (k === cur ? " selected" : "") + ' style="font-family:' + esc(TS_FONTS[k]).replace(/"/g, "'") + '">' + esc(k) + "</option>"; }).join(""); }
+  function sizeOpts(cur){ return '<option value="">' + L("def") + '</option>' + sizes.map(function(s){ return '<option value="' + s + '"' + (+cur === s ? " selected" : "") + ">" + s + "</option>"; }).join(""); }
+  /* —— 渲染后套用到表格行和甘特图标签 —— */
+  function applyDom(){
+    document.querySelectorAll("#taskList .trow[data-id]").forEach(function(r){
+      var t = byId(r.dataset.id); if(!t) return; var e = tsEff(t), fam = e.f && TS_FONTS[e.f];
+      if(!Object.keys(e).length) return;
+      for(var i = 0; i < r.children.length; i++){ var c = r.children[i].style;
+        if(fam) c.fontFamily = fam; if(e.s) c.fontSize = e.s + "px"; if(e.b != null) c.fontWeight = e.b ? "700" : "400"; if(e.i) c.fontStyle = "italic"; if(e.c) c.color = e.c; }
+      if(e.c) r.querySelectorAll(".cell-in,.date-in,select").forEach(function(x){ x.style.color = e.c; });
+    });
+    document.querySelectorAll(".g-bar[data-id] .lbl, .g-side[data-tid]").forEach(function(el){
+      var id = el.dataset.tid || (el.closest(".g-bar") || {}).dataset && el.closest(".g-bar").dataset.id, t = id && byId(id); if(!t) return;
+      var e = tsEff(t), fam = e.f && TS_FONTS[e.f], s = el.style;
+      if(fam) s.fontFamily = fam; if(e.s) s.fontSize = Math.min(e.s, 13) + "px"; if(e.b != null) s.fontWeight = e.b ? "700" : "400"; if(e.i) s.fontStyle = "italic";
+      if(e.c && el.classList.contains("g-side")) s.color = e.c;
+    });
+    syncBar();
+  }
+  var _r = render; render = function(){ var x = _r.apply(this, arguments); try{ applyDom(); }catch(e){} return x; };
+  /* —— 工具栏 —— */
+  function cur(){ return selId ? byId(selId) : null; }
+  function syncBar(){
+    var bar = document.getElementById("fmtBar"); if(!bar) return; var t = cur(), e = t ? tsEff(t) : {};
+    bar.querySelector(".fm-f").value = (t && t.ts && t.ts.f) || ""; bar.querySelector(".fm-s").value = (t && t.ts && t.ts.s) || "";
+    bar.querySelector(".fm-b").classList.toggle("on", !!e.b); bar.querySelector(".fm-i").classList.toggle("on", !!e.i);
+    bar.querySelector(".fm-cbar").style.background = e.c || "#1f2937";
+    bar.classList.toggle("dis", !t);
+  }
+  function setTs(k, v){
+    var t = cur(); if(!t){ toast(L("need")); syncBar(); return; }
+    t.ts = t.ts || {}; if(v === "" || v == null) delete t.ts[k]; else t.ts[k] = v;
+    if(!Object.keys(t.ts).length) delete t.ts;
+    save(); render();
+  }
+  function setupBar(){
+    if(document.getElementById("fmtBar")) return;
+    var anchor = document.getElementById("btnRedo"); if(!anchor) return;
+    var sp = document.createElement("span"); sp.className = "sep";
+    var bar = document.createElement("span"); bar.id = "fmtBar";
+    bar.innerHTML = '<select class="fm-f" title="' + L("font") + '">' + fontOpts("") + '</select>'
+      + '<select class="fm-s" title="' + L("size") + '">' + sizeOpts("") + '</select>'
+      + '<button type="button" class="fm-b" title="' + L("bold") + ' (Ctrl+B)"><b>B</b></button>'
+      + '<button type="button" class="fm-i" title="' + L("ital") + ' (Ctrl+I)"><i style="font-family:serif">I</i></button>'
+      + '<label class="fm-c" title="' + L("color") + '"><span class="fm-a">A</span><span class="fm-cbar"></span><input type="color" value="#1f2937"></label>'
+      + '<button type="button" class="fm-x" title="' + L("clrSel") + '">⌫</button>';
+    anchor.after(sp); sp.after(bar);
+    bar.querySelector(".fm-f").onchange = function(){ setTs("f", this.value); };
+    bar.querySelector(".fm-s").onchange = function(){ setTs("s", this.value ? +this.value : ""); };
+    bar.querySelector(".fm-b").onclick = function(){ var t = cur(); setTs("b", t ? !tsEff(t).b : true); };
+    bar.querySelector(".fm-i").onclick = function(){ var t = cur(); setTs("i", t ? (tsEff(t).i ? "" : true) : true); };
+    var ci = bar.querySelector(".fm-c input");
+    ci.addEventListener("click", function(e){ if(!cur()){ e.preventDefault(); toast(L("need")); } else { ci.value = tsEff(cur()).c || "#1f2937"; } });
+    ci.addEventListener("change", function(){ setTs("c", ci.value); });
+    bar.querySelector(".fm-x").onclick = function(){ var t = cur(); if(!t){ toast(L("need")); return; } delete t.ts; save(); render(); };
+    document.addEventListener("keydown", function(e){
+      if(!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return; var k = e.key.toLowerCase(); if(k !== "b" && k !== "i") return;
+      var a = document.activeElement; if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; if(!cur()) return;
+      e.preventDefault(); bar.querySelector(k === "b" ? ".fm-b" : ".fm-i").click();
+    });
+    document.addEventListener("click", function(e){ if(e.target.closest && e.target.closest(".trow,.g-bar,.g-ms")) setTimeout(syncBar, 0); });
+    syncBar();
+  }
+  /* —— 各类别默认样式对话框 —— */
+  function openDlg(){
+    var S = state.textStyle || {}, bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "txtStyleBg";
+    function row(k){ var s = S[k] || {};
+      return '<div class="ts-row" data-k="' + k + '" style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 40px;gap:6px;align-items:center;margin-bottom:8px">'
+        + '<span style="font-size:13px">' + L(k) + '</span><select class="ts-f">' + fontOpts(s.f || "") + '</select><select class="ts-s">' + sizeOpts(s.s || "") + '</select>'
+        + '<label title="' + L("bold") + '" style="display:flex;align-items:center;gap:2px;font-weight:700"><input type="checkbox" class="ts-b" style="width:auto"' + (s.b ? " checked" : "") + '>B</label>'
+        + '<label title="' + L("ital") + '" style="display:flex;align-items:center;gap:2px;font-style:italic;font-family:serif"><input type="checkbox" class="ts-i" style="width:auto"' + (s.i ? " checked" : "") + '>I</label>'
+        + '<input type="color" class="ts-c" value="' + (s.c || "#1f2937") + '" data-set="' + (s.c ? 1 : 0) + '" style="width:40px;height:28px;padding:0;border:1px solid var(--line);border-radius:4px"></div>'; }
+    bg.innerHTML = '<div class="modal" style="width:520px"><div class="modal-h"><span>' + L("t") + '</span><button class="ts-x">×</button></div><div class="modal-b">'
+      + '<div style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 40px;gap:6px;font-size:11px;color:#6b7280;margin-bottom:6px"><span></span><span>' + L("font") + '</span><span>' + L("size") + '</span><span>B</span><span>I</span><span>A</span></div>'
+      + ["task","ms","sum"].map(row).join("")
+      + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:6px 0"><input type="checkbox" class="ts-clr" style="width:auto">' + L("clr") + '</label>'
+      + '<div style="font-size:11px;color:#6b7280;margin:8px 0 12px">' + L("hint") + '</div>'
+      + '<div style="display:flex;justify-content:space-between;gap:8px"><button class="ts-def">' + L("reset") + '</button><span><button class="ts-no">' + L("no") + '</button> <button class="primary ts-ok">' + L("ok") + '</button></span></div></div></div>';
+    document.body.appendChild(bg);
+    var q = function(s){ return bg.querySelector(s); };
+    function close(){ bg.remove(); }
+    q(".ts-x").onclick = close; q(".ts-no").onclick = close;
+    bg.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape") close(); });
+    bg.querySelectorAll(".ts-c").forEach(function(i){ i.addEventListener("input", function(){ i.dataset.set = 1; }); });
+    q(".ts-def").onclick = function(){ bg.querySelectorAll(".ts-row").forEach(function(r){ r.querySelector(".ts-f").value = ""; r.querySelector(".ts-s").value = ""; r.querySelector(".ts-b").checked = false; r.querySelector(".ts-i").checked = false; r.querySelector(".ts-c").value = "#1f2937"; r.querySelector(".ts-c").dataset.set = 0; }); };
+    q(".ts-ok").onclick = function(){
+      var N = {};
+      bg.querySelectorAll(".ts-row").forEach(function(r){ var o = {}, f = r.querySelector(".ts-f").value, s = r.querySelector(".ts-s").value, ci = r.querySelector(".ts-c");
+        if(f) o.f = f; if(s) o.s = +s; if(r.querySelector(".ts-b").checked) o.b = true; if(r.querySelector(".ts-i").checked) o.i = true; if(+ci.dataset.set) o.c = ci.value;
+        if(Object.keys(o).length) N[r.dataset.k] = o; });
+      state.textStyle = N;
+      if(q(".ts-clr").checked) state.tasks.forEach(function(t){ delete t.ts; });
+      save(); render(); close(); toast(L("done"));
+    };
+  }
+  function setupMenu(){
+    var cb = document.getElementById("btnColors"); if(!cb || document.getElementById("btnTxtStyle")) return;
+    var b = document.createElement("button"); b.type = "button"; b.id = "btnTxtStyle";
+    b.innerHTML = '<span style="width:13px;text-align:center;font-size:11px;font-weight:700;font-family:serif">A</span><span>' + L("t") + "</span>";
+    cb.after(b); b.addEventListener("click", openDlg);
+  }
+  function setup(){ setupBar(); setupMenu(); }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4TextStyle = openDlg;
+})();
+/* ===== v4：新建项目计划（清空当前项目数据，保留颜色/文本样式/列/视图等显示设置；默认先下载当前项目备份） ===== */
+(function(){
+  var TX = {
+    zh:{ btn:"＋ 新建项目", t:"新建项目计划", name:"项目名称", start:"项目开始日期", bak:"先下载当前项目备份（.json，可用「导入」恢复）", tpl:"放入一个示例阶段（可删除）", warn:"当前计划的任务、资源、基线将被清空，颜色、字体等显示设置保留。", ok:"新建", no:"取消", done:"已新建项目", ph:"新项目", grp:"阶段 1", task:"新任务" },
+    en:{ btn:"＋ New project", t:"New project plan", name:"Project name", start:"Project start", bak:"Download a backup of the current project first (.json, restore via Import)", tpl:"Add a starter phase (can delete)", warn:"Tasks, resources and baselines of the current plan will be cleared; colors, fonts and other display settings are kept.", ok:"Create", no:"Cancel", done:"New project created", ph:"New project", grp:"Phase 1", task:"New task" },
+    de:{ btn:"＋ Neues Projekt", t:"Neuer Projektplan", name:"Projektname", start:"Projektbeginn", bak:"Zuerst Sicherung des aktuellen Projekts herunterladen (.json)", tpl:"Startphase anlegen (löschbar)", warn:"Vorgänge, Ressourcen und Basispläne werden gelöscht; Farben, Schriften und Anzeige bleiben.", ok:"Anlegen", no:"Abbrechen", done:"Neues Projekt angelegt", ph:"Neues Projekt", grp:"Phase 1", task:"Neuer Vorgang" }
+  };
+  function L(k){ return (TX[lang] || TX.zh)[k]; }
+  function nextWork(d){ var x = parseD(d); for(var i = 0; i < 30 && !isWorkday(x); i++) x = addDays(x, 1); return fmtD(x); }
+  function open(){
+    var bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "newProjBg";
+    var has = (state.tasks || []).length > 0;
+    bg.innerHTML = '<div class="modal" style="width:440px"><div class="modal-h"><span>' + L("t") + '</span><button class="np-x">×</button></div><div class="modal-b">'
+      + '<div class="frow"><label>' + L("name") + '</label><input class="np-name" placeholder="' + L("ph") + '"></div>'
+      + '<div class="frow"><label>' + L("start") + '</label><input class="np-start" type="date" value="' + fmtD(new Date()) + '"></div>'
+      + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:8px 0"><input type="checkbox" class="np-tpl" style="width:auto" checked>' + L("tpl") + '</label>'
+      + (has ? '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:8px 0"><input type="checkbox" class="np-bak" style="width:auto" checked>' + L("bak") + '</label>'
+        + '<div style="font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;margin:8px 0">' + L("warn") + '</div>' : '')
+      + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="np-no">' + L("no") + '</button><button class="primary np-ok" style="background:var(--accent);color:#fff">' + L("ok") + '</button></div></div></div>';
+    document.body.appendChild(bg);
+    var q = function(s){ return bg.querySelector(s); };
+    function close(){ bg.remove(); }
+    q(".np-x").onclick = close; q(".np-no").onclick = close;
+    bg.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape") close(); if(e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "checkbox") q(".np-ok").click(); });
+    q(".np-ok").onclick = function(){
+      if(q(".np-bak") && q(".np-bak").checked){ try{ exportJSON(); }catch(e){} }
+      var name = q(".np-name").value.trim() || L("ph"), st = nextWork(q(".np-start").value || fmtD(new Date()));
+      var keepInfo = state.info || {};
+      state.tasks = []; state.resources = []; state.baseline = null; state.baselines = {}; state.showBaseline = false; state.collapsed = {}; state.seq = 1;
+      delete state.statusDate; delete state.planOem;
+      state.info = { title:name, author:keepInfo.author || "", logo:keepInfo.logo };
+      if(!state.info.logo) delete state.info.logo;
+      if(q(".np-tpl").checked){
+        var g = mkTask({ name:L("grp"), type:"group" }); state.tasks.push(g);
+        state.tasks.push(mkTask({ name:L("task"), group:g.id, start:st, dur:5 }));
+      }
+      selId = null; state.view = "fit";
+      save(); render(); close(); toast(L("done"));
+      var pn = document.getElementById("projName"); if(pn){ pn.value = name; }
+    };
+    setTimeout(function(){ q(".np-name").focus(); }, 0);
+  }
+  function setup(){
+    var pn = document.getElementById("projName"); if(!pn || document.getElementById("btnNewProj")) return;
+    var b = document.createElement("button"); b.id = "btnNewProj"; b.type = "button"; b.textContent = L("btn"); b.title = L("t");
+    pn.before(b); b.addEventListener("click", open);
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4NewProj = open;
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
