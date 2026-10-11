@@ -15,6 +15,12 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
 .tb:hover,.tabs button:hover{background:#3a6283}
 .tabs button.on:hover{background:#fff}
 .sp{flex:1}
+.oemwrap{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.oemwrap select{height:32px;border-radius:6px;border:1px solid #4b6a85;background:#fff;color:#1f2937;font-size:13px;padding:0 8px;max-width:220px}
+.oemwrap.need select{outline:3px solid #fbbf24;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(251,191,36,.25)}}
+.arrow{opacity:.55;font-size:13px}
+.tabs{align-items:center}
 .lang button{padding:0 9px}
 .lang button.on,.tabs.lang button.on:hover{background:#2563eb;border-color:#2563eb;color:#fff}
 #hint{display:none;background:#fff7e6;color:#92400e;font-size:12px;padding:5px 14px;border-bottom:1px solid #fde3b0}
@@ -29,6 +35,8 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
   #top{height:auto;min-height:52px;flex-wrap:wrap;padding:6px 8px;white-space:normal}
   #top h1{display:none}
   .tabs button,.tb{height:44px;min-height:44px;min-width:44px}
+  .oemwrap select{height:44px}
+  .arrow{display:none}
   #stage{height:calc(100% - 108px)}
   #hint.show + #stage{height:calc(100% - 135px)}
 }
@@ -37,9 +45,12 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
 <body>
 <div id="top">
   <h1 data-t="title">汽车零部件项目甘特图</h1>
+  <label class="oemwrap" id="oemWrap"><span data-t="stepOem">① 客户</span><select id="oemSel" aria-label="OEM"><option value="">…</option></select></label>
+  <span class="arrow">→</span>
   <div class="tabs">
-    <button data-view="exec" data-t="tabExec">项目甘特图</button>
-    <button data-view="plan" data-t="tabPlan">客户节点</button>
+    <button data-view="plan" data-t="tabPlan">② 客户节点</button>
+    <span class="arrow">→</span>
+    <button data-view="exec" data-t="tabExec">③ 开发任务</button>
   </div>
   <span class="sp"></span>
   <div class="tabs lang"><button class="tb" data-lang="zh">中文</button><button class="tb" data-lang="en">EN</button><button class="tb" data-lang="de">DE</button></div>
@@ -60,17 +71,17 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
    两个视图实时联动：改客户节点 → 项目甘特图里的里程碑和推荐任务自动更新；在项目甘特图里拖动客户里程碑 → 节点日期自动回写。 */
 var KEYS = ["gantt-tool-v1", "gantt-exec-v1", "gantt-workcal-v1"];
 var T = {
-  zh:{title:"汽车零部件项目甘特图", tabExec:"项目甘特图", tabPlan:"客户节点", exp:"导出项目", imp:"导入项目", clr:"清空",
-      hintPlan:"在这里选主机厂、填客户节点日期，项目甘特图里的里程碑和推荐任务会自动跟着变。这一页的导出就是给主机厂的节点报告。",
-      hintExec:"还没有客户节点：先到「客户节点」选主机厂并填日期，或者直接在这里加任务、载入 ASTEMO 模板。",
+  zh:{title:"汽车零部件项目甘特图", stepOem:"① 客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期，最后排开发任务。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
+      hintPlan:"在这里填客户节点日期，项目甘特图里的里程碑和推荐任务会自动跟着变。这一页的导出就是给主机厂的节点报告。",
+      hintExec:"还没有客户节点日期：先到「② 客户节点」填日期，或者直接在这里加任务、载入模板。",
       clrAsk:"清空整个项目（客户节点、任务、工作日历）？", impOk:"项目已导入", impBad:"不是有效的项目文件", expOk:"项目已导出"},
-  en:{title:"Auto Parts Project Gantt", tabExec:"Project Gantt", tabPlan:"Customer Milestones", exp:"Export project", imp:"Import project", clr:"Clear",
-      hintPlan:"Pick the OEM and fill in customer milestone dates here; milestones and recommended tasks in the Project Gantt update automatically. Export from this view is the OEM milestone report.",
-      hintExec:"No customer milestones yet: pick an OEM under Customer Milestones, or add tasks / load the ASTEMO template here.",
+  en:{title:"Auto Parts Project Gantt", stepOem:"① Customer", tabExec:"③ Development Tasks", tabPlan:"② Customer Milestones", hintOem:"Step 1: pick the customer (OEM) at top left, then enter customer milestone dates, then plan development tasks.", oemAsk:"Switching customer clears the milestone dates entered (your own tasks are kept). Continue?", exp:"Export project", imp:"Import project", clr:"Clear",
+      hintPlan:"Fill in customer milestone dates here; milestones and recommended tasks in the Project Gantt update automatically. Export from this view is the OEM milestone report.",
+      hintExec:"No customer milestone dates yet: fill them in under ② Customer Milestones, or add tasks / load a template here.",
       clrAsk:"Clear the whole project (milestones, tasks, calendar)?", impOk:"Project imported", impBad:"Not a valid project file", expOk:"Project exported"},
-  de:{title:"Projekt-Gantt Automobilzulieferer", tabExec:"Projekt-Gantt", tabPlan:"Kundenmeilensteine", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
-      hintPlan:"Hier OEM wählen und Kundenmeilensteine eintragen; Meilensteine und empfohlene Aufgaben im Projekt-Gantt folgen automatisch. Der Export dieser Ansicht ist der Meilensteinbericht für den OEM.",
-      hintExec:"Noch keine Kundenmeilensteine: OEM unter Kundenmeilensteine wählen oder hier Aufgaben anlegen / ASTEMO-Vorlage laden.",
+  de:{title:"Projekt-Gantt Automobilzulieferer", stepOem:"① Kunde", tabExec:"③ Entwicklungsaufgaben", tabPlan:"② Kundenmeilensteine", hintOem:"Schritt 1: oben links den Kunden (OEM) wählen, dann Kundenmeilensteine eintragen, dann Entwicklungsaufgaben planen.", oemAsk:"Kundenwechsel löscht die eingetragenen Meilensteindaten (eigene Aufgaben bleiben). Fortfahren?", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
+      hintPlan:"Hier Kundenmeilensteine eintragen; Meilensteine und empfohlene Aufgaben im Projekt-Gantt folgen automatisch. Der Export dieser Ansicht ist der Meilensteinbericht für den OEM.",
+      hintExec:"Noch keine Meilensteindaten: unter ② Kundenmeilensteine eintragen oder hier Aufgaben anlegen / Vorlage laden.",
       clrAsk:"Gesamtes Projekt leeren (Meilensteine, Aufgaben, Kalender)?", impOk:"Projekt importiert", impBad:"Keine gültige Projektdatei", expOk:"Projekt exportiert"}
 };
 /* 预览模式（沙箱里无 localStorage）：由构建脚本注入 INLINE 应用和内存存储 */
@@ -82,7 +93,9 @@ function getK(k){ if(PREVIEW) return Object.prototype.hasOwnProperty.call(mem, k
 function setK(k, v){ if(PREVIEW){ if(v === null) delete mem[k]; else mem[k] = v; return; } try{ if(v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} }
 
 var lang = getK("gantt-shell-lang") || "zh";
-var view = "exec";
+var view = "exec", curOem = "", oemList = null;
+function curOemFromStore(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return (p && p.oem) || ""; }catch(e){ return ""; } }
+curOem = curOemFromStore();
 var fExec = document.getElementById("fExec"), fPlan = document.getElementById("fPlan");
 function $(id){ return document.getElementById(id); }
 function tr(k){ return (T[lang] || T.zh)[k] || T.zh[k] || k; }
@@ -99,8 +112,10 @@ function applyLang(){
 }
 function updateHint(){
   var h = $("hint"), txt = "";
-  if(view === "plan") txt = tr("hintPlan");
+  if(!curOem) txt = tr("hintOem");
+  else if(view === "plan") txt = tr("hintPlan");
   else if(!hasNodes()) txt = tr("hintExec");
+  $("oemWrap").classList.toggle("need", !curOem);
   h.textContent = txt; h.classList.toggle("show", !!txt);
 }
 function show(v){
@@ -124,11 +139,17 @@ function loadFrames(){
   if(INLINE){ fExec.srcdoc = srcdocFor("exec"); fPlan.srcdoc = srcdocFor("plan"); }
   else { var q = "?lang=" + lang + "&v=" + Date.now(); fExec.src = "exec.html" + q; fPlan.src = "plan.html" + q; }
 }
-[fExec, fPlan].forEach(function(f){ f.addEventListener("load", function(){ post(f, { t:"lang", v:lang }); updateHint(); }); });
+[fExec, fPlan].forEach(function(f){ f.addEventListener("load", function(){ post(f, { t:"lang", v:lang }); if(f === fPlan) post(f, { t:"hello" }); updateHint(); }); });
 
 /* 预览模式：一个视图写数据 → 转发给另一个视图（触发它的 storage 事件），保持两边一致 */
+function renderOems(){
+  var sel = $("oemSel");
+  if(oemList) sel.innerHTML = oemList.map(function(o){ return '<option value="' + String(o.v).replace(/"/g, "&quot;") + '">' + String(o.l).replace(/</g, "&lt;") + "</option>"; }).join("");
+  sel.value = curOem;
+}
 window.addEventListener("message", function(e){
   var d = e.data || {};
+  if(d.t === "oems"){ oemList = d.list || []; curOem = d.cur || ""; renderOems(); updateHint(); return; }
   if(d.t !== "ls") return;
   if(getK(d.k) === d.v) return;
   setK(d.k, d.v);
@@ -136,10 +157,17 @@ window.addEventListener("message", function(e){
   post(other, { t:"ls-in", k:d.k, v:d.v });
   updateHint();
 });
-if(!PREVIEW) window.addEventListener("storage", function(){ updateHint(); });
+if(!PREVIEW) window.addEventListener("storage", function(){ curOem = curOemFromStore(); renderOems(); updateHint(); });
 
 /* ---- 顶栏 ---- */
 document.querySelectorAll("#top .tabs:not(.lang) button").forEach(function(b){ b.addEventListener("click", function(){ show(b.getAttribute("data-view")); }); });
+$("oemSel").addEventListener("change", function(){
+  var v = this.value;
+  if(curOem && v !== curOem && hasNodes() && !confirm(tr("oemAsk"))){ this.value = curOem; return; }
+  curOem = v; updateHint();
+  post(fPlan, { t:"oem", v:v });
+  show("plan");
+});
 document.querySelectorAll(".lang button").forEach(function(b){
   b.addEventListener("click", function(){
     lang = b.getAttribute("data-lang"); setK("gantt-shell-lang", lang); applyLang();
@@ -168,6 +196,7 @@ $("fileImp").addEventListener("change", function(){
     else if(d.app === "gantt-exec" && d.state){ /* 旧执行页 JSON */ setK("gantt-exec-v1", JSON.stringify(d.state)); }
     else if(d.oem !== undefined && d.dates){ /* 旧里程碑计划 JSON */ setK("gantt-tool-v1", JSON.stringify(d)); }
     else { toast(tr("impBad")); return; }
+    curOem = curOemFromStore(); renderOems();
     loadFrames(); toast(tr("impOk"));
     setTimeout(function(){ show(hasNodes() ? "exec" : "plan"); }, 300);
   };
@@ -176,6 +205,7 @@ $("fileImp").addEventListener("change", function(){
 $("btnClr").addEventListener("click", function(){
   if(!confirm(tr("clrAsk"))) return;
   KEYS.forEach(function(k){ setK(k, null); });
+  curOem = ""; renderOems();
   loadFrames(); show("plan");
 });
 
