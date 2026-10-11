@@ -49,6 +49,7 @@ header button:hover{background:var(--steel3)}
 .trow{height:34px;box-sizing:border-box;overflow:hidden}
 .trow.band-sp{height:30px;background:#f8fafc;cursor:default;align-items:center;padding-left:8px;font-size:11px;color:var(--tx3)}
 .toolbar .dd-m .dd-row{display:flex;gap:4px;align-items:center}
+#mspView button{white-space:nowrap;height:28px;flex-shrink:0}#mspView .ms-lvl{flex:1;min-width:70px}
 .toolbar .dd-m select{max-width:none}
 .toolbar .dd-h{font-size:11px;color:var(--tx3);padding:2px 6px}
 .toolbar .tb-lab{font-size:12px;color:var(--tx3);margin-right:2px}
@@ -399,7 +400,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub">v4</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.1</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -568,7 +569,7 @@ var I18N = {
 zh:{vFit:"全局",qaTask:"新任务",qaMs:"新里程碑",unitLbl:"排程单位",unitDay:"按天",unitHour:"按小时",unitToDay:"有 {0} 个任务的工期不足整天或不从早上开始，切换为按天会向上取整为整天。继续？",endBeforeStart:"完成时间早于开始时间",paneNet:"网络图",paneUse:"资源使用",netHint:"列 = 前置任务层级；红框 = 关键任务；双击方框编辑。",nbStart:"开始",nbEnd:"完成",nbDur:"工期",nbFloat:"浮时",ub_day:"按日",ub_week:"按周",ub_month:"按月",useHint:"每个资源下列出分配的任务；红色 = 该时段超过最大单位。",baseN:"基线 {0}",clearBase:"清除",clearBaseAsk:"清除基线 {0}？",levelBtn:"资源平衡",unlevelBtn:"清除平衡",levelOk:"资源平衡完成：推迟了 {0} 个任务",unlevelOk:"已清除平衡延迟",lvlTip:"平衡延迟 {0} 个工作日",recurBtn:"周期性任务",recurT:"插入周期性任务",recurDef:"周例会",rcFreq:"重复",rcDay:"每个工作日",rcWeek:"每周",rcMonth:"每月",rcEvery:"每隔（N）",rcOn:"星期",rcMday:"每月第几日",rcEnd:"结束日期（可空）",rcCount:"次数（未填结束日期时）",recurOk:"已生成 {0} 次",recurNone:"没有生成任何日期，请检查设置",wdNames:"一,二,三,四,五,六,日",fTaskCal:"任务日历",projCal:"项目日历",fSplit:"拆分（工作 N 天后暂停 M 天）",fSplitHint:"例：3+2, 6+1 = 做 3 天停 2 天，再做到第 6 天停 1 天；工时不变、完成日顺延。",paneEvm:"跟踪 / 挣值",statusDate:"状态日期",evNoBase:"未保存基线：BAC/PV 暂按当前计划计算。",evHint:"录入实际开始/完成或完成%，挣值按状态日期计算。SPI/CPI < 1 标红。",evTask:"任务名称",cStartA:"实际开始",cFinishA:"实际完成",cProg:"完成%",evFixed:"固定成本",evCost:"成本",evBAC:"BAC 完工预算",evPV:"PV 计划值",evEV:"EV 挣值",evAC:"AC 实际成本",evSV:"SV 进度偏差",evCV:"CV 成本偏差",evSPI:"SPI",evCPI:"CPI",evTotal:"项目合计",cWork:"工时",ownerPh:"张三[50%], 李四",workNeedRes:"请先分配资源，再按工时反算工期",paneGantt:"甘特图",paneRes:"资源工作表",rsName:"资源名称",rsType:"类型",rsMat:"材料标签",rsIni:"缩写",rsGroup:"组",rsMax:"最大单位",rsRate:"标准费率",rsOt:"加班费率",rsPerUse:"每次使用成本",rsWork:"工时",rsAdd:"+ 新增资源",rsHint:"任务的「资源名称」列可写 张三[50%], 李四；新名字会自动加入此表。红色 = 过度分配。",rsWorkT:"工时",rsMatT:"材料",rsOverTip:"有 {0} 个工作日分配超过最大单位",rsNew:"资源",rsDup:"已有同名资源",rsDelAsk:"删除资源「{0}」？",rsDelUsed:"资源「{0}」已分配到 {1} 个任务，删除后这些分配一并移除。继续？",cWbs:"WBS",indent:"降级 ⇥",outdent:"⇤ 升级",undo:"↶ 撤销",redo:"↷ 重做",undoNone:"没有可撤销的操作",redoNone:"没有可重做的操作",indentSys:"同步行由客户节点管理，不能调整层级",indentNone:"上方没有同级行，无法降级",outdentNone:"已经是最高层级",indentToGroup:"「{0}」已转为分组",cMode:"任务模式",modeAuto:"自动计划",modeManual:"手动计划",tbOut:"导出 / 导入",msPinnedDeps:"客户里程碑是客户给定的日期（📌固定），不会被前置任务推移；如需调整请在②客户节点修改",unpinnedByDeps:"已取消📌固定，开始日期改由前置任务自动推算",consASAP:"尽早开始",consALAP:"尽晚开始",consSNET:"不得早于...开始",consSNLT:"不得晚于...开始",consFNET:"不得早于...完成",consFNLT:"不得晚于...完成",consMSO:"必须开始于",consMFO:"必须完成于",cPred:"前置任务",cCons:"约束",fCons:"约束类型",fConsDate:"约束日期",predPh:"如 3,4SS+2",managedRename:"这是从②客户节点同步来的行，名称请到②客户节点页修改",delSel:"🗑 删除",delSelTip:"删除选中的任务/分组（也可按 Delete 键，或点行尾 🗑）",delPick:"请先单击选中要删除的行",delAsk:"删除「{0}」？",weekdayNames:["一","二","三","四","五","六","日"],appTitle:"项目开发甘特图",backToPlan:"← 里程碑计划",addTask:"+ 新增任务",addGroup:"+ 新增分组",addMs:"+ 里程碑",fromPlan:"从计划导入",syncBack:"回写里程碑计划",syncBackOk:"已同步到里程碑计划",syncBackEmpty:"没有可同步的里程碑",syncBackFail:"计划数据读取失败",importSub:"导入细项",vDay:"日",vWeek:"周",vMonth:"月",workCal:"工作日历",showPhase:"阶段",oemPlaceholder:"请选择主机厂",exportJSON:"导出JSON",importJSON:"导入JSON",exportCSV:"导出CSV",preview:"预览",exportPDF:"导出 PDF",exportJPG:"导出 JPG",expXls:"导出 Excel",expPreviewTitle:"导出预览",expDate:"日期",expCreator:"制作者",legendPhase:"阶段区间",legendTask:"任务",today:"今天",cName:"任务名称",cOwner:"资源名称",cDur:"工期",cProg:"进度",cStart:"开始",cEnd:"结束",calTitle:"工作日历 · 自然语言导入",calPh:"例如：2026年春节2月15日到2月23日放假，2月14日、2月28日调休上班",calParse:"解析并导入",calReset:"恢复默认",calHint:"支持：X月X日、X月X日至X月X日、放假/调休/补班/上班等关键词，年份缺省为当年。",calModeNL:"自然语言",calModeText:"文本格式",calHintText:"一行一条：2026-10-01~2026-10-07,国庆 表示放假区间；补班 2026-10-10 表示调休上班。",calPhText:"2026-10-01~2026-10-07,国庆\n补班 2026-10-10",del:"删除",cancel:"取消",ok:"确定",importSubT:"导入细项",subTarget:"目标任务",subContent:"细项内容（一行一条，可含负责人、工期，用逗号分隔）",subFile:"或从 CSV 文件导入",editTask:"编辑任务",newTask:"新增任务",newGroup:"新增分组",newMs:"新增里程碑",fName:"名称",fType:"类型",tTask:"任务",tMs:"里程碑",tGroup:"分组",fGroup:"所属分组",fStart:"开始日期",fDur:"工期（工作日）",fDeps:"前置任务（ID，可带类型与滞后）",fDepsHint:"格式：ID+类型+滞后天数，如 3FS,5SS+2d；-2d 表示提前 2 个工作日；默认 FS（完成→开始）。类型：FS 完成→开始，SS 开始→开始，FF 完成→完成，SF 开始→完成",fDeadline:"期限",deadlineWarn:"结束日期晚于期限",criticalPath:"关键路径",floatCol:"总浮时",fOwner:"资源名称",fOutput:"输出成果",fProg:"进度%",fRemarks:"备注",fColor:"颜色",needName:"请填写名称",fromPlanOk:"已从计划导入",noPlan:"未找到计划数据",calApplied:"日历已更新",cycleWarn:"检测到循环依赖，已忽略",importOk:"导入成功",subOk:"细项导入成功",topGroup:"顶级",planGroupMs:"客户里程碑",planGroupRec:"推荐任务",planGroupSup:"供应商节点",planGroupCustom:"自定义任务",saveBaseline:"保存基线",showBaseline:"基线对比",baselineConfirm:"覆盖已有基线？",baselineSaved:"基线已保存",varianceCol:"偏差",manualSched:"手动排程",resWarn:"资源预警",resWarnTip:"该负责人当日有多个并行任务",colSettings:"显示列 ▾",colFixed:"固定列",colReset:"双击表头右边缘恢复默认宽度",oemAutoImport:"已导入{0}的里程碑",oemNoData:"里程碑计划中没有该 OEM 的数据",oemImportConfirm:"切换 OEM 将重新导入里程碑，当前任务会被替换，继续？",tplBtn:"模板",barLbl:"条形标注",blName:"名称",blStart:"开始日期",blEnd:"完成日期",blNone:"不显示",managedDel:"「客户里程碑」「推荐任务」「供应商节点」跟随②客户节点自动同步，请到②客户节点页取消勾选（或清空日期），这里会自动消失。",grpDelAsk:"删除这个分组及其下 {0} 行？",tplConfirm:"插入模板任务到当前计划？",tplOk:"模板已插入",expXml:"导出 XML",impXml:"导入 XML",impXmlConfirm:"导入将替换当前任务，继续？"},
 en:{vFit:"Fit",qaTask:"New task",qaMs:"New milestone",unitLbl:"Schedule in",unitDay:"Days",unitHour:"Hours",unitToDay:"{0} tasks have partial-day durations or start times; switching to days rounds them up. Continue?",endBeforeStart:"Finish is before start",paneNet:"Network",paneUse:"Resource Usage",netHint:"Columns = predecessor depth; red = critical; double-click a box to edit.",nbStart:"Start",nbEnd:"Finish",nbDur:"Dur",nbFloat:"Float",ub_day:"Days",ub_week:"Weeks",ub_month:"Months",useHint:"Tasks listed under each resource; red = above max units in that period.",baseN:"Baseline {0}",clearBase:"Clear",clearBaseAsk:"Clear baseline {0}?",levelBtn:"Level resources",unlevelBtn:"Clear leveling",levelOk:"Leveling done: {0} tasks delayed",unlevelOk:"Leveling delay cleared",lvlTip:"Leveling delay {0} working days",recurBtn:"Recurring task",recurT:"Insert recurring task",recurDef:"Weekly meeting",rcFreq:"Recurs",rcDay:"Every working day",rcWeek:"Weekly",rcMonth:"Monthly",rcEvery:"Every (N)",rcOn:"On",rcMday:"Day of month",rcEnd:"End by (optional)",rcCount:"Occurrences (if no end date)",recurOk:"{0} occurrences created",recurNone:"No dates generated; check the settings",wdNames:"Mon,Tue,Wed,Thu,Fri,Sat,Sun",fTaskCal:"Task calendar",projCal:"Project calendar",fSplit:"Split (pause M days after N days)",fSplitHint:"e.g. 3+2, 6+1 = work 3 days, pause 2, work to day 6, pause 1; finish moves out.",paneEvm:"Tracking / EVM",statusDate:"Status date",evNoBase:"No baseline saved: BAC/PV use the current plan.",evHint:"Enter actual start/finish or % complete; EVM uses the status date. SPI/CPI < 1 in red.",evTask:"Task Name",cStartA:"Actual Start",cFinishA:"Actual Finish",cProg:"% Complete",evFixed:"Fixed Cost",evCost:"Cost",evBAC:"BAC",evPV:"PV",evEV:"EV",evAC:"AC",evSV:"SV",evCV:"CV",evSPI:"SPI",evCPI:"CPI",evTotal:"Project total",cWork:"Work",ownerPh:"Ann[50%], Bob",workNeedRes:"Assign a resource first",paneGantt:"Gantt",paneRes:"Resource Sheet",rsName:"Resource Name",rsType:"Type",rsMat:"Material Label",rsIni:"Initials",rsGroup:"Group",rsMax:"Max Units",rsRate:"Std. Rate",rsOt:"Ovt. Rate",rsPerUse:"Cost/Use",rsWork:"Work",rsAdd:"+ Add resource",rsHint:"Type Ann[50%], Bob in the Resource Names column; new names are added here. Red = overallocated.",rsWorkT:"Work",rsMatT:"Material",rsOverTip:"Overallocated on {0} working days",rsNew:"Resource ",rsDup:"A resource with this name exists",rsDelAsk:"Delete resource \"{0}\"?",rsDelUsed:"\"{0}\" is assigned to {1} tasks; those assignments will be removed. Continue?",cWbs:"WBS",indent:"Indent ⇥",outdent:"⇤ Outdent",undo:"↶ Undo",redo:"↷ Redo",undoNone:"Nothing to undo",redoNone:"Nothing to redo",indentSys:"Synced rows are managed by customer milestones",indentNone:"No row above at the same level",outdentNone:"Already at top level",indentToGroup:"\"{0}\" is now a summary",cMode:"Task Mode",modeAuto:"Auto Scheduled",modeManual:"Manually Scheduled",tbOut:"Export / Import",msPinnedDeps:"Customer milestones are fixed customer dates (📌) and are not moved by predecessors; change them in ② Customer Milestones",unpinnedByDeps:"Unpinned: the start date is now driven by the predecessors",consASAP:"As Soon As Possible",consALAP:"As Late As Possible",consSNET:"Start No Earlier Than",consSNLT:"Start No Later Than",consFNET:"Finish No Earlier Than",consFNLT:"Finish No Later Than",consMSO:"Must Start On",consMFO:"Must Finish On",cPred:"Predecessors",cCons:"Constraint",fCons:"Constraint type",fConsDate:"Constraint date",predPh:"e.g. 3,4SS+2",managedRename:"This row is synced from ② Customer Milestones; rename it there",delSel:"🗑 Delete",delSelTip:"Delete the selected task/group (or press Delete, or click 🗑 at the row end)",delPick:"Click a row to select it first",delAsk:"Delete \"{0}\"?",weekdayNames:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],appTitle:"Project Gantt",backToPlan:"← Milestone Plan",addTask:"+ Add Task",addGroup:"+ Add Group",addMs:"+ Milestone",fromPlan:"Import from Plan",syncBack:"Write Back to Plan",syncBackOk:"Synced to milestone plan",syncBackEmpty:"No linked milestones to sync",syncBackFail:"Failed to read plan data",importSub:"Import Sub-items",vDay:"Day",vWeek:"Week",vMonth:"Month",workCal:"Work Calendar",showPhase:"Phases",oemPlaceholder:"Select OEM",exportJSON:"Export JSON",importJSON:"Import JSON",exportCSV:"Export CSV",preview:"Preview",exportPDF:"Export PDF",exportJPG:"Export JPG",expXls:"Export Excel",expPreviewTitle:"Export Preview",expDate:"Date",expCreator:"Creator",legendPhase:"Phase",legendTask:"Task",today:"Today",cName:"Task",cOwner:"Resource Names",cDur:"Dur.",cProg:"Prog.",cStart:"Start",cEnd:"End",calTitle:"Work Calendar · Natural Language Import",calPh:"e.g. Spring Festival 2026-02-15 to 2026-02-23 off, 02-14 and 02-28 work",calParse:"Parse & Import",calReset:"Reset",calHint:"Supports date ranges and keywords like off/work. Year defaults to current.",calModeNL:"Natural language",calModeText:"Text format",calHintText:"One per line: 2026-10-01~2026-10-07,National Day = holiday range; Make-up 2026-10-10 = workday.",calPhText:"2026-10-01~2026-10-07,National Day\nMake-up 2026-10-10",del:"Delete",cancel:"Cancel",ok:"OK",importSubT:"Import Sub-items",subTarget:"Target Task",subContent:"One per line, optional owner,duration comma-separated",subFile:"Or import from CSV file",editTask:"Edit Task",newTask:"New Task",newGroup:"New Group",newMs:"New Milestone",fName:"Name",fType:"Type",tTask:"Task",tMs:"Milestone",tGroup:"Group",fGroup:"Group",fStart:"Start Date",fDur:"Duration (workdays)",fDeps:"Predecessors (IDs, types & lag)",fDepsHint:"Format: ID+type+lag workdays, e.g. 3FS,5SS+2d; -2d = 2 workdays early; default FS (finish-to-start). Types: FS finish→start, SS start→start, FF finish→finish, SF start→finish",fDeadline:"Deadline",deadlineWarn:"End date is later than the deadline",criticalPath:"Critical Path",floatCol:"Total Float",fOwner:"Resource Names",fOutput:"Deliverable",fProg:"Progress %",fRemarks:"Remarks",fColor:"Color",needName:"Name required",fromPlanOk:"Imported from plan",noPlan:"No plan data found",calApplied:"Calendar updated",cycleWarn:"Circular dependency detected and ignored",importOk:"Import OK",subOk:"Sub-items imported",topGroup:"Top",planGroupMs:"Customer Milestones",planGroupRec:"Recommended Tasks",planGroupSup:"Supplier Nodes",planGroupCustom:"Custom Tasks",saveBaseline:"Save Baseline",showBaseline:"Baseline Compare",baselineConfirm:"Overwrite existing baseline?",baselineSaved:"Baseline saved",varianceCol:"Variance",manualSched:"Manual scheduling",resWarn:"Resource Alert",resWarnTip:"Owner has overlapping tasks on this day",colSettings:"Columns ▾",colFixed:"Fixed",colReset:"Double-click header edge to reset width",oemAutoImport:"Milestones imported for {0}",oemNoData:"No milestone data for this OEM",oemImportConfirm:"Switching OEM will re-import milestones and replace current tasks. Continue?",tplBtn:"Templates",barLbl:"Bar label",blName:"Name",blStart:"Start date",blEnd:"Finish date",blNone:"None",managedDel:"Customer milestones, recommended tasks and supplier nodes are synced from ② Customer Milestones. Untick them (or clear the dates) there and they disappear here.",grpDelAsk:"Delete this group and its {0} rows?",tplConfirm:"Insert template tasks into the current plan?",tplOk:"Template inserted",expXml:"Export XML",impXml:"Import XML",impXmlConfirm:"Import will replace current tasks. Continue?"},
 de:{vFit:"Gesamt",qaTask:"Neuer Vorgang",qaMs:"Neuer Meilenstein",unitLbl:"Planung in",unitDay:"Tagen",unitHour:"Stunden",unitToDay:"{0} Vorgänge haben Teiltage; beim Wechsel auf Tage wird aufgerundet. Fortfahren?",endBeforeStart:"Ende liegt vor Anfang",paneNet:"Netzplan",paneUse:"Ressourceneinsatz",netHint:"Spalten = Vorgängerebene; rot = kritisch; Doppelklick zum Bearbeiten.",nbStart:"Anf.",nbEnd:"Ende",nbDur:"Dauer",nbFloat:"Puffer",ub_day:"Tage",ub_week:"Wochen",ub_month:"Monate",useHint:"Vorgänge je Ressource; rot = über max. Einheiten.",baseN:"Basisplan {0}",clearBase:"Löschen",clearBaseAsk:"Basisplan {0} löschen?",levelBtn:"Kapazitätsabgleich",unlevelBtn:"Abgleich löschen",levelOk:"Abgleich fertig: {0} Vorgänge verschoben",unlevelOk:"Abgleichsverzögerung gelöscht",lvlTip:"Abgleichsverzögerung {0} Arbeitstage",recurBtn:"Periodischer Vorgang",recurT:"Periodischen Vorgang einfügen",recurDef:"Wochenbesprechung",rcFreq:"Wiederholung",rcDay:"Jeden Arbeitstag",rcWeek:"Wöchentlich",rcMonth:"Monatlich",rcEvery:"Alle (N)",rcOn:"Am",rcMday:"Tag im Monat",rcEnd:"Ende am (optional)",rcCount:"Anzahl (ohne Enddatum)",recurOk:"{0} Termine erstellt",recurNone:"Keine Termine erzeugt",wdNames:"Mo,Di,Mi,Do,Fr,Sa,So",fTaskCal:"Vorgangskalender",projCal:"Projektkalender",fSplit:"Unterbrechung (nach N Tagen M Tage Pause)",fSplitHint:"z. B. 3+2, 6+1; Ende verschiebt sich.",paneEvm:"Überwachung / EVM",statusDate:"Statusdatum",evNoBase:"Kein Basisplan: BAC/PV aus aktuellem Plan.",evHint:"Ist-Anfang/-Ende oder % Abgeschlossen eingeben; EVM zum Statusdatum. SPI/CPI < 1 rot.",evTask:"Vorgangsname",cStartA:"Ist-Anfang",cFinishA:"Ist-Ende",cProg:"% Abgeschl.",evFixed:"Feste Kosten",evCost:"Kosten",evBAC:"BAC",evPV:"PV",evEV:"EV",evAC:"AC",evSV:"SV",evCV:"CV",evSPI:"SPI",evCPI:"CPI",evTotal:"Projektsumme",cWork:"Arbeit",ownerPh:"Anna[50%], Ben",workNeedRes:"Bitte zuerst eine Ressource zuordnen",paneGantt:"Gantt",paneRes:"Ressourcentabelle",rsName:"Ressourcenname",rsType:"Art",rsMat:"Materialbeschriftung",rsIni:"Kürzel",rsGroup:"Gruppe",rsMax:"Max. Einh.",rsRate:"Standardsatz",rsOt:"Überstundensatz",rsPerUse:"Kosten/Einsatz",rsWork:"Arbeit",rsAdd:"+ Ressource",rsHint:"In der Spalte Ressourcennamen z. B. Anna[50%], Ben eingeben; neue Namen erscheinen hier. Rot = überlastet.",rsWorkT:"Arbeit",rsMatT:"Material",rsOverTip:"An {0} Arbeitstagen überlastet",rsNew:"Ressource ",rsDup:"Name existiert bereits",rsDelAsk:"Ressource „{0}“ löschen?",rsDelUsed:"„{0}“ ist {1} Vorgängen zugeordnet; diese Zuordnungen werden entfernt. Fortfahren?",cWbs:"PSP",indent:"Tiefer ⇥",outdent:"⇤ Höher",undo:"↶ Rückgängig",redo:"↷ Wiederholen",undoNone:"Nichts rückgängig zu machen",redoNone:"Nichts zu wiederholen",indentSys:"Synchronisierte Zeilen werden über Kundenmeilensteine verwaltet",indentNone:"Keine Zeile darüber auf gleicher Ebene",outdentNone:"Bereits oberste Ebene",indentToGroup:"„{0}“ ist jetzt ein Sammelvorgang",cMode:"Vorgangsmodus",modeAuto:"Automatisch geplant",modeManual:"Manuell geplant",tbOut:"Export / Import",msPinnedDeps:"Kundenmeilensteine sind feste Kundentermine (📌) und werden nicht durch Vorgänger verschoben; in ② Kundenmeilensteine ändern",unpinnedByDeps:"Fixierung aufgehoben: Start wird jetzt aus den Vorgängern berechnet",consASAP:"So früh wie möglich",consALAP:"So spät wie möglich",consSNET:"Anfang nicht früher als",consSNLT:"Anfang nicht später als",consFNET:"Ende nicht früher als",consFNLT:"Ende nicht später als",consMSO:"Muss anfangen am",consMFO:"Muss enden am",cPred:"Vorgänger",cCons:"Einschränkung",fCons:"Einschränkungsart",fConsDate:"Einschränkungsdatum",predPh:"z.B. 3,4SS+2",managedRename:"Diese Zeile wird aus ② Kundenmeilensteine synchronisiert; dort umbenennen",delSel:"🗑 Löschen",delSelTip:"Ausgewählte Aufgabe/Gruppe löschen (oder Entf-Taste, oder 🗑 am Zeilenende)",delPick:"Bitte zuerst eine Zeile anklicken",delAsk:"\"{0}\" löschen?",weekdayNames:["Mo","Di","Mi","Do","Fr","Sa","So"],appTitle:"Projekt-Gantt",backToPlan:"← Meilensteinplan",addTask:"+ Aufgabe",addGroup:"+ Gruppe",addMs:"+ Meilenstein",fromPlan:"Aus Plan importieren",syncBack:"In Plan zurückschreiben",syncBackOk:"Mit Meilensteinplan synchronisiert",syncBackEmpty:"Keine verknüpften Meilensteine",syncBackFail:"Plandaten konnten nicht gelesen werden",importSub:"Unterpunkte importieren",vDay:"Tag",vWeek:"Woche",vMonth:"Monat",workCal:"Arbeitskalender",showPhase:"Phasen",oemPlaceholder:"OEM wählen",exportJSON:"JSON exportieren",importJSON:"JSON importieren",exportCSV:"CSV exportieren",preview:"Vorschau",exportPDF:"PDF exportieren",exportJPG:"JPG exportieren",expXls:"Excel-Export",expPreviewTitle:"Exportvorschau",expDate:"Datum",expCreator:"Ersteller",legendPhase:"Phasen",legendTask:"Aufgabe",today:"Heute",cName:"Aufgabe",cOwner:"Ressourcennamen",cDur:"Dauer",cProg:"Fort.",cStart:"Start",cEnd:"End",calTitle:"Arbeitskalender · Import in natürlicher Sprache",calPh:"z.B. Frühlingsfest 2026-02-15 bis 2026-02-23 frei",calParse:"Parsen & importieren",calReset:"Zurücksetzen",calHint:"Datumsbereiche und Schlüsselwörter werden unterstützt.",calModeNL:"Natürliche Sprache",calModeText:"Textformat",calHintText:"Eine Zeile pro Eintrag: 2026-10-01~2026-10-07,Feiertag = Ferienbereich; Ausgleich 2026-10-10 = Arbeitstag.",calPhText:"2026-10-01~2026-10-07,Feiertag\nAusgleich 2026-10-10",del:"Löschen",cancel:"Abbrechen",ok:"OK",importSubT:"Unterpunkte importieren",subTarget:"Zielaufgabe",subContent:"Eins pro Zeile, optional Eigner,Dauer",subFile:"Oder aus CSV-Datei importieren",editTask:"Aufgabe bearbeiten",newTask:"Neue Aufgabe",newGroup:"Neue Gruppe",newMs:"Neuer Meilenstein",fName:"Name",fType:"Typ",tTask:"Aufgabe",tMs:"Meilenstein",tGroup:"Gruppe",fGroup:"Gruppe",fStart:"Startdatum",fDur:"Dauer (Arbeitstage)",fDeps:"Vorgänger (IDs, Typen & Versatz)",fDepsHint:"Format: ID+Typ+Versatztage, z.B. 3FS,5SS+2d; -2d = 2 Arbeitstage früher; Standard FS (Ende→Start). Typen: FS Ende→Start, SS Start→Start, FF Ende→Ende, SF Start→Ende",fDeadline:"Frist",deadlineWarn:"Enddatum liegt nach der Frist",criticalPath:"Kritischer Pfad",floatCol:"Gesamtpuffer",fOwner:"Ressourcennamen",fOutput:"Ergebnis",fProg:"Fortschritt %",fRemarks:"Bemerkungen",fColor:"Farbe",needName:"Name erforderlich",fromPlanOk:"Aus Plan importiert",noPlan:"Keine Plandaten",calApplied:"Kalender aktualisiert",cycleWarn:"Zirkuläre Abhängigkeit ignoriert",importOk:"Import OK",subOk:"Unterpunkte importiert",topGroup:"Oberste",planGroupMs:"Kundenmeilensteine",planGroupRec:"Empfohlene Aufgaben",planGroupSup:"Lieferantenknoten",planGroupCustom:"Eigene Aufgaben",saveBaseline:"Basisplan speichern",showBaseline:"Basisvergleich",baselineConfirm:"Bestehende Basis überschreiben?",baselineSaved:"Basisplan gespeichert",varianceCol:"Abweichung",manualSched:"Manuelle Planung",resWarn:"Ressourcenwarnung",resWarnTip:"Verantwortlicher hat überlappende Aufgaben",colSettings:"Spalten",colFixed:"Fest",colReset:"Doppelklick auf Kopfrand setzt Breite zurück",oemAutoImport:"Meilensteine für {0} importiert",oemNoData:"Keine Meilensteindaten für diesen OEM",oemImportConfirm:"OEM-Wechsel importiert Meilensteine neu und ersetzt aktuelle Aufgaben. Fortfahren?",tplBtn:"Vorlagen",barLbl:"Balkenbeschriftung",blName:"Name",blStart:"Startdatum",blEnd:"Enddatum",blNone:"Keine",managedDel:"Kundenmeilensteine, empfohlene Aufgaben und Lieferantenknoten werden aus ② Kundenmeilensteine synchronisiert. Dort abwählen (oder Datum löschen), dann verschwinden sie hier.",grpDelAsk:"Diese Gruppe und ihre {0} Zeilen löschen?",tplConfirm:"Vorlagenaufgaben in den aktuellen Plan einfügen?",tplOk:"Vorlage eingefügt",expXml:"XML-Export",impXml:"XML-Import",impXmlConfirm:"Der Import ersetzt die aktuellen Aufgaben. Fortfahren?"}};
-var lang = "zh";
+var lang = (function(){ try { var v = localStorage.getItem("gantt-lang-v4"); return v === "en" || v === "de" ? v : "zh"; } catch(e){ return "zh"; } })(); /* 语言偏好持久化 */
 function tr(k){ return (I18N[lang] && I18N[lang][k]) || I18N.zh[k] || k; }
 function applyLang(){ if(typeof syncCalModeSel === "function" && document.getElementById("calModeSel")) setTimeout(syncCalModeSel, 0);
   document.querySelectorAll("[data-i18n]").forEach(function(el){ el.textContent = tr(el.dataset.i18n); });
@@ -857,10 +858,31 @@ const TPL_ANPQP = [
 var LS_KEY = "gantt-exec-v4";
 var CHART_COL_DEF = { task:"#2563eb", ms:"#dc2626", sum:"#111111", prog:"#1e3a8a", hy:"#7ba7bc", hm:"#bdd5e5", bg:"#eef1f5", wk:"#f3f4f6" };
 function CC(){ var c = state.chartColors || {}, r = {}; for(var k in CHART_COL_DEF) r[k] = /^#[0-9a-f]{6}$/i.test(c[k] || "") ? c[k] : CHART_COL_DEF[k]; return r; }
-var TS_FONTS = { "微软雅黑":'"Microsoft YaHei","PingFang SC",sans-serif', "宋体":'SimSun,"Songti SC",serif', "黑体":'SimHei,"Heiti SC",sans-serif', "楷体":'KaiTi,"Kaiti SC",serif', "仿宋":'FangSong,"STFangsong",serif', "Arial":'Arial,Helvetica,sans-serif', "Calibri":'Calibri,Carlito,sans-serif', "Segoe UI":'"Segoe UI",sans-serif', "Times New Roman":'"Times New Roman",Times,serif', "Courier New":'"Courier New",monospace' };
+var TS_FONTS = {
+  /* 中文 */ "微软雅黑":'"Microsoft YaHei","PingFang SC",sans-serif', "等线":'DengXian,sans-serif', "宋体":'SimSun,"Songti SC",serif', "新宋体":'NSimSun,serif', "黑体":'SimHei,"Heiti SC",sans-serif', "楷体":'KaiTi,"Kaiti SC",serif', "仿宋":'FangSong,"STFangsong",serif',
+  "隶书":'LiSu,serif', "幼圆":'YouYuan,sans-serif', "苹方":'"PingFang SC",sans-serif', "华文黑体":'STHeiti,sans-serif', "华文细黑":'STXihei,sans-serif', "华文宋体":'STSong,serif', "华文中宋":'STZhongsong,serif', "华文楷体":'STKaiti,serif', "华文仿宋":'STFangsong,serif', "华文行楷":'STXingkai,cursive', "华文新魏":'STXinwei,serif', "华文隶书":'STLiti,serif', "华文琥珀":'STHupo,sans-serif', "华文彩云":'STCaiyun,sans-serif',
+  "方正舒体":'FZShuTi,cursive', "方正姚体":'FZYaoti,serif', "思源黑体":'"Source Han Sans SC","Noto Sans CJK SC","Noto Sans SC",sans-serif', "思源宋体":'"Source Han Serif SC","Noto Serif CJK SC","Noto Serif SC",serif', "文泉驿微米黑":'"WenQuanYi Micro Hei",sans-serif',
+  /* 西文 */ "Arial":'Arial,Helvetica,sans-serif', "Arial Black":'"Arial Black",sans-serif', "Arial Narrow":'"Arial Narrow",sans-serif', "Calibri":'Calibri,Carlito,sans-serif', "Calibri Light":'"Calibri Light",Calibri,sans-serif', "Cambria":'Cambria,Caladea,serif', "Candara":'Candara,sans-serif', "Century Gothic":'"Century Gothic",sans-serif',
+  "Consolas":'Consolas,monospace', "Constantia":'Constantia,serif', "Corbel":'Corbel,sans-serif', "Courier New":'"Courier New",monospace', "Franklin Gothic Medium":'"Franklin Gothic Medium",sans-serif', "Garamond":'Garamond,serif', "Georgia":'Georgia,serif', "Helvetica":'Helvetica,Arial,sans-serif', "Impact":'Impact,sans-serif',
+  "Lucida Console":'"Lucida Console",monospace', "Palatino Linotype":'"Palatino Linotype",Palatino,serif', "Segoe UI":'"Segoe UI",sans-serif', "Tahoma":'Tahoma,sans-serif', "Times New Roman":'"Times New Roman",Times,serif', "Trebuchet MS":'"Trebuchet MS",sans-serif', "Verdana":'Verdana,sans-serif', "Roboto":'Roboto,sans-serif', "Open Sans":'"Open Sans",sans-serif' };
+var TS_FONT_CN_END = "文泉驿微米黑", TS_BUILTIN = Object.keys(TS_FONTS);
+/* 检测本机是否装有该字体（Canvas 宽度比对；无 Canvas 环境视为已安装） */
+var _fontOk = {};
+function fontInstalled(k){
+  if(_fontOk[k] != null) return _fontOk[k];
+  var stack = String(TS_FONTS[k] || "").split(",").map(function(s){ return s.trim().replace(/^["']|["']$/g, ""); }).filter(function(s){ return !/^(serif|sans-serif|monospace|cursive)$/.test(s); });
+  var c = null; try { c = document.createElement("canvas").getContext("2d"); } catch(e){}
+  if(!c || !c.measureText){ return (_fontOk[k] = true); }
+  var txt = "mmmmmmmmmwwwwwlli 甘特图项目进度 0123", ok = false;
+  ["monospace","serif","sans-serif"].forEach(function(base){ c.font = "40px " + base; var w0 = c.measureText(txt).width;
+    stack.forEach(function(f){ c.font = '40px "' + f + '",' + base; if(Math.abs(c.measureText(txt).width - w0) > 0.5) ok = true; }); });
+  return (_fontOk[k] = ok);
+}
+/* 用户添加的本机字体（state.customFonts） */
+function regCustomFonts(){ (state.customFonts || []).forEach(function(n){ if(n && !TS_FONTS[n]) TS_FONTS[n] = '"' + String(n).replace(/"/g, "") + '",sans-serif'; }); }
 /* 文本样式：类别默认（state.textStyle.task/ms/sum）+ 单个任务 t.ts；字段 f 字体 s 字号 b 粗体 i 斜体 c 颜色 */
-function tsEff(t){ var cat = t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task", d = (state.textStyle || {})[cat] || {}, o = t.ts || {}, r = {};
-  ["f","s","b","i","c"].forEach(function(k){ if(o[k] != null && o[k] !== "") r[k] = o[k]; else if(d[k] != null && d[k] !== "") r[k] = d[k]; }); return r; }
+function tsEff(t){ regCustomFonts(); var cat = t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task", d = (state.textStyle || {})[cat] || {}, o = t.ts || {}, r = {};
+  ["f","s","b","i","k","c"].forEach(function(k){ if(o[k] != null && o[k] !== "") r[k] = o[k]; else if(d[k] != null && d[k] !== "") r[k] = d[k]; }); return r; }
 function tsFont(t, sz, defBold, fixedSize){ var e = tsEff(t), b = e.b == null ? defBold : e.b, s = fixedSize || !e.s ? sz : Math.round(sz * e.s / 12);
   var fam = e.f && TS_FONTS[e.f] ? TS_FONTS[e.f] : '-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
   return (e.i ? "italic " : "") + (b ? "700 " : "") + s + "px " + fam; }
@@ -2974,7 +2996,9 @@ function drawMspExport(cb, plan, imgL){
   ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
   function line(x1, y1, x2, y2, col, w){ ctx.strokeStyle = col; ctx.lineWidth = w || 1; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
   function txt(s, x, y, f, col, al){ ctx.font = f; ctx.fillStyle = col || "#111"; ctx.textAlign = al || "left"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y); }
-  function nameLbl(s, x, cy, f, xr, col){ ctx.font = f; var w = ctx.measureText(s).width; if(x - w > CX + 4) txt(s, x, cy, f, col || "#111", "right"); else txt(s, xr, cy, f, col || "#111", "left"); }
+  var _stk = false; /* 当前任务是否删除线（文本样式 k） */
+  function nameLbl(s, x, cy, f, xr, col){ ctx.font = f; var w = ctx.measureText(s).width, left = x - w > CX + 4; if(left) txt(s, x, cy, f, col || "#111", "right"); else txt(s, xr, cy, f, col || "#111", "left");
+    if(_stk){ var a = left ? x - w : xr; line(a, cy, a + w, cy, col || "#111"); } }
   function clip(s, w, f){ s = String(s); ctx.font = f; if(ctx.measureText(s).width <= w) return s; while(s.length > 1 && ctx.measureText(s + "…").width > w) s = s.slice(0, -1); return s + "…"; }
   /* ---- 页眉：左 Logo，中间项目名称 ---- */
   if(imgL && imgL.naturalWidth){ var s1 = Math.min(44 / imgL.naturalHeight, 200 / imgL.naturalWidth); ctx.drawImage(imgL, X0 + 8, Y0 + (HEAD - imgL.naturalHeight * s1) / 2, imgL.naturalWidth * s1, imgL.naturalHeight * s1); }
@@ -3009,12 +3033,14 @@ function drawMspExport(cb, plan, imgL){
   }
   /* ---- 表体 ---- */
   vis.forEach(function(t, i){
-    var y = BY + i * ROW, cy = y + ROW / 2, grp = t.type === "group", f = tsFont(t, FS, grp), sp = span(t);
+    var y = BY + i * ROW, cy = y + ROW / 2, grp = t.type === "group", f = tsFont(t, FS, grp), sp = span(t); _stk = !!tsEff(t).k;
     var vals = { id:grp ? "" : (rn[t.id] || ""), name:t.name, dur:durTxt(t), start:sp.s ? fmtD(sp.s) : "", fin:sp.e ? fmtD(sp.e) : "" };
     var x = X0;
     cols.forEach(function(cl){
       var pad = cl[0] === "name" ? 5 + depthOf(t) * 12 : 5;
-      txt(clip(vals[cl[0]], cl[1] - pad - 4, f), cl[2] === "center" ? x + cl[1] / 2 : x + pad, cy, f, tsCol(t, grp ? "#111" : "#1f2937"), cl[2]);
+      var _cs = clip(vals[cl[0]], cl[1] - pad - 4, f), _cc = tsCol(t, grp ? "#111" : "#1f2937");
+      txt(_cs, cl[2] === "center" ? x + cl[1] / 2 : x + pad, cy, f, _cc, cl[2]);
+      if(_stk && cl[0] === "name" && _cs){ ctx.font = f; line(x + pad, cy, x + pad + ctx.measureText(_cs).width, cy, _cc); }
       x += cl[1];
     });
     line(X0, y + ROW, CX, y + ROW, "#e5e7eb");
@@ -3597,7 +3623,10 @@ function init(){
   syncOemSelect();
   render();
   document.querySelectorAll(".langbtns button").forEach(function(b){
-    b.addEventListener("click", function(){ lang = b.dataset.lang; applyLang(); buildOemOptions(); syncOemSelect(); closeTplMenu(); render(); });
+    b.addEventListener("click", function(){ if(b.dataset.lang === lang) return; lang = b.dataset.lang; try { localStorage.setItem("gantt-lang-v4", lang); } catch(e){}
+      applyLang(); buildOemOptions(); syncOemSelect(); closeTplMenu(); render();
+      /* 后加的功能模块在初始化时生成界面文字；切换语言后重新载入页面，确保所有菜单/按钮/对话框都换成新语言（数据已自动保存） */
+      if(!window.__v4NoLangReload) setTimeout(function(){ try { var u = new URL(location.href); if(u.searchParams.has("lang")){ u.searchParams.set("lang", lang); location.replace(u.href); return; } } catch(e){} location.reload(); }, 30); });
   });
   document.getElementById("btnOemMs").addEventListener("click", function(){ openOemMs(); });
   document.querySelectorAll("#modeBtns button").forEach(function(b){ b.addEventListener("click", function(){
@@ -4821,13 +4850,43 @@ function v4ExpPlan(){
 /* ===== v4：文本样式（字体 / 字号 / 粗细 / 斜体 / 颜色）——工具栏作用于选中任务；「显示 ▾ → 🔤 文本样式」设置各类别默认；导出 PDF/JPG 跟随 ===== */
 (function(){
   var TX = {
-    zh:{ font:"字体", size:"字号", bold:"粗体", ital:"斜体", color:"文字颜色", def:"默认", need:"请先选中任务", t:"文本样式", task:"任务", ms:"里程碑", sum:"摘要（分组）", clr:"同时清除各任务单独设置的文本样式", reset:"恢复默认", ok:"确定", no:"取消", done:"已更新文本样式", clrSel:"清除选中任务的文本样式", hint:"单个任务：选中后用工具栏上的字体 / B / I / A 修改。PDF/JPG 导出跟随。" },
-    en:{ font:"Font", size:"Size", bold:"Bold", ital:"Italic", color:"Text color", def:"Default", need:"Select a task first", t:"Text styles", task:"Tasks", ms:"Milestones", sum:"Summary (groups)", clr:"Also clear per-task text styles", reset:"Reset", ok:"OK", no:"Cancel", done:"Text styles updated", clrSel:"Clear selected task's text style", hint:"Single task: select it and use the font / B / I / A tools in the toolbar. PDF/JPG export follows." },
-    de:{ font:"Schrift", size:"Größe", bold:"Fett", ital:"Kursiv", color:"Textfarbe", def:"Standard", need:"Bitte zuerst einen Vorgang wählen", t:"Textarten", task:"Vorgänge", ms:"Meilensteine", sum:"Sammelvorgänge", clr:"Einzelformate der Vorgänge entfernen", reset:"Standard", ok:"OK", no:"Abbrechen", done:"Textarten aktualisiert", clrSel:"Textformat des Vorgangs löschen", hint:"Einzelner Vorgang: auswählen und Schrift / B / I / A in der Symbolleiste nutzen. PDF/JPG-Export folgt." }
+    zh:{ strike:"删除线", fcn:"中文字体", fwest:"西文字体", fmine:"本机字体", fmore:"＋ 添加本机字体…", fadd:"添加本机字体", faddHint:"输入电脑上已安装的字体名称（如：方正兰亭黑、Source Han Sans）。Chrome/Edge 可点「读取本机字体列表」从系统里挑。", fread:"读取本机字体列表", fnone:"未检测到该字体，可能没有安装", font:"字体", size:"字号", bold:"粗体", ital:"斜体", color:"文字颜色", def:"默认", need:"请先选中任务", t:"文本样式", task:"任务", ms:"里程碑", sum:"摘要（分组）", clr:"同时清除各任务单独设置的文本样式", reset:"恢复默认", ok:"确定", no:"取消", done:"已更新文本样式", clrSel:"清除选中任务的文本样式", hint:"单个任务：选中后用工具栏上的字体 / B / I / A 修改。PDF/JPG 导出跟随。" },
+    en:{ strike:"Strikethrough", fcn:"Chinese fonts", fwest:"Western fonts", fmine:"Local fonts", fmore:"+ Add local font…", fadd:"Add local font", faddHint:"Type the name of a font installed on this computer. In Chrome/Edge you can read the system font list.", fread:"Read system font list", fnone:"Font not detected — it may not be installed", font:"Font", size:"Size", bold:"Bold", ital:"Italic", color:"Text color", def:"Default", need:"Select a task first", t:"Text styles", task:"Tasks", ms:"Milestones", sum:"Summary (groups)", clr:"Also clear per-task text styles", reset:"Reset", ok:"OK", no:"Cancel", done:"Text styles updated", clrSel:"Clear selected task's text style", hint:"Single task: select it and use the font / B / I / A tools in the toolbar. PDF/JPG export follows." },
+    de:{ strike:"Durchgestrichen", fcn:"Chinesische Schriften", fwest:"Westliche Schriften", fmine:"Lokale Schriften", fmore:"+ Lokale Schrift hinzufügen…", fadd:"Lokale Schrift hinzufügen", faddHint:"Name einer installierten Schrift eingeben. In Chrome/Edge kann die Systemliste gelesen werden.", fread:"Systemschriften lesen", fnone:"Schrift nicht gefunden – evtl. nicht installiert", font:"Schrift", size:"Größe", bold:"Fett", ital:"Kursiv", color:"Textfarbe", def:"Standard", need:"Bitte zuerst einen Vorgang wählen", t:"Textarten", task:"Vorgänge", ms:"Meilensteine", sum:"Sammelvorgänge", clr:"Einzelformate der Vorgänge entfernen", reset:"Standard", ok:"OK", no:"Abbrechen", done:"Textarten aktualisiert", clrSel:"Textformat des Vorgangs löschen", hint:"Einzelner Vorgang: auswählen und Schrift / B / I / A in der Symbolleiste nutzen. PDF/JPG-Export folgt." }
   };
   function L(k){ return (TX[lang] || TX.zh)[k]; }
   var sizes = [10, 11, 12, 13, 14, 16];
-  function fontOpts(cur){ return '<option value="">' + L("def") + '</option>' + Object.keys(TS_FONTS).map(function(k){ return '<option value="' + esc(k) + '"' + (k === cur ? " selected" : "") + ' style="font-family:' + esc(TS_FONTS[k]).replace(/"/g, "'") + '">' + esc(k) + "</option>"; }).join(""); }
+  function fontOpts(cur){ regCustomFonts();
+    var keys = Object.keys(TS_FONTS), cut = keys.indexOf(TS_FONT_CN_END), mine = state.customFonts || [];
+    function op(k){ return '<option value="' + esc(k) + '"' + (k === cur ? " selected" : "") + ' style="font-family:' + esc(TS_FONTS[k]).replace(/"/g, "'") + '">' + esc(k) + "</option>"; }
+    function grp(lbl, list){ list = list.filter(function(k){ return k === cur || fontInstalled(k); }); return list.length ? '<optgroup label="' + esc(lbl) + '">' + list.map(op).join("") + "</optgroup>" : ""; }
+    return '<option value="">' + L("def") + '</option>'
+      + grp(L("fcn"), keys.slice(0, cut + 1).filter(function(k){ return mine.indexOf(k) < 0; }))
+      + grp(L("fwest"), keys.slice(cut + 1).filter(function(k){ return mine.indexOf(k) < 0; }))
+      + (mine.length ? '<optgroup label="' + esc(L("fmine")) + '">' + mine.map(op).join("") + "</optgroup>" : "")
+      + '<option value="__more">' + esc(L("fmore")) + "</option>"; }
+  /* 添加本机字体：手动输入；支持 Local Font Access API（Chrome/Edge）读取系统字体列表 */
+  function addFontDlg(done){
+    var bg = document.createElement("div"); bg.className = "modal-bg show";
+    bg.innerHTML = '<div class="modal" style="width:440px"><div class="modal-h"><span>' + L("fadd") + '</span><button class="af-x">×</button></div><div class="modal-b">'
+      + '<div style="font-size:12px;color:var(--tx3);margin-bottom:8px">' + L("faddHint") + '</div>'
+      + '<input class="af-in" list="afList" style="width:100%;height:30px;box-sizing:border-box" placeholder="Font name"><datalist id="afList"></datalist>'
+      + '<div class="af-pv" style="margin:10px 0;font-size:18px;min-height:26px">甘特图 Project 2026</div><div class="af-w" style="font-size:11px;color:#dc2626;min-height:14px"></div>'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:8px"><button class="af-read"' + (window.queryLocalFonts ? "" : " disabled") + '>' + L("fread") + '</button><span><button class="af-no">' + L("no") + '</button> <button class="primary af-ok">' + L("ok") + "</button></span></div></div></div>";
+    document.body.appendChild(bg);
+    var q = function(s){ return bg.querySelector(s); }, inp = q(".af-in");
+    function close(v){ bg.remove(); done(v || ""); }
+    q(".af-x").onclick = function(){ close(); }; q(".af-no").onclick = function(){ close(); };
+    bg.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape") close(); if(e.key === "Enter" && e.target === inp) q(".af-ok").click(); });
+    inp.addEventListener("input", function(){ var n = inp.value.trim(); q(".af-pv").style.fontFamily = n ? '"' + n.replace(/"/g, "") + '",monospace' : ""; q(".af-w").textContent = ""; });
+    q(".af-read").onclick = function(){ window.queryLocalFonts().then(function(fs){ var s = {}; fs.forEach(function(f){ s[f.family] = 1; }); q("#afList").innerHTML = Object.keys(s).sort().map(function(n){ return '<option value="' + esc(n) + '">'; }).join(""); inp.focus(); }).catch(function(){}); };
+    q(".af-ok").onclick = function(){ var n = inp.value.trim().replace(/"/g, ""); if(!n){ close(); return; }
+      if(!TS_FONTS[n]){ TS_FONTS[n] = '"' + n + '",sans-serif'; delete _fontOk[n]; if(!fontInstalled(n)){ q(".af-w").textContent = L("fnone"); delete TS_FONTS[n]; delete _fontOk[n]; return; } }
+      state.customFonts = state.customFonts || []; if(state.customFonts.indexOf(n) < 0 && TS_BUILTIN.indexOf(n) < 0) state.customFonts.push(n);
+      save(); close(n); };
+    setTimeout(function(){ inp.focus(); }, 0);
+  }
+  window.__v4AddFont = addFontDlg;
   function sizeOpts(cur){ return '<option value="">' + L("def") + '</option>' + sizes.map(function(s){ return '<option value="' + s + '"' + (+cur === s ? " selected" : "") + ">" + s + "</option>"; }).join(""); }
   /* —— 渲染后套用到表格行和甘特图标签 —— */
   function applyDom(){
@@ -4835,13 +4894,13 @@ function v4ExpPlan(){
       var t = byId(r.dataset.id); if(!t) return; var e = tsEff(t), fam = e.f && TS_FONTS[e.f];
       if(!Object.keys(e).length) return;
       for(var i = 0; i < r.children.length; i++){ var c = r.children[i].style;
-        if(fam) c.fontFamily = fam; if(e.s) c.fontSize = e.s + "px"; if(e.b != null) c.fontWeight = e.b ? "700" : "400"; if(e.i) c.fontStyle = "italic"; if(e.c) c.color = e.c; }
-      if(e.c) r.querySelectorAll(".cell-in,.date-in,select").forEach(function(x){ x.style.color = e.c; });
+        if(fam) c.fontFamily = fam; if(e.s) c.fontSize = e.s + "px"; if(e.b != null) c.fontWeight = e.b ? "700" : "400"; if(e.i) c.fontStyle = "italic"; if(e.k) c.textDecoration = "line-through"; if(e.c) c.color = e.c; }
+      if(e.c || e.k) r.querySelectorAll(".cell-in,.date-in,select").forEach(function(x){ if(e.c) x.style.color = e.c; if(e.k) x.style.textDecoration = "line-through"; });
     });
     document.querySelectorAll(".g-bar[data-id] .lbl, .g-side[data-tid]").forEach(function(el){
       var id = el.dataset.tid || (el.closest(".g-bar") || {}).dataset && el.closest(".g-bar").dataset.id, t = id && byId(id); if(!t) return;
       var e = tsEff(t), fam = e.f && TS_FONTS[e.f], s = el.style;
-      if(fam) s.fontFamily = fam; if(e.s) s.fontSize = Math.min(e.s, 13) + "px"; if(e.b != null) s.fontWeight = e.b ? "700" : "400"; if(e.i) s.fontStyle = "italic";
+      if(fam) s.fontFamily = fam; if(e.s) s.fontSize = Math.min(e.s, 13) + "px"; if(e.b != null) s.fontWeight = e.b ? "700" : "400"; if(e.i) s.fontStyle = "italic"; if(e.k) s.textDecoration = "line-through";
       if(e.c && el.classList.contains("g-side")) s.color = e.c;
     });
     syncBar();
@@ -4849,10 +4908,12 @@ function v4ExpPlan(){
   var _r = render; render = function(){ var x = _r.apply(this, arguments); try{ applyDom(); }catch(e){} return x; };
   /* —— 工具栏 —— */
   function cur(){ return selId ? byId(selId) : null; }
+  function refreshFontSelects(){ document.querySelectorAll("#fmtBar .fm-f").forEach(function(s){ var v = s.value === "__more" ? "" : s.value; s.innerHTML = fontOpts(v); s.value = v; }); }
   function syncBar(){
     var bar = document.getElementById("fmtBar"); if(!bar) return; var t = cur(), e = t ? tsEff(t) : {};
+    var _fv = (t && t.ts && t.ts.f) || ""; if(_fv && !bar.querySelector('.fm-f option[value="' + _fv.replace(/"/g, "") + '"]')) refreshFontSelects();
     bar.querySelector(".fm-f").value = (t && t.ts && t.ts.f) || ""; bar.querySelector(".fm-s").value = (t && t.ts && t.ts.s) || "";
-    bar.querySelector(".fm-b").classList.toggle("on", !!e.b); bar.querySelector(".fm-i").classList.toggle("on", !!e.i);
+    bar.querySelector(".fm-b").classList.toggle("on", !!e.b); bar.querySelector(".fm-i").classList.toggle("on", !!e.i); bar.querySelector(".fm-k").classList.toggle("on", !!e.k);
     bar.querySelector(".fm-cbar").style.background = e.c || "#1f2937";
     bar.classList.toggle("dis", !t);
   }
@@ -4871,10 +4932,14 @@ function v4ExpPlan(){
       + '<select class="fm-s" title="' + L("size") + '">' + sizeOpts("") + '</select>'
       + '<button type="button" class="fm-b" title="' + L("bold") + ' (Ctrl+B)"><b>B</b></button>'
       + '<button type="button" class="fm-i" title="' + L("ital") + ' (Ctrl+I)"><i style="font-family:serif">I</i></button>'
+      + '<button type="button" class="fm-k" title="' + L("strike") + ' (Ctrl+5)"><s>S</s></button>'
       + '<label class="fm-c" title="' + L("color") + '"><span class="fm-a">A</span><span class="fm-cbar"></span><input type="color" value="#1f2937"></label>'
       + '<button type="button" class="fm-x" title="' + L("clrSel") + '">⌫</button>';
     anchor.after(sp); sp.after(bar);
-    bar.querySelector(".fm-f").onchange = function(){ setTs("f", this.value); };
+    bar.querySelector(".fm-f").onchange = function(){ var sel = this; if(sel.value !== "__more"){ setTs("f", sel.value); return; }
+      if(!cur()){ toast(L("need")); syncBar(); return; }
+      addFontDlg(function(n){ if(n) setTs("f", n); else syncBar(); refreshFontSelects(); }); };
+    bar.querySelector(".fm-k").onclick = function(){ var t = cur(); setTs("k", t ? (tsEff(t).k ? "" : true) : true); };
     bar.querySelector(".fm-s").onchange = function(){ setTs("s", this.value ? +this.value : ""); };
     bar.querySelector(".fm-b").onclick = function(){ var t = cur(); setTs("b", t ? !tsEff(t).b : true); };
     bar.querySelector(".fm-i").onclick = function(){ var t = cur(); setTs("i", t ? (tsEff(t).i ? "" : true) : true); };
@@ -4883,9 +4948,9 @@ function v4ExpPlan(){
     ci.addEventListener("change", function(){ setTs("c", ci.value); });
     bar.querySelector(".fm-x").onclick = function(){ var t = cur(); if(!t){ toast(L("need")); return; } delete t.ts; save(); render(); };
     document.addEventListener("keydown", function(e){
-      if(!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return; var k = e.key.toLowerCase(); if(k !== "b" && k !== "i") return;
+      if(!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return; var k = e.key.toLowerCase(); if(k !== "b" && k !== "i" && k !== "5") return;
       var a = document.activeElement; if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; if(!cur()) return;
-      e.preventDefault(); bar.querySelector(k === "b" ? ".fm-b" : ".fm-i").click();
+      e.preventDefault(); bar.querySelector(k === "b" ? ".fm-b" : k === "5" ? ".fm-k" : ".fm-i").click();
     });
     document.addEventListener("click", function(e){ if(e.target.closest && e.target.closest(".trow,.g-bar,.g-ms")) setTimeout(syncBar, 0); });
     syncBar();
@@ -4894,13 +4959,14 @@ function v4ExpPlan(){
   function openDlg(){
     var S = state.textStyle || {}, bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "txtStyleBg";
     function row(k){ var s = S[k] || {};
-      return '<div class="ts-row" data-k="' + k + '" style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 40px;gap:6px;align-items:center;margin-bottom:8px">'
+      return '<div class="ts-row" data-k="' + k + '" style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 34px 40px;gap:6px;align-items:center;margin-bottom:8px">'
         + '<span style="font-size:13px">' + L(k) + '</span><select class="ts-f">' + fontOpts(s.f || "") + '</select><select class="ts-s">' + sizeOpts(s.s || "") + '</select>'
         + '<label title="' + L("bold") + '" style="display:flex;align-items:center;gap:2px;font-weight:700"><input type="checkbox" class="ts-b" style="width:auto"' + (s.b ? " checked" : "") + '>B</label>'
         + '<label title="' + L("ital") + '" style="display:flex;align-items:center;gap:2px;font-style:italic;font-family:serif"><input type="checkbox" class="ts-i" style="width:auto"' + (s.i ? " checked" : "") + '>I</label>'
+        + '<label title="' + L("strike") + '" style="display:flex;align-items:center;gap:2px;text-decoration:line-through"><input type="checkbox" class="ts-k" style="width:auto"' + (s.k ? " checked" : "") + '>S</label>'
         + '<input type="color" class="ts-c" value="' + (s.c || "#1f2937") + '" data-set="' + (s.c ? 1 : 0) + '" style="width:40px;height:28px;padding:0;border:1px solid var(--line);border-radius:4px"></div>'; }
     bg.innerHTML = '<div class="modal" style="width:520px"><div class="modal-h"><span>' + L("t") + '</span><button class="ts-x">×</button></div><div class="modal-b">'
-      + '<div style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 40px;gap:6px;font-size:11px;color:#6b7280;margin-bottom:6px"><span></span><span>' + L("font") + '</span><span>' + L("size") + '</span><span>B</span><span>I</span><span>A</span></div>'
+      + '<div style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 34px 40px;gap:6px;font-size:11px;color:#6b7280;margin-bottom:6px"><span></span><span>' + L("font") + '</span><span>' + L("size") + '</span><span>B</span><span>I</span><span>S</span><span>A</span></div>'
       + ["task","ms","sum"].map(row).join("")
       + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:6px 0"><input type="checkbox" class="ts-clr" style="width:auto">' + L("clr") + '</label>'
       + '<div style="font-size:11px;color:#6b7280;margin:8px 0 12px">' + L("hint") + '</div>'
@@ -4911,11 +4977,13 @@ function v4ExpPlan(){
     q(".ts-x").onclick = close; q(".ts-no").onclick = close;
     bg.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape") close(); });
     bg.querySelectorAll(".ts-c").forEach(function(i){ i.addEventListener("input", function(){ i.dataset.set = 1; }); });
-    q(".ts-def").onclick = function(){ bg.querySelectorAll(".ts-row").forEach(function(r){ r.querySelector(".ts-f").value = ""; r.querySelector(".ts-s").value = ""; r.querySelector(".ts-b").checked = false; r.querySelector(".ts-i").checked = false; r.querySelector(".ts-c").value = "#1f2937"; r.querySelector(".ts-c").dataset.set = 0; }); };
+    bg.querySelectorAll(".ts-f").forEach(function(s){ var prev = s.value; s.addEventListener("change", function(){ if(s.value !== "__more"){ prev = s.value; return; }
+      addFontDlg(function(n){ bg.querySelectorAll(".ts-f").forEach(function(o){ var v = o === s ? (n || prev) : o.value; o.innerHTML = fontOpts(v); o.value = v; }); prev = s.value; }); }); });
+    q(".ts-def").onclick = function(){ bg.querySelectorAll(".ts-row").forEach(function(r){ r.querySelector(".ts-f").value = ""; r.querySelector(".ts-s").value = ""; r.querySelector(".ts-b").checked = false; r.querySelector(".ts-i").checked = false; r.querySelector(".ts-k").checked = false; r.querySelector(".ts-c").value = "#1f2937"; r.querySelector(".ts-c").dataset.set = 0; }); };
     q(".ts-ok").onclick = function(){
       var N = {};
       bg.querySelectorAll(".ts-row").forEach(function(r){ var o = {}, f = r.querySelector(".ts-f").value, s = r.querySelector(".ts-s").value, ci = r.querySelector(".ts-c");
-        if(f) o.f = f; if(s) o.s = +s; if(r.querySelector(".ts-b").checked) o.b = true; if(r.querySelector(".ts-i").checked) o.i = true; if(+ci.dataset.set) o.c = ci.value;
+        if(f) o.f = f; if(s) o.s = +s; if(r.querySelector(".ts-b").checked) o.b = true; if(r.querySelector(".ts-i").checked) o.i = true; if(r.querySelector(".ts-k").checked) o.k = true; if(+ci.dataset.set) o.c = ci.value;
         if(Object.keys(o).length) N[r.dataset.k] = o; });
       state.textStyle = N;
       if(q(".ts-clr").checked) state.tasks.forEach(function(t){ delete t.ts; });
@@ -5489,6 +5557,29 @@ function v4ExpPlan(){
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4Msp3 = { fillDown:fillDown, drawForm:drawForm, setCol:function(c){ lastCol = c; } };
+})();
+/* ===== v4：静态界面文字补充翻译（HTML 中写死的中文 title / placeholder / 文本） ===== */
+(function(){
+  var M = [
+    ["#projName", "placeholder", "Project name", "Projektname"],
+    ["#projName", "title", "Project name: used for export title and file name", "Projektname: für Exporttitel und Dateiname"],
+    ["#lnkOem", "text", "OEM plan ↗", "OEM-Plan ↗"],
+    ["#modeBtns", "title", "Task mode", "Vorgangsmodus"],
+    ['[data-view="fit"]', "title", "Entire project (zoom to fit)", "Gesamtes Projekt (einpassen)"],
+    ["#baseSel", "title", "Baseline", "Basisplan"],
+    ["#btnExpInfo", "text", "⚙ Export info (creator / logo)", "⚙ Exportinfo (Ersteller / Logo)"],
+    ["#paneSplit", "title", "Drag to resize (double-click to reset)", "Ziehen zum Anpassen (Doppelklick = zurücksetzen)"],
+    ["#subText", "placeholder", "High-temp test,Alice,5\nVibration test,Bob,3\nSalt spray test", "Hochtemperaturtest,Anna,5\nVibrationstest,Ben,3\nSalzsprühtest"]
+  ];
+  var ZH = {};
+  function apply(){
+    M.forEach(function(m){ document.querySelectorAll(m[0]).forEach(function(el, i){ var key = m[0] + "|" + m[1] + "|" + i;
+      if(!(key in ZH)) ZH[key] = m[1] === "text" ? el.textContent : el.getAttribute(m[1]);
+      var v = lang === "en" ? m[2] : lang === "de" ? m[3] : ZH[key]; if(v == null) return;
+      if(m[1] === "text") el.textContent = v; else el.setAttribute(m[1], v); }); });
+  }
+  var _al = applyLang; applyLang = function(){ var r = _al.apply(this, arguments); try { apply(); } catch(e){} return r; };
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", function(){ setTimeout(apply, 0); }); else setTimeout(apply, 0);
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
