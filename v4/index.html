@@ -45,6 +45,9 @@ header button:hover{background:var(--steel3)}
 .toolbar .dd-m>button{text-align:left;width:100%;border-color:transparent}
 .toolbar .dd-m>button:hover{background:#f1f5f9;border-color:transparent}
 .toolbar .dd-m .ck{padding:4px 6px}
+.toolbar .dd-m>#btnColors{display:flex;align-items:center;gap:4px;padding:4px 6px;height:auto;font-size:12px;background:transparent}
+.trow{height:34px;box-sizing:border-box;overflow:hidden}
+.trow.band-sp{height:30px;background:#f8fafc;cursor:default;align-items:center;padding-left:8px;font-size:11px;color:var(--tx3)}
 .toolbar .dd-m .dd-row{display:flex;gap:4px;align-items:center}
 .toolbar .dd-m select{max-width:none}
 .toolbar .dd-h{font-size:11px;color:var(--tx3);padding:2px 6px}
@@ -341,7 +344,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
     <label class="ck"><input type="checkbox" id="ckCrit"><span data-i18n="criticalPath">关键路径</span></label>
     <label class="ck"><input type="checkbox" id="ckResWarn" checked><span data-i18n="resWarn">资源预警</span></label>
     <label class="ck"><input type="checkbox" id="ckProgLine"><span data-i18n="progLine">进度线</span></label>
-    <button id="btnColors" type="button">🎨 <span data-i18n="chartColors">颜色</span></button>
+    <button id="btnColors" type="button"><span style="width:13px;text-align:center;font-size:11px">🎨</span><span data-i18n="chartColors">颜色</span></button>
     <select id="oemSelect" title="OEM" style="display:none"></select>
   </div></div>
   <div class="dd" id="ddBase"><button class="dd-b" type="button"><span data-i18n="ddBase">基线</span> ▾</button><div class="dd-m">
@@ -1873,11 +1876,12 @@ function renderTable(){
       + ["ttype","effort","priority","text1","text2","text3","num1","num2","num3"].map(function(k){ return colVis(k) ? '<div class="c-' + k + '">' + p6Cell(t, k) + "</div>" : ""; }).join("")
       + "</div>";
   });
+  if(html && phaseAnchors().length) html = '<div class="trow band-sp">' + esc(tr("legendPhase")) + '</div>' + html; /* 与甘特图阶段色带行对齐 */
   el.innerHTML = html || '<div style="padding:20px;color:var(--tx3)">—</div>';
   renderHead();
   applyColWidths();
   /* 单击：选中行；单击任务名称直接改名（同步来的客户节点行除外）；双击：弹出编辑窗口。分组点 ▼/▶ 折叠 */
-  el.querySelectorAll(".trow").forEach(function(r){
+  el.querySelectorAll(".trow[data-id]").forEach(function(r){
     r.addEventListener("click", function(e){
       if(e.target.closest(".nm-edit")) return;
       var id = this.dataset.id, t = byId(id);
