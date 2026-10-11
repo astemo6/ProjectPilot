@@ -204,7 +204,7 @@ body.resizing .col-resize{display:block}
 .g-row{position:relative;border-bottom:1px solid var(--line2)}
 .g-row.group{background:#e8eef555}
 .g-bar{position:absolute;height:20px;top:7px;border-radius:4px;cursor:grab;display:flex;align-items:center;overflow:hidden;font-size:11px;color:#fff;white-space:nowrap}
-.g-bar .fill{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.35);border-radius:4px 0 0 4px}
+.g-bar .fill{position:absolute;left:0;top:7px;height:6px;background:#1e3a8a;border-radius:0}
 .g-bar .lbl{position:relative;padding:0 8px;z-index:1}
 .g-bar.crit{border:2px solid #7f1d1d}
 .g-gap{position:absolute;height:24px;background:var(--bg-gantt,#fff);z-index:3;pointer-events:none;background-image:linear-gradient(to right,#64748b 50%,transparent 0);background-size:6px 2px;background-repeat:repeat-x;background-position:0 50%}
@@ -212,6 +212,9 @@ body.resizing .col-resize{display:block}
 .g-lvl::after{content:"";position:absolute;right:-1px;top:-5px;height:8px;border-right:2px solid #94a3b8}
 .g-bar.crit .lbl{font-weight:700}
 .g-side{position:absolute;height:34px;line-height:34px;font-size:11px;color:#374151;white-space:nowrap;pointer-events:none;z-index:2}
+.g-sum{position:absolute;height:5px;background:currentColor;pointer-events:none;z-index:1}
+.g-sum:before,.g-sum:after{content:"";position:absolute;top:5px;border-bottom:6px solid transparent}
+.g-sum:before{left:0;border-left:6px solid currentColor}.g-sum:after{right:0;border-right:6px solid currentColor}
 .g-ms{position:absolute;top:9px;width:16px;height:16px;transform:rotate(45deg);cursor:grab;border-radius:2px}
 .g-ms.crit{box-shadow:0 0 0 2px #7f1d1d}
 .g-base{position:absolute;height:5px;border-radius:2px;background:#9ca3af;opacity:.85;z-index:2;pointer-events:none}
@@ -338,6 +341,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
     <label class="ck"><input type="checkbox" id="ckCrit"><span data-i18n="criticalPath">关键路径</span></label>
     <label class="ck"><input type="checkbox" id="ckResWarn" checked><span data-i18n="resWarn">资源预警</span></label>
     <label class="ck"><input type="checkbox" id="ckProgLine"><span data-i18n="progLine">进度线</span></label>
+    <button id="btnColors" type="button">🎨 <span data-i18n="chartColors">颜色</span></button>
     <select id="oemSelect" title="OEM" style="display:none"></select>
   </div></div>
   <div class="dd" id="ddBase"><button class="dd-b" type="button"><span data-i18n="ddBase">基线</span> ▾</button><div class="dd-m">
@@ -752,6 +756,9 @@ const TPL_ANPQP = [
 ];
 /* ============ 数据模型与状态 ============ */
 var LS_KEY = "gantt-exec-v4";
+var CHART_COL_DEF = { task:"#2563eb", ms:"#dc2626", sum:"#111111", prog:"#1e3a8a" };
+function CC(){ var c = state.chartColors || {}, r = {}; for(var k in CHART_COL_DEF) r[k] = /^#[0-9a-f]{6}$/i.test(c[k] || "") ? c[k] : CHART_COL_DEF[k]; return r; }
+function tColor(t){ return t.color || CC()[t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task"]; }
 var COLORS = ["#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#dc2626","#4f46e5","#0d9488"];
 var state = { tasks:[], seq:1, view:"day", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{}, colDefV4:true };
 /* 列模型：ID 与任务名称为冻结固定列（常显不可隐藏），其余列可显隐、可拖拽调宽 */
@@ -797,7 +804,7 @@ function mkTask(o){
   return { id:o.id||newId(), name:o.name||"", type:o.type||"task",
     group:o.group||"", start:o.start||(o.type==="group"?"":fmtD(new Date())), dur:o.dur!=null?o.dur:(o.type==="group"?0:5),
     end:o.end||"", deps:o.deps||[], deadline:o.deadline||"", owner:o.owner||"", output:o.output||"",
-    progress:o.progress||0, remarks:o.remarks||"", color:o.color||COLORS[0],
+    progress:o.progress||0, remarks:o.remarks||"", color:o.color||"",
     manual:!!o.manual, source:o.source||"manual", subs:o.subs||[], cons:o.cons||"ASAP", consDate:o.consDate||"" };
 }
 /* 撤销/重做：每次保存时对任务 + 基线做快照（界面设置如列宽、折叠不计入） */
@@ -2155,21 +2162,23 @@ function renderGantt(){
   vis.forEach(function(t, ri){
     var y = BAND_H + ri * ROW_H;
     html += '<div class="g-row' + (t.type === "group" ? " group" : "") + '" style="height:' + ROW_H + 'px"></div>';
-    if(t.type === "group") return;
+    if(t.type === "group"){ var _gs = grpSpan(t), _a = parseD(_gs.s), _b = parseD(_gs.e);
+      if(_a && _b){ var _x1 = X(_a, min), _x2 = X(addDays(_b, 1), min); html += '<div class="g-sum" style="left:' + _x1 + 'px;top:' + (y + 11) + 'px;width:' + Math.max(_x2 - _x1, 4) + 'px;color:' + tColor(t) + '" title="' + esc(t.name) + '"></div>'; }
+      return; }
     var s = parseD(t.start); if(!s) return;
     var crit = state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
     var late = t.deadline && taskEnd(t) > t.deadline;
     var tip = esc(t.name) + (late ? " ⚠ " + tr("deadlineWarn") : "");
     if(t.type === "milestone"){
       var mx = barGeom(t, function(d){ return X(d, min); }, PX_DAY).c - 8;
-      html += '<div class="g-ms' + (crit ? " crit" : "") + '" data-id="' + t.id + '" style="left:' + mx + 'px;top:' + (y + 9) + 'px;background:' + (t.color || "#dc2626") + '" title="' + tip + '"></div>';
+      html += '<div class="g-ms' + (crit ? " crit" : "") + '" data-id="' + t.id + '" style="left:' + mx + 'px;top:' + (y + 9) + 'px;background:' + tColor(t) + '" title="' + tip + '"></div>';
       var mlt = barLblMode() === "name" ? t.name : barDateText(t);
       if(mlt) html += '<div class="g-side" style="left:' + (mx + 22) + 'px;top:' + y + 'px">' + esc(mlt) + "</div>";
     } else {
       var e = parseD(taskEnd(t));
       var _g = barGeom(t, function(d){ return X(d, min); }, PX_DAY), bx = _g.l, bw = _g.w;
-      html += '<div class="g-bar' + (crit ? " crit" : "") + '" data-id="' + t.id + '" style="left:' + bx + 'px;top:' + (y + 7) + 'px;width:' + bw + 'px;background:' + (t.color || "#2563eb") + '" title="' + tip + '">'
-        + '<div class="fill" style="width:' + t.progress + '%"></div>'
+      html += '<div class="g-bar' + (crit ? " crit" : "") + '" data-id="' + t.id + '" style="left:' + bx + 'px;top:' + (y + 7) + 'px;width:' + bw + 'px;background:' + tColor(t) + '" title="' + tip + '">'
+        + '<div class="fill" style="width:' + t.progress + '%;background:' + CC().prog + '"></div>'
         + (barLblMode() === "name" ? '<span class="lbl">' + esc(t.name) + " " + t.progress + "%</span>" : "") + "</div>";
       gapRanges(t).forEach(function(g){ html += '<div class="g-gap" style="left:' + X(g.s, min) + 'px;top:' + (y + 5) + 'px;width:' + ((diffDays(g.s, g.e) + 1) * PX_DAY) + 'px"></div>'; });
       if(+t.lvl > 0){ var lvs = withCal(t, function(){ return subWorkdays(s, +t.lvl); }); html += '<div class="g-lvl" title="' + esc(tr("lvlTip").replace("{0}", t.lvl)) + '" style="left:' + X(lvs, min) + 'px;top:' + (y + 16) + 'px;width:' + Math.max(diffDays(lvs, s) * PX_DAY, 2) + 'px"></div>'; }
@@ -2230,7 +2239,7 @@ function openModal(id){
   editId = id;
   var t = id ? byId(id) : null;
   var isNew = !t;
-  if(isNew) t = { type:"task", name:"", group:"", start:fmtD(new Date()), dur:5, deps:[], owner:"", output:"", progress:0, remarks:"", color:COLORS[0] };
+  if(isNew) t = { type:"task", name:"", group:"", start:fmtD(new Date()), dur:5, deps:[], owner:"", output:"", progress:0, remarks:"", color:"" };
   document.getElementById("modalTitle").textContent = isNew ? tr("newTask") : tr("editTask");
   document.getElementById("modalDel").style.display = isNew ? "none" : "";
   var groups = state.tasks.filter(function(x){ return x.type === "group"; });
@@ -2268,7 +2277,7 @@ function openModal(id){
     + '<div class="frow2"><div class="frow"><label>' + tr("fOwner") + '</label><input id="fOwner" value="' + esc(t.owner||"") + '"></div>'
     + '<div class="frow"><label>' + tr("fOutput") + '</label><input id="fOutput" value="' + esc(t.output||"") + '"></div></div>'
     + '<div class="frow"><label>' + tr("fRemarks") + '</label><input id="fRemarks" value="' + esc(t.remarks||"") + '"></div>'
-    + '<div class="frow"><label>' + tr("fColor") + '</label><input id="fColor" type="color" value="' + (t.color||"#2563eb") + '" style="height:36px;padding:2px"></div>';
+    + '<div class="frow"><label>' + tr("fColor") + '</label><input id="fColor" type="color" value="' + tColor(t) + '" style="height:36px;padding:2px"></div>';
   // 依赖文本框 ↔ 复选框双向同步：文本支持 '3FS,5SS+2d' 格式（类型/滞后）
   document.getElementById("fDepsText").addEventListener("input", function(){
     var set = {};
@@ -2300,7 +2309,7 @@ function saveModal(){
     manual:document.getElementById("fManual").checked,
     owner:document.getElementById("fOwner").value.trim(), output:document.getElementById("fOutput").value.trim(),
     progress:Math.min(100, Math.max(0, +document.getElementById("fProg").value || 0)),
-    remarks:document.getElementById("fRemarks").value.trim(), color:document.getElementById("fColor").value,
+    remarks:document.getElementById("fRemarks").value.trim(), color:(function(){ var v = document.getElementById("fColor").value, ty = document.getElementById("fType").value; return v.toLowerCase() === CC()[ty === "milestone" ? "ms" : ty === "group" ? "sum" : "task"].toLowerCase() ? "" : v; })(),
     cal:(document.getElementById("fTaskCal") || {}).value || "", splits:parseSplits((document.getElementById("fSplit") || {}).value) };
   var cons = document.getElementById("fCons") ? document.getElementById("fCons").value : "ASAP";
   var consDate = document.getElementById("fConsDate") ? document.getElementById("fConsDate").value : "";
@@ -2802,7 +2811,7 @@ function renderExportCanvas(cb){
 }
 /* ===== v4：MS Project 打印样式导出（A3 横向一页：左表格 + 右时间轴甘特 + 页脚图例）===== */
 function drawMspExport(cb, plan, imgL){
-  var COL = plan.colors || (typeof expColors === "function" ? expColors() : { task:"#8fb4e3", ms:"#dc2626", sum:"#111", prog:"#1f4e8c" });
+  var COL = CC();
   var vis = visibleTasks(), rn = rowNoMap(), zh = lang === "zh";
   var L = { id:"ID", name:tr("cName"), dur:tr("cDur"), start:tr("cStart"), fin:zh ? "完成" : (lang === "de" ? "Ende" : "Finish"),
     upd:zh ? "更新日期" : (lang === "de" ? "Aktualisiert" : "Update"), cr:tr("expCreator"),
@@ -2886,19 +2895,19 @@ function drawMspExport(cb, plan, imgL){
     if(!sp.s) return;
     var bx = X(sp.s), bx2 = X(addDays(sp.e, 1)), lf = expFont(10, true);
     if(grp){ /* 摘要：黑色细条 + 两端下勾 */
-      ctx.fillStyle = COL.sum; ctx.fillRect(bx, cy - 3, Math.max(bx2 - bx, 2), 3);
+      ctx.fillStyle = tColor(t); ctx.fillRect(bx, cy - 3, Math.max(bx2 - bx, 2), 3);
       ctx.beginPath(); ctx.moveTo(bx, cy - 3); ctx.lineTo(bx + 4, cy - 3); ctx.lineTo(bx, cy + 4); ctx.closePath(); ctx.fill();
       ctx.beginPath(); ctx.moveTo(bx2, cy - 3); ctx.lineTo(bx2 - 4, cy - 3); ctx.lineTo(bx2, cy + 4); ctx.closePath(); ctx.fill();
       nameLbl(t.name, bx - 6, cy, lf, bx2 + 6);
     } else if(t.type === "milestone"){
       var mx = X(sp.s);
-      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = COL.ms; ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); /* 与图例一致：里程碑统一红色 */
+      ctx.save(); ctx.translate(mx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = tColor(t); ctx.fillRect(-4.5, -4.5, 9, 9); ctx.restore(); /* 与图例一致：里程碑统一红色 */
       var dt = fmtD(sp.s); ctx.font = expFont(10, true); var dw = ctx.measureText(dt).width;
       nameLbl(t.name, mx - 9, cy, lf, mx + 9 + dw + 8);
       txt(dt, mx + 9, cy, expFont(10, true), "#111", "left");
     } else {
       var bh = Math.max(6, Math.min(10, ROW - 8)), bw = Math.max(bx2 - bx, 2);
-      ctx.fillStyle = COL.task; ctx.fillRect(bx, cy - bh / 2, bw, bh);
+      ctx.fillStyle = tColor(t); ctx.fillRect(bx, cy - bh / 2, bw, bh);
       if(+t.progress > 0){ ctx.fillStyle = COL.prog; ctx.fillRect(bx, cy - 1.5, bw * Math.min(100, +t.progress) / 100, 3); }
       var de = fmtD(sp.e); ctx.font = expFont(10, true); var dw2 = ctx.measureText(de).width;
       nameLbl(t.name, bx - 6, cy, lf, bx2 + 5 + dw2 + 8);
@@ -4551,13 +4560,52 @@ I18N.zh.ddSched = "排程"; I18N.en.ddSched = "Schedule"; I18N.de.ddSched = "Pla
 I18N.zh.ddExp = "导出"; I18N.en.ddExp = "Export"; I18N.de.ddExp = "Export";
 I18N.zh.ddImp = "导入"; I18N.en.ddImp = "Import"; I18N.de.ddImp = "Import";
 
+I18N.zh.chartColors = "颜色"; I18N.en.chartColors = "Colors"; I18N.de.chartColors = "Farben";
+/* ===== v4：甘特图颜色（任务条 / 里程碑 / 摘要 / 进度），state.chartColors；单个任务可在编辑框单独设色（t.color），导出跟随 ===== */
+(function(){
+  var TXT = { zh:{ t:"甘特图颜色", task:"任务条", ms:"里程碑", sum:"摘要", prog:"进度", def:"恢复默认", clr:"同时清除各任务单独设置的颜色", sel:"把选中任务设为对应颜色", hint:"单个任务的颜色：双击任务，在编辑框「颜色」里设置。导出 PDF/JPG 跟随这里的颜色。", ok:"确定", no:"取消", done:"已更新颜色" },
+    en:{ t:"Chart colors", task:"Task bar", ms:"Milestone", sum:"Summary", prog:"Progress", def:"Reset", clr:"Also clear per-task colors", sel:"Apply to selected tasks", hint:"Per-task color: double-click a task and use Color. PDF/JPG export follows these colors.", ok:"OK", no:"Cancel", done:"Colors updated" },
+    de:{ t:"Diagrammfarben", task:"Balken", ms:"Meilenstein", sum:"Sammelvorgang", prog:"Fortschritt", def:"Standard", clr:"Einzelfarben der Vorgänge entfernen", sel:"Auf ausgewählte Vorgänge anwenden", hint:"Einzelfarbe: Vorgang doppelklicken → Farbe. PDF/JPG-Export übernimmt diese Farben.", ok:"OK", no:"Abbrechen", done:"Farben aktualisiert" } };
+  function T(k){ return (TXT[lang] || TXT.zh)[k]; }
+  function migrate(){ /* 旧数据：默认蓝色写死在每个任务上 → 改为跟随默认；旧导出颜色迁移 */
+    if(state._colMig) return; state._colMig = 1;
+    (state.tasks || []).forEach(function(t){ if(String(t.color || "").toLowerCase() === "#2563eb") t.color = ""; });
+    var ec = state.info && state.info.expColors; if(ec && !state.chartColors){ state.chartColors = { ms:ec.ms, sum:ec.sum }; } if(state.info) delete state.info.expColors;
+    save();
+  }
+  var _r = render; render = function(){ migrate(); return _r.apply(this, arguments); };
+  function selIds(){ return (selId && byId(selId)) ? [selId] : []; }
+  function open(){
+    var c = CC(), bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "chartColBg";
+    var sel = selIds();
+    bg.innerHTML = '<div class="modal" style="width:420px"><div class="modal-h"><span>' + T("t") + '</span><button class="cc-x">×</button></div><div class="modal-b">'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-bottom:12px">'
+      + ["task","ms","sum","prog"].map(function(k){ return '<label style="display:flex;align-items:center;gap:8px;font-size:13px"><input type="color" class="cc-c" data-k="' + k + '" value="' + c[k] + '" style="width:40px;height:28px;padding:0;border:1px solid #d1d5db">' + T(k) + '</label>'; }).join("")
+      + '</div><label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px"><input type="checkbox" class="cc-clr" style="width:auto">' + T("clr") + '</label>'
+      + (sel.length ? '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px"><input type="checkbox" class="cc-sel" style="width:auto">' + T("sel") + ' (' + sel.length + ')</label>' : '')
+      + '<div style="font-size:11px;color:#6b7280;margin:8px 0 12px">' + T("hint") + '</div>'
+      + '<div style="display:flex;justify-content:space-between;gap:8px"><button class="cc-def">' + T("def") + '</button><span><button class="cc-no">' + T("no") + '</button> <button class="primary cc-ok">' + T("ok") + '</button></span></div></div></div>';
+    document.body.appendChild(bg);
+    var q = function(s){ return bg.querySelector(s); };
+    function close(){ bg.remove(); }
+    q(".cc-x").onclick = close; q(".cc-no").onclick = close;
+    bg.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape") close(); });
+    q(".cc-def").onclick = function(){ bg.querySelectorAll(".cc-c").forEach(function(i){ i.value = CHART_COL_DEF[i.dataset.k]; }); };
+    q(".cc-ok").onclick = function(){
+      var nc = {}; bg.querySelectorAll(".cc-c").forEach(function(i){ nc[i.dataset.k] = i.value; }); state.chartColors = nc;
+      if(q(".cc-clr").checked) state.tasks.forEach(function(t){ t.color = ""; });
+      if(q(".cc-sel") && q(".cc-sel").checked) sel.forEach(function(id){ var t = byId(id); if(t) t.color = nc[t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task"]; });
+      save(); render(); close(); toast(T("done"));
+    };
+  }
+  function setup(){ var b = document.getElementById("btnColors"); if(b && !b._v4){ b._v4 = 1; b.addEventListener("click", open); } }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+})();
 /* ===== v4：项目名称 + 导出信息（制作者 / Logo），存于 state.info（title / author / logo） ===== */
 function v4ExpPlan(){
   var I = state.info || {};
-  return { projectName:I.title || '', creatorName:I.author || '', ckShowCreator:true, ckShowDate:true, logoLeft:I.logo || '', colors:expColors() };
+  return { projectName:I.title || '', creatorName:I.author || '', ckShowCreator:true, ckShowDate:true, logoLeft:I.logo || '', colors:CC() };
 }
-var EXP_COL_DEF = { task:"#8fb4e3", ms:"#dc2626", sum:"#111111", prog:"#1f4e8c" };
-function expColors(){ var c = (state.info && state.info.expColors) || {}, r = {}; for(var k in EXP_COL_DEF) r[k] = /^#[0-9a-f]{6}$/i.test(c[k] || "") ? c[k] : EXP_COL_DEF[k]; return r; }
 (function(){
   function syncName(){ var el = document.getElementById("projName"); if(el && document.activeElement !== el) el.value = (state.info && state.info.title) || ""; }
   function migOemNames(){ var mig = 0;
@@ -4581,19 +4629,13 @@ function expColors(){ var c = (state.info && state.info.expColors) || {}, r = {}
       + '<label class="ei-row">项目名称（导出标题 / 文件名）<input type="text" class="ei-name"></label>'
       + '<label class="ei-row">制作者（导出图左下角）<input type="text" class="ei-cr" placeholder="如：张三"></label>'
       + '<div class="ei-row">Logo（导出图左上角）<div class="ei-logo"><img class="ei-img"><button class="ei-up">上传图片</button><button class="ei-clr">清除</button><input type="file" accept="image/*" class="ei-file" style="display:none"></div></div>'
-      + '<div class="ei-row">导出颜色<div class="ei-cols" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:4px">'
-      + [["task","任务条"],["ms","里程碑"],["sum","摘要"],["prog","进度"]].map(function(p){ return '<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="color" class="ei-c" data-k="' + p[0] + '" style="width:30px;height:22px;padding:0;border:1px solid #d1d5db">' + p[1] + '</label>'; }).join("")
-      + '<button class="ei-cdef" style="font-size:11px">恢复默认</button></div></div>'
-      + '<div style="font-size:11px;color:#6b7280;margin-bottom:12px">日期自动取导出当天；文件名默认为「项目名称_日期」。</div>'
+      + '<div style="font-size:11px;color:#6b7280;margin-bottom:12px">日期自动取导出当天；文件名默认为「项目名称_日期」；导出颜色跟随甘特图（显示 ▾ → 颜色）。</div>'
       + '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="ei-cancel">取消</button><button class="primary ei-ok">确定</button></div></div></div>';
     document.body.appendChild(bg);
     var q = function(s){ return bg.querySelector(s); };
     q(".ei-name").value = I.title || ""; q(".ei-cr").value = I.author || "";
     function showLogo(){ var im = q(".ei-img"); if(logo){ im.src = logo; im.style.display = ""; q(".ei-clr").style.display = ""; } else { im.removeAttribute("src"); im.style.display = "none"; q(".ei-clr").style.display = "none"; } }
     showLogo();
-    var cols = expColors();
-    bg.querySelectorAll(".ei-c").forEach(function(inp){ inp.value = cols[inp.dataset.k]; });
-    q(".ei-cdef").onclick = function(){ bg.querySelectorAll(".ei-c").forEach(function(inp){ inp.value = EXP_COL_DEF[inp.dataset.k]; }); };
     q(".ei-up").onclick = function(){ q(".ei-file").click(); };
     q(".ei-clr").onclick = function(){ logo = ""; showLogo(); };
     q(".ei-file").onchange = function(){
@@ -4617,7 +4659,6 @@ function expColors(){ var c = (state.info && state.info.expColors) || {}, r = {}
     q(".ei-ok").onclick = function(){
       I.title = q(".ei-name").value.trim(); I.author = q(".ei-cr").value.trim();
       if(logo) I.logo = logo; else delete I.logo;
-      var ec = {}; bg.querySelectorAll(".ei-c").forEach(function(inp){ ec[inp.dataset.k] = inp.value; }); I.expColors = ec;
       save(); syncName(); close(); toast("已保存导出信息");
     };
     setTimeout(function(){ q(".ei-cr").focus(); }, 0);
