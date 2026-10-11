@@ -457,7 +457,7 @@ html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:no
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.8</span>
+  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.9</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="color:#fff;opacity:.85;font-size:13px;text-decoration:none;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:3px 10px;margin-right:8px">OEM 开发计划 ↗</a>
@@ -2888,6 +2888,7 @@ function importXMLText(text, asSub){
         var _ac = xmlTagText(el, "ActualCost"); if(+_ac) t.actCost = +_ac;
         var _aw = xmlTagText(el, "ActualWork").match(/PT(\d+(?:\.\d+)?)H(\d+)M/); if(_aw && (+_aw[1] || +_aw[2])) t.actWork = +_aw[1] + (+_aw[2]) / 60;
         var _nt = xmlTagText(el, "Notes"); if(_nt && !t.remarks) t.remarks = _nt;
+        var _hla = xmlKidText(el, "HyperlinkAddress"); if(_hla && !/^javascript:/i.test(_hla)) t.link = { url:_hla, text:xmlKidText(el, "Hyperlink") };
         if(xmlTagText(el, "Manual") === "1") t.manual = true;
         var _cty = xmlTagText(el, "ConstraintType"), _cd = xmlTagText(el, "ConstraintDate").slice(0, 10);
         var _cmap = ["ASAP","ALAP","MSO","MFO","SNET","SNLT","FNET","FNLT"][+_cty];
@@ -6074,6 +6075,148 @@ function v4ExpPlan(){
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
   window.__v4Note = { note:noteDlg, link:linkDlg, openLink:openLink };
+})();
+/* ===== v4.9：对标 GanttProject —— 导入/导出 .gan（GanttProject 原生格式）、导入 CSV 任务（GanttProject / 本工具 CSV） ===== */
+(function(){
+  var TX = {
+    zh:{ impGan:"导入 GanttProject (.gan)", expGan:"导出 GanttProject (.gan)", impCsv:"导入 CSV 任务", bad:"无法识别的文件", noTask:"文件里没有任务", noName:"CSV 缺少「名称 / Name」列" },
+    en:{ impGan:"Import GanttProject (.gan)", expGan:"Export GanttProject (.gan)", impCsv:"Import CSV tasks", bad:"Unrecognized file", noTask:"No tasks in file", noName:"CSV has no Name column" },
+    de:{ impGan:"GanttProject importieren (.gan)", expGan:"GanttProject exportieren (.gan)", impCsv:"CSV-Vorgänge importieren", bad:"Unbekannte Datei", noTask:"Keine Vorgänge in der Datei", noName:"CSV ohne Spalte Name" } };
+  function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
+  function X(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  /* 统一中间结构 → MSPDI XML，交给现有 XML 导入（分组、依赖、资源、分配全部复用） */
+  /* rows: [{ uid, lvl, sum, name, start, dur, ms, pct, notes, link, linkText, prio, preds:[{uid,type,lag}], res:[{name,units}] }] */
+  function toMspdi(title, rows){
+    var resIdx = {}, resList = [], asg = [];
+    rows.forEach(function(r){ (r.res || []).forEach(function(a){ if(!a.name) return; if(!(a.name in resIdx)){ resIdx[a.name] = resList.length + 1; resList.push(a.name); } asg.push([r.uid, resIdx[a.name], a.units == null ? 1 : a.units]); }); });
+    var MT = { FF:0, FS:1, SF:2, SS:3 };
+    var x = '<?xml version="1.0" encoding="UTF-8"?>\n<Project xmlns="http://schemas.microsoft.com/project"><Name>' + X(title || "") + "</Name><Title>" + X(title || "") + "</Title><MinutesPerDay>480</MinutesPerDay><Tasks>";
+    rows.forEach(function(r, i){
+      x += "<Task><UID>" + r.uid + "</UID><ID>" + (i + 1) + "</ID><Name>" + X(r.name) + "</Name><OutlineLevel>" + r.lvl + "</OutlineLevel><Summary>" + (r.sum ? 1 : 0) + "</Summary>";
+      if(!r.sum){ var d = r.ms ? 0 : Math.max(0, +r.dur || 0);
+        x += "<Start>" + r.start + "T08:00:00</Start><Duration>PT" + Math.round(d * 8) + "H0M0S</Duration><Milestone>" + (r.ms ? 1 : 0) + "</Milestone><PercentComplete>" + (Math.max(0, Math.min(100, Math.round(+r.pct || 0)))) + "</PercentComplete>"; }
+      if(r.notes) x += "<Notes>" + X(r.notes) + "</Notes>";
+      if(r.link) x += "<Hyperlink>" + X(r.linkText || "") + "</Hyperlink><HyperlinkAddress>" + X(r.link) + "</HyperlinkAddress>";
+      if(r.prio != null) x += "<Priority>" + r.prio + "</Priority>";
+      (r.preds || []).forEach(function(p){ x += "<PredecessorLink><PredecessorUID>" + p.uid + "</PredecessorUID><Type>" + (MT[p.type] != null ? MT[p.type] : 1) + "</Type><LinkLag>" + Math.round((+p.lag || 0) * 4800) + "</LinkLag><LagFormat>7</LagFormat></PredecessorLink>"; });
+      x += "</Task>"; });
+    x += "</Tasks><Resources>" + resList.map(function(n, i){ return "<Resource><UID>" + (i + 1) + "</UID><ID>" + (i + 1) + "</ID><Name>" + X(n) + "</Name><Type>1</Type></Resource>"; }).join("") + "</Resources><Assignments>"
+      + asg.map(function(a, i){ return "<Assignment><UID>" + (i + 1) + "</UID><TaskUID>" + a[0] + "</TaskUID><ResourceUID>" + a[1] + "</ResourceUID><Units>" + a[2] + "</Units></Assignment>"; }).join("") + "</Assignments></Project>";
+    return x; }
+
+  /* —— .gan 导入 —— GanttProject：<depend> 写在前置任务上，id 指向后续任务；类型 1=SS 2=FS 3=FF 4=SF */
+  var GT = { "1":"SS", "2":"FS", "3":"FF", "4":"SF" };
+  function ganToRows(doc){
+    var rows = [], byGid = {}, prd = {}, alloc = {};
+    var resName = {}; Array.prototype.forEach.call(doc.getElementsByTagName("resource"), function(r){ resName[r.getAttribute("id")] = r.getAttribute("name") || ""; });
+    Array.prototype.forEach.call(doc.getElementsByTagName("allocation"), function(a){ var tid = a.getAttribute("task-id"), n = resName[a.getAttribute("resource-id")]; if(n == null) return; (alloc[tid] = alloc[tid] || []).push({ name:n, units:(parseFloat(a.getAttribute("load")) || 100) / 100 }); });
+    var tasksEl = doc.getElementsByTagName("tasks")[0]; if(!tasksEl) return rows;
+    (function walk(parent, lvl){ Array.prototype.forEach.call(parent.children, function(el){ if(el.tagName !== "task") return;
+      var gid = el.getAttribute("id"), kids = Array.prototype.filter.call(el.children, function(c){ return c.tagName === "task"; }), nt = el.getElementsByTagName("notes")[0];
+      var notes = ""; Array.prototype.forEach.call(el.children, function(c){ if(c.tagName === "notes") notes = c.textContent || ""; });
+      var wl = el.getAttribute("webLink") || ""; try { wl = decodeURIComponent(wl); } catch(e){}
+      var r = { uid:rows.length + 1, gid:gid, lvl:lvl, sum:kids.length > 0, name:el.getAttribute("name") || "?", start:el.getAttribute("start") || fmtD(new Date()), dur:parseFloat(el.getAttribute("duration")) || 0,
+        ms:el.getAttribute("meeting") === "true", pct:parseFloat(el.getAttribute("complete")) || 0, notes:notes.trim(), link:/^https?:|^mailto:|^file:/i.test(wl) ? wl : "", preds:[], res:alloc[gid] || [] };
+      var pr = el.getAttribute("priority"); if(pr != null) r.prio = ({ "0":300, "1":500, "2":700, "3":100, "4":900 })[pr];
+      byGid[gid] = r; rows.push(r);
+      Array.prototype.forEach.call(el.children, function(c){ if(c.tagName !== "depend") return; var to = c.getAttribute("id"); (prd[to] = prd[to] || []).push({ from:gid, type:GT[c.getAttribute("type")] || "FS", lag:parseFloat(c.getAttribute("difference")) || 0 }); });
+      if(kids.length) walk(el, lvl + 1); }); })(tasksEl, 1);
+    rows.forEach(function(r){ (prd[r.gid] || []).forEach(function(p){ var f = byGid[p.from]; if(f) r.preds.push({ uid:f.uid, type:p.type, lag:p.lag }); }); });
+    return rows; }
+  function importGanText(text){
+    var doc = new DOMParser().parseFromString(String(text), "text/xml");
+    if(doc.getElementsByTagName("parsererror").length || doc.documentElement.tagName !== "project"){ toast(L("bad")); return; }
+    var rows = ganToRows(doc); if(!rows.length){ toast(L("noTask")); return; }
+    importXMLText(toMspdi(doc.documentElement.getAttribute("name") || "", rows), false); }
+
+  /* —— CSV 导入：自动识别 GanttProject CSV（ID, Name, Begin date, End date, Duration, Completion, Predecessors, Outline number, Resources, Web Link, Notes）与本工具导出的 CSV —— */
+  function parseCsv(s){ s = String(s).replace(/^\ufeff/, ""); var sep = (s.split("\n")[0].match(/;/g) || []).length > (s.split("\n")[0].match(/,/g) || []).length ? ";" : (s.split("\n")[0].indexOf("\t") >= 0 ? "\t" : ",");
+    var out = [], row = [], f = "", q = false; for(var i = 0; i < s.length; i++){ var c = s[i];
+      if(q){ if(c === '"'){ if(s[i + 1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+      else if(c === '"') q = true; else if(c === sep){ row.push(f); f = ""; } else if(c === "\n" || c === "\r"){ if(c === "\r" && s[i + 1] === "\n") i++; row.push(f); f = ""; if(row.some(function(x){ return x.trim() !== ""; })) out.push(row); row = []; } else f += c; }
+    row.push(f); if(row.some(function(x){ return x.trim() !== ""; })) out.push(row); return out; }
+  function anyDate(v){ v = String(v || "").trim(); if(!v) return null; var m = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/); if(m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = v.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})/); if(m){ var y = +m[3]; if(y < 100) y += 2000; var a = +m[1], b = +m[2]; /* 点分隔按日.月.年，斜杠按月/日/年（GanttProject 英文默认） */
+      return v.indexOf(".") >= 0 || a > 12 ? new Date(y, b - 1, a) : new Date(y, a - 1, b); }
+    var d = new Date(v); return isNaN(d) ? null : d; }
+  function csvToRows(tab){
+    var H = tab[0].map(function(h){ return h.trim().toLowerCase(); });
+    function col(){ for(var i = 0; i < arguments.length; i++){ var k = H.indexOf(arguments[i]); if(k >= 0) return k; } return -1; }
+    var C = { id:col("id","标识号","编号"), name:col("name","名称","任务名称","task name"), start:col("begin date","start","开始","开始时间","start date"), end:col("end date","end","finish","完成","结束","完成时间"),
+      dur:col("duration","dur","工期"), pct:col("completion","progress","% complete","完成%","完成百分比"), pred:col("predecessors","deps","前置任务","前置"), outline:col("outline number","outline","大纲数字","wbs"),
+      res:col("resources","owner","coordinator","资源名称","资源","负责人"), link:col("web link","超链接","link"), notes:col("notes","remarks","备注"), type:col("type","类型"), group:col("group","分组") };
+    if(C.name < 0) return null;
+    var body = tab.slice(1), rows = [], idMap = {}, grpRow = {};
+    body.forEach(function(c){ var name = (c[C.name] || "").trim(); if(!name) return;
+      var s = anyDate(C.start >= 0 ? c[C.start] : ""), e = anyDate(C.end >= 0 ? c[C.end] : ""), d = C.dur >= 0 ? parseFloat(String(c[C.dur]).replace(/[^\d.\-]/g, "")) : NaN;
+      if(!s) s = new Date(); if(isNaN(d)) d = e ? workdaysBetween(s, e) + 1 : 1;
+      var ty = C.type >= 0 ? String(c[C.type]).toLowerCase() : "", ms = ty === "milestone" || (C.type < 0 && d === 0);
+      var r = { uid:rows.length + 1, name:name, start:fmtD(s), dur:ms ? 0 : d, ms:ms, pct:C.pct >= 0 ? parseFloat(c[C.pct]) || 0 : 0, notes:C.notes >= 0 ? c[C.notes] : "", link:C.link >= 0 ? c[C.link].trim() : "",
+        on:C.outline >= 0 ? String(c[C.outline]).trim() : "", grp:C.group >= 0 ? String(c[C.group]).trim() : "", isGrp:ty === "group", predTxt:C.pred >= 0 ? c[C.pred] : "", res:[] };
+      if(C.res >= 0) String(c[C.res] || "").split(/[;,，；]/).forEach(function(x){ var m = x.trim().match(/^(.*?)\s*(?:\[(\d+(?:\.\d+)?)%?\])?$/); if(m && m[1]) r.res.push({ name:m[1].trim(), units:m[2] ? +m[2] / 100 : 1 }); });
+      if(C.id >= 0 && String(c[C.id]).trim()) idMap[String(c[C.id]).trim()] = r; idMap["#" + (rows.length + 1)] = r;
+      rows.push(r); });
+    /* 层级：大纲数字优先；否则按「分组」列建立摘要任务 */
+    if(rows.some(function(r){ return r.on; })){
+      rows.forEach(function(r, i){ r.lvl = r.on ? r.on.split(".").length : 1; var nx = rows[i + 1]; r.sum = !!(nx && nx.on && r.on && nx.on.indexOf(r.on + ".") === 0); });
+    } else if(rows.some(function(r){ return r.isGrp || r.grp; })){
+      var out = [], depth = {};
+      rows.forEach(function(r){ if(r.isGrp){ r.sum = true; r.lvl = r.grp && depth[r.grp] ? depth[r.grp] + 1 : 1; depth[r.name] = r.lvl; out.push(r); return; }
+        if(r.grp && !depth[r.grp]){ var g = { uid:0, name:r.grp, sum:true, lvl:1, preds:[], res:[] }; depth[r.grp] = 1; out.push(g); }
+        r.lvl = r.grp ? depth[r.grp] + 1 : 1; out.push(r); });
+      /* 分组下的任务需紧跟其摘要任务：按分组重新排列 */
+      var sorted = [], seen = {}; (function place(parentName, lvl){ out.forEach(function(r){ var p = r.sum ? (r.grp || "") : (r.grp || ""); if(seen[r.name + "|" + r.uid] || p !== parentName) return; seen[r.name + "|" + r.uid] = 1; r.lvl = lvl; sorted.push(r); if(r.sum) place(r.name, lvl + 1); }); })("", 1);
+      out.forEach(function(r){ if(!seen[r.name + "|" + r.uid]) sorted.push(r); }); rows = sorted;
+      rows.forEach(function(r, i){ r.uid = i + 1; });
+    } else rows.forEach(function(r){ r.lvl = 1; r.sum = false; });
+    /* 依赖：GanttProject 用「3;5」或「3FS+2d」；本工具用行号「2FS+1d」 */
+    rows.forEach(function(r){ r.preds = []; String(r.predTxt || "").split(/[;,，；]/).forEach(function(tk){ var m = tk.trim().match(/^(\d+)\s*(FS|SS|FF|SF)?\s*([+-]\s*\d+(?:\.\d+)?)?\s*(d|天|days?)?$/i); if(!m) return;
+      var f = idMap[m[1]] || idMap["#" + m[1]]; if(f && f !== r) r.preds.push({ uid:f.uid, type:(m[2] || "FS").toUpperCase(), lag:m[3] ? parseFloat(m[3].replace(/\s/g, "")) : 0 }); }); });
+    return rows; }
+  function importCsvText(text){ var tab = parseCsv(text); if(tab.length < 2){ toast(L("noTask")); return; } var rows = csvToRows(tab); if(!rows){ toast(L("noName")); return; } if(!rows.length){ toast(L("noTask")); return; }
+    importXMLText(toMspdi((state.info && state.info.title) || "", rows), false); }
+
+  /* —— .gan 导出 —— */
+  function exportGan(){
+    var idn = {}, n = 0; state.tasks.forEach(function(t){ idn[t.id] = n++; });
+    var succ = {}; state.tasks.forEach(function(t){ normDeps(t.deps).forEach(function(d){ if(idn[d.id] == null) return; (succ[d.id] = succ[d.id] || []).push({ to:idn[t.id], type:{ SS:1, FS:2, FF:3, SF:4 }[d.type || "FS"] || 2, lag:Math.round(+d.lag || 0) }); }); });
+    var res = {}, rl = [], al = [];
+    state.tasks.forEach(function(t){ if(t.type === "group") return; String(t.owner || "").split(/[,，;；]/).forEach(function(x){ var m = x.trim().match(/^(.*?)\s*(?:\[(\d+(?:\.\d+)?)%?\])?$/); if(!m || !m[1]) return; var nm = m[1].trim();
+      if(!(nm in res)){ res[nm] = rl.length; rl.push(nm); } al.push('<allocation task-id="' + idn[t.id] + '" resource-id="' + res[nm] + '" function="Default:0" responsible="true" load="' + (m[2] ? (+m[2]).toFixed(1) : "100.0") + '"/>'); }); });
+    function span(g){ var s = null, e = null; (function walk(gid){ state.tasks.forEach(function(x){ if(x.group !== gid) return; if(x.type === "group"){ walk(x.id); return; } var a = x.start, b = taskEnd(x); if(a && (!s || a < s)) s = a; if(b && (!e || b > e)) e = b; }); })(g.id); return { s:s, e:e }; }
+    function col(t){ var c = typeof tColor === "function" ? tColor(t) : ""; return /^#[0-9a-f]{6}$/i.test(c) ? c : "#8cb6ce"; }
+    function taskXml(t, ind){
+      var pad = new Array(ind + 1).join("    "), grp = t.type === "group", ms = t.type === "milestone", s = t.start, dur = +t.dur || 0, cp = Math.round(+t.progress || 0);
+      if(grp){ var sp = span(t); s = sp.s || fmtD(new Date()); dur = sp.s && sp.e ? workdaysBetween(parseD(sp.s), parseD(sp.e)) + 1 : 1; if(typeof grpProg === "function"){ try { cp = Math.round(grpProg(t) || 0); } catch(e){} } }
+      if(ms) dur = 0; else dur = Math.max(1, Math.round(dur));
+      var x = pad + '<task id="' + idn[t.id] + '" name="' + X(t.name) + '" color="' + col(t) + '" meeting="' + (ms ? "true" : "false") + '" start="' + (s || fmtD(new Date())) + '" duration="' + dur + '" complete="' + cp + '"'
+        + (t.link && t.link.url ? ' webLink="' + X(encodeURIComponent(t.link.url)) + '"' : "") + ' expand="' + (state.collapsed[t.id] ? "false" : "true") + '">\n';
+      if(t.remarks) x += pad + "    <notes><![CDATA[" + String(t.remarks).replace(/\]\]>/g, "]]]]><![CDATA[>") + "]]></notes>\n";
+      (succ[t.id] || []).forEach(function(d){ x += pad + '    <depend id="' + d.to + '" type="' + d.type + '" difference="' + d.lag + '" hardness="Strong"/>\n'; });
+      state.tasks.forEach(function(c){ if(c.group === t.id) x += taskXml(c, ind + 1); });
+      return x + pad + "</task>\n"; }
+    var title = (state.info && state.info.title) || "";
+    var x = '<?xml version="1.0" encoding="UTF-8"?>\n<project name="' + X(title) + '" company="" webLink="" view-date="' + fmtD(new Date()) + '" view-index="0" gantt-divider-location="400" resource-divider-location="300" version="3.2.3240" locale="' + (lang === "zh" ? "zh_CN" : lang === "de" ? "de_DE" : "en_US") + '">\n'
+      + '    <description/>\n    <view zooming-state="default:3" id="gantt-chart"/>\n    <view id="resource-table"/>\n'
+      + '    <calendars>\n        <day-types>\n            <day-type id="0"/>\n            <day-type id="1"/>\n            <default-week id="1" name="default" sun="1" mon="0" tue="0" wed="0" thu="0" fri="0" sat="1"/>\n            <only-show-weekends value="false"/>\n            <overriden-day-types/>\n            <days/>\n        </day-types>\n    </calendars>\n'
+      + '    <tasks empty-milestones="true">\n        <taskproperties>\n            <taskproperty id="tpd0" name="type" type="default" valuetype="icon"/>\n            <taskproperty id="tpd1" name="priority" type="default" valuetype="icon"/>\n            <taskproperty id="tpd2" name="info" type="default" valuetype="icon"/>\n            <taskproperty id="tpd3" name="name" type="default" valuetype="text"/>\n            <taskproperty id="tpd4" name="begindate" type="default" valuetype="date"/>\n            <taskproperty id="tpd5" name="enddate" type="default" valuetype="date"/>\n            <taskproperty id="tpd6" name="duration" type="default" valuetype="int"/>\n            <taskproperty id="tpd7" name="completion" type="default" valuetype="int"/>\n            <taskproperty id="tpd8" name="coordinator" type="default" valuetype="text"/>\n            <taskproperty id="tpd9" name="predecessorsr" type="default" valuetype="text"/>\n        </taskproperties>\n';
+    state.tasks.forEach(function(t){ if(!t.group || !state.tasks.some(function(g){ return g.id === t.group; })) x += taskXml(t, 2); });
+    x += "    </tasks>\n    <resources>\n" + rl.map(function(nm, i){ return '        <resource id="' + i + '" name="' + X(nm) + '" function="Default:0" contacts="" phone=""/>'; }).join("\n") + (rl.length ? "\n" : "") + "    </resources>\n    <allocations>\n"
+      + al.map(function(a){ return "        " + a; }).join("\n") + (al.length ? "\n" : "") + "    </allocations>\n    <vacations/>\n    <previous/>\n    <roles roleset-name=\"Default\"/>\n</project>\n";
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([x], { type:"application/xml" })); a.download = exportFileBase() + ".gan"; document.body.appendChild(a); a.click(); a.remove();
+    return x; }
+
+  function setup(){
+    var im = document.querySelector("#ddImp .dd-m"), ex = document.querySelector("#ddExp .dd-m"); if(!im || document.getElementById("btnImpGan")) return;
+    function fileBtn(id, label, accept, fn){ var inp = document.createElement("input"); inp.type = "file"; inp.accept = accept; inp.style.display = "none"; document.body.appendChild(inp);
+      inp.onchange = function(){ var f = inp.files[0]; inp.value = ""; if(!f) return; var r = new FileReader(); r.onload = function(){ try { fn(String(r.result)); } catch(e){ console.error(e); toast(L("bad")); } }; r.readAsText(f); };
+      var b = document.createElement("button"); b.type = "button"; b.id = id; b.textContent = label; b.onclick = function(){ inp.click(); var dd = b.closest(".dd"); if(dd) dd.classList.remove("open"); }; im.appendChild(b); }
+    fileBtn("btnImpGan", L("impGan"), ".gan,.xml", importGanText);
+    fileBtn("btnImpCsv", L("impCsv"), ".csv,.txt", importCsvText);
+    var eb = document.createElement("button"); eb.type = "button"; eb.id = "btnExpGan"; eb.textContent = L("expGan"); eb.onclick = function(){ exportGan(); var dd = eb.closest(".dd"); if(dd) dd.classList.remove("open"); }; ex.appendChild(eb);
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
+  window.__v4Gan = { importGanText:importGanText, importCsvText:importCsvText, exportGan:exportGan, toMspdi:toMspdi, csvToRows:csvToRows, parseCsv:parseCsv };
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
