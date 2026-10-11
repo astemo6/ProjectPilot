@@ -4357,7 +4357,7 @@ function openOemMs(oem){
     /* 分组 */
     var gsrc = "oemgrp:" + oem, grp = null;
     state.tasks.forEach(function(t){ if(t.type === "group" && t.source === gsrc) grp = t; });
-    if(!grp && pick.length){ grp = mkTask({ name:tr("oemMsGrp") + " · " + oem, type:"group", group:"" }); grp.source = gsrc; state.tasks.unshift(grp); }
+    if(!grp && pick.length){ grp = mkTask({ name:tr("oemMsGrp"), type:"group", group:"" }); grp.source = gsrc; state.tasks.unshift(grp); }
     /* 移除取消勾选的 */
     var drop = {}; oemMsTasks(oem).forEach(function(t){ if(!keep[t.source]) drop[t.id] = 1; });
     state.tasks = state.tasks.filter(function(t){ return !drop[t.id]; });
@@ -4432,7 +4432,7 @@ function v4ExpPlan(){
 (function(){
   function syncName(){ var el = document.getElementById("projName"); if(el && document.activeElement !== el) el.value = (state.info && state.info.title) || ""; }
   function migOemNames(){ var mig = 0;
-    (state.tasks || []).forEach(function(t){ var s = String(t.source || ""); if(s.indexOf("oem:") === 0){ var full = s.slice(s.indexOf("|") + 1); if((t.name === full || t.name === oemShort0(full)) && oemShort(full) !== t.name){ t.name = oemShort(full); mig++; } } });
+    (state.tasks || []).forEach(function(t){ var s = String(t.source || ""); if(t.type === "group" && s.indexOf("oemgrp:") === 0 && t.name !== tr("oemMsGrp")){ t.name = tr("oemMsGrp"); mig++; } /* 分组名只显示「客户里程碑」，随语言切换 */ if(s.indexOf("oem:") === 0){ var full = s.slice(s.indexOf("|") + 1); if((t.name === full || t.name === oemShort0(full)) && oemShort(full) !== t.name){ t.name = oemShort(full); mig++; } } });
     if(mig) save(); }
   var _r = render; render = function(){ migOemNames(); _r.apply(this, arguments); syncName(); };
   function setup(){
