@@ -1,0 +1,2597 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>执行层计划 · Execution Plan</title>
+<style>
+:root{
+  --steel:#1e3a52; --steel2:#2b4d6a; --steel3:#3a6283; --accent:#2563eb;
+  --tx1:#1f2937; --tx2:#4b5563; --tx3:#6b7280;
+  --bg:#eef1f5; --side:#f8fafc; --card:#fff; --line:#d9dee5; --line2:#e5e7eb;
+  --danger:#dc2626;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--tx1);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{background:var(--steel);color:#fff;height:48px;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+header h1{font-size:15px;font-weight:600}
+header .sub{font-size:11px;opacity:.7}
+header .sp{flex:1}
+header button{background:var(--steel2);border:1px solid #4b6a85;color:#fff;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer}
+header button:hover{background:var(--steel3)}
+.langbtns{display:flex;gap:4px}
+.langbtns button{padding:4px 8px;font-size:11px}
+.langbtns button.on{background:var(--accent);border-color:var(--accent)}
+.toolbar{background:var(--card);border-bottom:1px solid var(--line);padding:8px 16px;display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+.toolbar button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--tx1)}
+.toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+.toolbar button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.toolbar button.primary:hover{background:#1d4ed8}
+.toolbar .sep{width:1px;height:20px;background:var(--line)}
+.toolbar select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--tx1);background:#fff;cursor:pointer;max-width:220px}
+.toolbar select:hover{border-color:var(--accent)}
+.toolbar .ck{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--tx1);cursor:pointer;user-select:none;white-space:nowrap}
+.toolbar .ck input{margin:0;accent-color:var(--accent);cursor:pointer}
+.viewbtns{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.viewbtns button{border:none;border-radius:0;padding:6px 14px}
+.viewbtns button.on{background:var(--steel2);color:#fff}
+.main{flex:1;display:flex;min-height:0}
+.table-pane{width:460px;min-width:340px;max-width:640px;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+/* 表头与表体共用同一滚动容器：竖分割线上下始终对齐；scrollbar-gutter 避免滚动条出现/消失时列宽跳动 */
+.table-scroll{flex:1;overflow:auto;min-height:0;scrollbar-gutter:stable}
+.table-inner{min-width:0}
+.table-head{display:flex;background:var(--steel);color:#fff;font-size:11px;font-weight:600;flex-shrink:0;position:sticky;top:0;z-index:2}
+.table-head>div{padding:8px 6px;border-right:1px solid #4b6a85;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.trow{display:flex;border-bottom:1px solid var(--line2);cursor:pointer;align-items:stretch}
+.trow:hover{background:#eef4ff}
+.trow.sel{background:#dbeafe}
+.trow>div{padding:7px 6px;border-right:1px solid var(--line2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;display:flex;align-items:center}
+.trow.group{background:#e8eef5;font-weight:600}
+.trow.group>div{font-size:12px}
+.trow .c-id{width:36px;justify-content:center;color:var(--tx3);flex-shrink:0}
+.trow .c-name{flex:1;min-width:0}
+.trow .c-owner{width:64px;flex-shrink:0}
+.trow .c-dur{width:52px;justify-content:center;flex-shrink:0}
+.trow .c-prog{width:56px;justify-content:center;flex-shrink:0}
+.trow .c-start{width:86px;justify-content:center;flex-shrink:0;color:var(--tx2)}
+.trow .c-end{width:86px;justify-content:center;flex-shrink:0;color:var(--tx2)}
+.trow .c-float{width:64px;justify-content:center;flex-shrink:0;color:var(--tx2)}
+.trow .c-var{width:52px;justify-content:center;flex-shrink:0;color:var(--tx2)}
+.trow .c-output,.trow .c-remarks{width:120px;flex-shrink:0;color:var(--tx2)}
+.table-head .c-output,.table-head .c-remarks{width:120px;flex-shrink:0}
+.table-head .c-id{width:36px;text-align:center;flex-shrink:0}
+.table-head .c-name{flex:1}
+.table-head .c-owner{width:64px;flex-shrink:0}
+.table-head .c-dur{width:52px;text-align:center;flex-shrink:0}
+.table-head .c-prog{width:56px;text-align:center;flex-shrink:0}
+.table-head .c-start{width:86px;text-align:center;flex-shrink:0}
+.table-head .c-end{width:86px;text-align:center;flex-shrink:0}
+.table-head .c-float{width:64px;text-align:center;flex-shrink:0}
+.table-head .c-var{width:52px;text-align:center;flex-shrink:0}
+/* ===== 冻结列：ID + 任务名称（横向滚动时固定左侧，表头与表体均冻结） ===== */
+.table-head>div{position:relative}
+.table-head .c-id,.table-head .c-name{position:sticky;background:var(--steel);z-index:4}
+.table-head .c-id{left:0}
+.table-head .c-name{left:36px}
+.trow .c-id,.trow .c-name{position:sticky;z-index:1;background:var(--card)}
+.trow .c-id{left:0}
+.trow .c-name{left:36px}
+.trow:hover .c-id,.trow:hover .c-name{background:#eef4ff}
+.trow.sel .c-id,.trow.sel .c-name{background:#dbeafe}
+.trow.group .c-id,.trow.group .c-name{background:#e8eef5}
+/* 列宽拖拽手柄：表头单元格 hover 时显示竖线，左右箭头光标 */
+.col-resize{position:absolute;top:0;bottom:0;right:-3px;width:7px;cursor:col-resize;z-index:5;display:none}
+.col-resize::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;border-radius:1px;background:var(--accent)}
+.table-head>div:hover .col-resize{display:block}
+body.resizing{cursor:col-resize;user-select:none}
+body.resizing .col-resize{display:block}
+/* 列设置弹出菜单 */
+.col-menu{position:fixed;z-index:60;display:none;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:8px 10px;min-width:150px}
+.col-menu h4{font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px}
+.col-menu label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tx1);padding:4px 2px;cursor:pointer;user-select:none;white-space:nowrap}
+.col-menu label.dis{opacity:.45;cursor:default}
+.col-menu input{margin:0;accent-color:var(--accent)}
+/* 模板库下拉菜单（复用 col-menu 容器样式；分组标题+条目按钮） */
+.tpl-g{font-size:11px;font-weight:600;color:var(--tx3);padding:8px 2px 2px}
+.tpl-it{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;background:none;border:none;padding:6px 8px;font-size:12px;cursor:pointer;color:var(--tx1);border-radius:4px;text-align:left}
+.tpl-it:hover{background:#eef4ff;color:var(--accent)}
+.tpl-n{color:var(--tx3);font-size:11px;flex-shrink:0}
+.progbar{width:44px;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}
+.progbar>i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.ms-diamond{color:var(--danger);font-size:14px}
+.dl-warn{color:var(--danger);margin-left:4px;cursor:help;font-weight:700}
+.ow-warn{margin-left:2px;cursor:help}
+.manual-badge{font-size:11px;margin-left:4px;cursor:help}
+.c-float.crit{color:var(--danger);font-weight:700}
+.gantt-pane{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.gantt-head{height:44px;background:var(--card);border-bottom:1px solid var(--line);position:relative;overflow:hidden;flex-shrink:0}
+.gantt-body{flex:1;overflow:auto;position:relative}
+.gantt-inner{position:relative;min-height:100%}
+.g-row{position:relative;border-bottom:1px solid var(--line2)}
+.g-row.group{background:#e8eef555}
+.g-bar{position:absolute;height:20px;top:7px;border-radius:4px;cursor:grab;display:flex;align-items:center;overflow:hidden;font-size:11px;color:#fff;white-space:nowrap}
+.g-bar .fill{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.35);border-radius:4px 0 0 4px}
+.g-bar .lbl{position:relative;padding:0 8px;z-index:1}
+.g-bar.crit{border:2px solid #7f1d1d}
+.g-bar.crit .lbl{font-weight:700}
+.g-ms{position:absolute;top:9px;width:16px;height:16px;transform:rotate(45deg);cursor:grab;border-radius:2px}
+.g-ms.crit{box-shadow:0 0 0 2px #7f1d1d}
+.g-base{position:absolute;height:5px;border-radius:2px;background:#9ca3af;opacity:.85;z-index:2;pointer-events:none}
+.g-base-ms{position:absolute;width:8px;height:8px;transform:rotate(45deg);background:#9ca3af;opacity:.85;z-index:2;pointer-events:none}
+.g-today{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:5}
+.g-weekend{position:absolute;top:0;bottom:0;background:#f3f4f6;z-index:0}
+.g-holiday{position:absolute;top:0;bottom:0;background:#fef2f2;z-index:0}
+.g-dep{position:absolute;z-index:4;pointer-events:none}
+.day-cell{position:absolute;top:0;bottom:0;border-right:1px dashed #e5e7eb}
+.gh-day{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden}
+.gh-date{font-size:9px;font-weight:600;color:var(--tx2);white-space:nowrap;line-height:1.25}
+.gh-wd{font-size:8px;color:var(--tx3);white-space:nowrap;line-height:1.25}
+.gh-wk{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--tx2);white-space:nowrap;overflow:hidden}
+.g-bandrow{position:absolute;left:0;top:0;border-bottom:1px solid var(--line);background:var(--card)}
+.g-band{position:absolute;top:0;height:100%;display:flex;align-items:center;overflow:hidden;font-size:10px;color:#1e3a52;border-right:1px solid rgba(255,255,255,.8);white-space:nowrap}
+.g-band span{padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:10px;width:520px;max-width:94vw;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-h{background:var(--steel);color:#fff;padding:12px 16px;font-size:14px;font-weight:600;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:center}
+.modal-h button{background:none;border:none;color:#fff;font-size:18px;cursor:pointer}
+.modal-b{padding:16px}
+.frow{margin-bottom:12px}
+.frow label{display:block;font-size:12px;color:var(--tx2);margin-bottom:4px}
+.frow input,.frow select,.frow textarea{width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;font-size:13px}
+.frow input:focus,.frow select:focus,.frow textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #93c5fd55}
+.frow2{display:flex;gap:12px}
+.frow2>div{flex:1}
+.modal-f{padding:12px 16px;border-top:1px solid var(--line2);display:flex;justify-content:flex-end;gap:8px}
+.modal-f button{padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;border:1px solid var(--line)}
+.modal-f .ok{background:var(--accent);border-color:var(--accent);color:#fff}
+.cal-panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:8px 16px}
+.cal-panel h3{font-size:13px;margin-bottom:8px}
+.cal-panel textarea{width:100%;height:64px;border:1px solid #cbd5e1;border-radius:6px;padding:8px;font-size:12px;resize:vertical}
+.cal-panel .row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.cal-panel button{background:var(--steel2);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer}
+.cal-panel button.on{background:var(--accent)}
+.cal-panel .hint{font-size:11px;color:var(--tx3);margin-top:6px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;display:none}
+#pvModal{position:fixed;inset:0;background:rgba(17,24,39,.72);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+#pvModal.open{display:flex}
+.pv-box{background:#fff;border-radius:10px;padding:12px 14px;max-width:90vw;max-height:85vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.pv-head{display:flex;align-items:center;justify-content:space-between;gap:16px;font-weight:600;font-size:14px;color:#1f2937}
+.pv-x{background:#e5e7eb;color:#1f2937;border:none;border-radius:6px;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;padding:0;flex-shrink:0}
+.pv-x:hover{background:#d1d5db}
+#pvImg{display:block;max-width:calc(90vw - 32px);max-height:calc(85vh - 62px);border:1px solid #e5e7eb;border-radius:6px}
+.dep-line{stroke:#94a3b8;stroke-width:1.5;fill:none}
+@media(max-width:768px){.table-pane{width:300px;min-width:260px}}
+/* ===== 手机端补充适配（仅小屏生效，不改桌面端布局与配色；不动 viewport，不拦截浏览器原生缩放） ===== */
+@media (max-width:768px){
+  /* 顶栏标题缩小 */
+  header{height:auto;min-height:48px;flex-wrap:wrap;padding:6px 10px;row-gap:6px}
+  header h1{font-size:13px}
+  header .sub{display:none}
+  /* 工具条按钮允许换行不溢出，触摸目标不小于 40px */
+  .toolbar{padding:6px 10px;gap:6px}
+  header button,.toolbar button,.viewbtns button,.modal-f button,.cal-panel button{min-height:40px;min-width:40px}
+  .frow input,.frow select,.frow textarea{min-height:40px}
+  /* 左侧任务表允许横向滚动（列宽不压缩，表头表体同宽同滚），甘特区横向滚动 */
+  .table-pane{width:42%;min-width:0;max-width:none;overflow-x:auto}
+  .table-inner{min-width:520px}
+  .toolbar .ck,.toolbar select{min-height:40px}
+  .gantt-pane{min-width:0}
+  /* 表格字号适当缩小 */
+  .table-head{font-size:10px}
+  .trow>div{font-size:11px;padding:6px 4px}
+  .gh-date{font-size:8px}
+  .gh-wd{font-size:7px}
+  .toast{max-width:90vw}
+}
+</style>
+<style id="embedCss">
+html.embed header, html.embed #btnFromPlan, html.embed #btnSyncBack, html.embed #oemSelect,
+html.embed #btnExport, html.embed #btnImport, html.embed #btnCSV + .x{display:none!important}
+</style>
+<script>if(window.self !== window.top) document.documentElement.className += " embed";</script>
+</head>
+<body>
+<header>
+  <h1 data-i18n="appTitle">执行层计划</h1><span class="sub">Execution Plan</span>
+  <span class="sp"></span>
+  <div class="langbtns">
+    <button data-lang="zh">中文</button><button data-lang="en">EN</button><button data-lang="de">DE</button>
+  </div>
+  <button id="btnBack" data-i18n="backToPlan">← 里程碑计划</button>
+</header>
+<div class="toolbar">
+  <button id="btnAdd" class="primary" data-i18n="addTask">+ 新增任务</button>
+  <button id="btnAddGroup" data-i18n="addGroup">+ 新增分组</button>
+  <button id="btnAddMs" data-i18n="addMs">+ 里程碑</button>
+  <span class="sep"></span>
+  <button id="btnFromPlan" data-i18n="fromPlan">从计划导入</button>
+  <button id="btnSyncBack" data-i18n="syncBack">回写里程碑计划</button>
+  <button id="btnImportSub" data-i18n="importSub">导入细项</button>
+  <button id="btnTPL" data-i18n="tplBtn">模板</button>
+  <span class="sep"></span>
+  <div class="viewbtns">
+    <button data-view="day" class="on" data-i18n="vDay">日</button><button data-view="week" data-i18n="vWeek">周</button><button data-view="month" data-i18n="vMonth">月</button>
+  </div>
+  <span class="sep"></span>
+  <button id="btnCols" data-i18n="colSettings">列</button>
+  <select id="oemSelect" title="OEM"></select>
+  <label class="ck"><input type="checkbox" id="ckPhase" checked><span data-i18n="showPhase">阶段</span></label>
+  <label class="ck"><input type="checkbox" id="ckCrit"><span data-i18n="criticalPath">关键路径</span></label>
+  <button id="btnBaseline" data-i18n="saveBaseline">保存基线</button>
+  <label class="ck"><input type="checkbox" id="ckBaseline"><span data-i18n="showBaseline">基线对比</span></label>
+  <label class="ck"><input type="checkbox" id="ckResWarn" checked><span data-i18n="resWarn">资源预警</span></label>
+  <span class="sep"></span>
+  <button id="btnCal" data-i18n="workCal">工作日历</button>
+  <span class="sep"></span>
+  <button id="btnPDF" data-i18n="exportPDF">导出 PDF</button>
+  <button id="btnJPG" data-i18n="exportJPG">导出 JPG</button>
+  <button id="btnXls" data-i18n="expXls">导出 Excel</button>
+  <button id="btnPreview" data-i18n="preview">预览</button>
+  <span class="sep"></span>
+  <button id="btnExport" data-i18n="exportJSON">导出JSON</button>
+  <button id="btnImport" data-i18n="importJSON">导入JSON</button>
+  <input type="file" id="fileJSON" accept=".json" style="display:none">
+  <button id="btnCSV" data-i18n="exportCSV">导出CSV</button>
+  <span class="sep"></span>
+  <button id="btnExpXML" data-i18n="expXml">导出 XML</button>
+  <button id="btnImpXML" data-i18n="impXml">导入 XML</button>
+  <input type="file" id="fileXML" accept=".xml" style="display:none">
+</div>
+<div class="cal-panel" id="calPanel" style="display:none">
+  <h3 data-i18n="calTitle">工作日历 · 自然语言导入</h3>
+  <div class="row" style="margin-bottom:6px">
+    <select id="calModeSel" title="Calendar"></select>
+    <button id="calModeNL" data-i18n="calModeNL">自然语言</button>
+    <button id="calModeText" data-i18n="calModeText">文本格式</button>
+  </div>
+  <textarea id="calInput" data-i18n-ph="calPh" placeholder="例如：2026年春节2月15日到2月23日放假，2月14日、2月28日调休上班"></textarea>
+  <div class="row">
+    <button id="btnCalParse" data-i18n="calParse">解析并导入</button>
+    <button id="btnCalReset" data-i18n="calReset">恢复默认</button>
+    <span class="hint" id="calSummary"></span>
+  </div>
+  <div class="hint" data-i18n="calHint">支持：X月X日、X月X日至X月X日、放假/调休/补班/上班等关键词，年份缺省为当年。解析结果会列出，请确认后再应用。</div>
+  <div id="calPreview" style="margin-top:8px;font-size:12px"></div>
+</div>
+<div class="main">
+  <div class="table-pane">
+    <div class="table-scroll">
+      <div class="table-inner">
+        <div class="table-head">
+          <div class="c-id">ID</div><div class="c-name" data-i18n="cName">任务名称</div><div class="c-owner" data-i18n="cOwner">负责人</div><div class="c-dur" data-i18n="cDur">工期</div><div class="c-prog" data-i18n="cProg">进度</div><div class="c-start" data-i18n="cStart">开始</div><div class="c-end" data-i18n="cEnd">结束</div><div class="c-var" data-i18n="varianceCol">偏差</div><div class="c-float" data-i18n="floatCol">总浮时</div>
+        </div>
+        <div class="table-body" id="taskList"></div>
+      </div>
+    </div>
+  </div>
+  <div class="gantt-pane">
+    <div class="gantt-head" id="ganttHead"></div>
+    <div class="gantt-body" id="ganttBody"><div class="gantt-inner" id="ganttInner"></div></div>
+  </div>
+</div>
+
+<div id="colMenu" class="col-menu"></div>
+<div id="tplMenu" class="col-menu" style="display:none;width:280px"></div>
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-h"><span id="modalTitle">编辑任务</span><button id="modalX">×</button></div>
+    <div class="modal-b" id="modalBody"></div>
+    <div class="modal-f">
+      <button id="modalDel" style="margin-right:auto;color:var(--danger);display:none" data-i18n="del">删除</button>
+      <button id="modalCancel" data-i18n="cancel">取消</button>
+      <button id="modalOk" class="ok" data-i18n="ok">确定</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="subModalBg">
+  <div class="modal">
+    <div class="modal-h"><span data-i18n="importSubT">导入细项</span><button id="subX">×</button></div>
+    <div class="modal-b">
+      <div class="frow"><label data-i18n="subTarget">目标任务</label><select id="subTask"></select></div>
+      <div class="frow"><label data-i18n="subContent">细项内容（一行一条，可含负责人、工期，用逗号分隔，如：高温测试,张三,5）</label>
+      <textarea id="subText" rows="8" placeholder="高温测试,张三,5&#10;振动测试,李四,3&#10;盐雾测试"></textarea></div>
+      <div class="frow"><label data-i18n="subFile">或从 CSV 文件导入</label><input type="file" id="subFile" accept=".csv,.txt"></div>
+    </div>
+    <div class="modal-f">
+      <button id="subCancel" data-i18n="cancel">取消</button>
+      <button id="subOk" class="ok" data-i18n="ok">确定</button>
+    </div>
+  </div>
+</div>
+<div id="pvModal" role="dialog" aria-modal="true" aria-labelledby="pvTitle">
+  <div class="pv-box">
+    <div class="pv-head">
+      <span id="pvTitle" data-i18n="expPreviewTitle">导出预览</span>
+      <button id="pvClose" class="pv-x" aria-label="Close">×</button>
+    </div>
+    <img id="pvImg" alt="Export preview">
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="workcal.js"></script>
+<script>
+(function(){
+"use strict";
+/* ============ I18N ============ */
+var I18N = {
+zh:{tplAstemo:"ASTEMO 摩擦件模板",tplAsk:"模板开始日期（YYYY-MM-DD）",astOk:"已载入 ASTEMO 摩擦件开发模板",astConfirm:"载入模板会替换当前任务，继续？",weekdayNames:["一","二","三","四","五","六","日"],appTitle:"执行层计划",backToPlan:"← 里程碑计划",addTask:"+ 新增任务",addGroup:"+ 新增分组",addMs:"+ 里程碑",fromPlan:"从计划导入",syncBack:"回写里程碑计划",syncBackOk:"已同步到里程碑计划",syncBackEmpty:"没有可同步的里程碑",syncBackFail:"计划数据读取失败",importSub:"导入细项",vDay:"日",vWeek:"周",vMonth:"月",workCal:"工作日历",showPhase:"阶段",oemPlaceholder:"请选择主机厂",exportJSON:"导出JSON",importJSON:"导入JSON",exportCSV:"导出CSV",preview:"预览",exportPDF:"导出 PDF",exportJPG:"导出 JPG",expXls:"导出 Excel",expPreviewTitle:"导出预览",expDate:"日期",legendPhase:"阶段区间",legendTask:"任务",today:"今天",cName:"任务名称",cOwner:"负责人",cDur:"工期",cProg:"进度",cStart:"开始",cEnd:"结束",calTitle:"工作日历 · 自然语言导入",calPh:"例如：2026年春节2月15日到2月23日放假，2月14日、2月28日调休上班",calParse:"解析并导入",calReset:"恢复默认",calHint:"支持：X月X日、X月X日至X月X日、放假/调休/补班/上班等关键词，年份缺省为当年。",calModeNL:"自然语言",calModeText:"文本格式",calHintText:"一行一条：2026-10-01~2026-10-07,国庆 表示放假区间；补班 2026-10-10 表示调休上班。",calPhText:"2026-10-01~2026-10-07,国庆\n补班 2026-10-10",del:"删除",cancel:"取消",ok:"确定",importSubT:"导入细项",subTarget:"目标任务",subContent:"细项内容（一行一条，可含负责人、工期，用逗号分隔）",subFile:"或从 CSV 文件导入",editTask:"编辑任务",newTask:"新增任务",newGroup:"新增分组",newMs:"新增里程碑",fName:"名称",fType:"类型",tTask:"任务",tMs:"里程碑",tGroup:"分组",fGroup:"所属分组",fStart:"开始日期",fDur:"工期（工作日）",fDeps:"前置任务（ID，可带类型与滞后）",fDepsHint:"格式：ID+类型+滞后天数，如 3FS,5SS+2d；-2d 表示提前 2 个工作日；默认 FS（完成→开始）。类型：FS 完成→开始，SS 开始→开始，FF 完成→完成，SF 开始→完成",fDeadline:"期限",deadlineWarn:"结束日期晚于期限",criticalPath:"关键路径",floatCol:"总浮时",fOwner:"负责人",fOutput:"输出成果",fProg:"进度%",fRemarks:"备注",fColor:"颜色",needName:"请填写名称",fromPlanOk:"已从计划导入",noPlan:"未找到计划数据",calApplied:"日历已更新",cycleWarn:"检测到循环依赖，已忽略",importOk:"导入成功",subOk:"细项导入成功",topGroup:"顶级",planGroupMs:"客户里程碑",planGroupRec:"推荐任务",planGroupSup:"供应商节点",planGroupCustom:"自定义任务",saveBaseline:"保存基线",showBaseline:"基线对比",baselineConfirm:"覆盖已有基线？",baselineSaved:"基线已保存",varianceCol:"偏差",manualSched:"手动排程",resWarn:"资源预警",resWarnTip:"该负责人当日有多个并行任务",colSettings:"列",colFixed:"固定列",colReset:"双击表头右边缘恢复默认宽度",oemAutoImport:"已导入{0}的里程碑",oemNoData:"里程碑计划中没有该 OEM 的数据",oemImportConfirm:"切换 OEM 将重新导入里程碑，当前任务会被替换，继续？",tplBtn:"模板",tplConfirm:"插入模板任务到当前计划？",tplOk:"模板已插入",expXml:"导出 XML",impXml:"导入 XML",impXmlConfirm:"导入将替换当前任务，继续？"},
+en:{tplAstemo:"ASTEMO Friction Template",tplAsk:"Template start date (YYYY-MM-DD)",astOk:"ASTEMO friction template loaded",astConfirm:"Loading the template replaces current tasks. Continue?",weekdayNames:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],appTitle:"Execution Plan",backToPlan:"← Milestone Plan",addTask:"+ Add Task",addGroup:"+ Add Group",addMs:"+ Milestone",fromPlan:"Import from Plan",syncBack:"Write Back to Plan",syncBackOk:"Synced to milestone plan",syncBackEmpty:"No linked milestones to sync",syncBackFail:"Failed to read plan data",importSub:"Import Sub-items",vDay:"Day",vWeek:"Week",vMonth:"Month",workCal:"Work Calendar",showPhase:"Phases",oemPlaceholder:"Select OEM",exportJSON:"Export JSON",importJSON:"Import JSON",exportCSV:"Export CSV",preview:"Preview",exportPDF:"Export PDF",exportJPG:"Export JPG",expXls:"Export Excel",expPreviewTitle:"Export Preview",expDate:"Date",legendPhase:"Phase",legendTask:"Task",today:"Today",cName:"Task",cOwner:"Owner",cDur:"Dur.",cProg:"Prog.",cStart:"Start",cEnd:"End",calTitle:"Work Calendar · Natural Language Import",calPh:"e.g. Spring Festival 2026-02-15 to 2026-02-23 off, 02-14 and 02-28 work",calParse:"Parse & Import",calReset:"Reset",calHint:"Supports date ranges and keywords like off/work. Year defaults to current.",calModeNL:"Natural language",calModeText:"Text format",calHintText:"One per line: 2026-10-01~2026-10-07,National Day = holiday range; Make-up 2026-10-10 = workday.",calPhText:"2026-10-01~2026-10-07,National Day\nMake-up 2026-10-10",del:"Delete",cancel:"Cancel",ok:"OK",importSubT:"Import Sub-items",subTarget:"Target Task",subContent:"One per line, optional owner,duration comma-separated",subFile:"Or import from CSV file",editTask:"Edit Task",newTask:"New Task",newGroup:"New Group",newMs:"New Milestone",fName:"Name",fType:"Type",tTask:"Task",tMs:"Milestone",tGroup:"Group",fGroup:"Group",fStart:"Start Date",fDur:"Duration (workdays)",fDeps:"Predecessors (IDs, types & lag)",fDepsHint:"Format: ID+type+lag workdays, e.g. 3FS,5SS+2d; -2d = 2 workdays early; default FS (finish-to-start). Types: FS finish→start, SS start→start, FF finish→finish, SF start→finish",fDeadline:"Deadline",deadlineWarn:"End date is later than the deadline",criticalPath:"Critical Path",floatCol:"Total Float",fOwner:"Owner",fOutput:"Deliverable",fProg:"Progress %",fRemarks:"Remarks",fColor:"Color",needName:"Name required",fromPlanOk:"Imported from plan",noPlan:"No plan data found",calApplied:"Calendar updated",cycleWarn:"Circular dependency detected and ignored",importOk:"Import OK",subOk:"Sub-items imported",topGroup:"Top",planGroupMs:"Customer Milestones",planGroupRec:"Recommended Tasks",planGroupSup:"Supplier Nodes",planGroupCustom:"Custom Tasks",saveBaseline:"Save Baseline",showBaseline:"Baseline Compare",baselineConfirm:"Overwrite existing baseline?",baselineSaved:"Baseline saved",varianceCol:"Variance",manualSched:"Manual scheduling",resWarn:"Resource Alert",resWarnTip:"Owner has overlapping tasks on this day",colSettings:"Columns",colFixed:"Fixed",colReset:"Double-click header edge to reset width",oemAutoImport:"Milestones imported for {0}",oemNoData:"No milestone data for this OEM",oemImportConfirm:"Switching OEM will re-import milestones and replace current tasks. Continue?",tplBtn:"Templates",tplConfirm:"Insert template tasks into the current plan?",tplOk:"Template inserted",expXml:"Export XML",impXml:"Import XML",impXmlConfirm:"Import will replace current tasks. Continue?"},
+de:{tplAstemo:"ASTEMO Reibbelag-Vorlage",tplAsk:"Startdatum der Vorlage (JJJJ-MM-TT)",astOk:"ASTEMO-Reibbelag-Vorlage geladen",astConfirm:"Vorlage ersetzt aktuelle Aufgaben. Fortfahren?",weekdayNames:["Mo","Di","Mi","Do","Fr","Sa","So"],appTitle:"Ausführungsplan",backToPlan:"← Meilensteinplan",addTask:"+ Aufgabe",addGroup:"+ Gruppe",addMs:"+ Meilenstein",fromPlan:"Aus Plan importieren",syncBack:"In Plan zurückschreiben",syncBackOk:"Mit Meilensteinplan synchronisiert",syncBackEmpty:"Keine verknüpften Meilensteine",syncBackFail:"Plandaten konnten nicht gelesen werden",importSub:"Unterpunkte importieren",vDay:"Tag",vWeek:"Woche",vMonth:"Monat",workCal:"Arbeitskalender",showPhase:"Phasen",oemPlaceholder:"OEM wählen",exportJSON:"JSON exportieren",importJSON:"JSON importieren",exportCSV:"CSV exportieren",preview:"Vorschau",exportPDF:"PDF exportieren",exportJPG:"JPG exportieren",expXls:"Excel-Export",expPreviewTitle:"Exportvorschau",expDate:"Datum",legendPhase:"Phasen",legendTask:"Aufgabe",today:"Heute",cName:"Aufgabe",cOwner:"Eigner",cDur:"Dauer",cProg:"Fort.",cStart:"Start",cEnd:"End",calTitle:"Arbeitskalender · Import in natürlicher Sprache",calPh:"z.B. Frühlingsfest 2026-02-15 bis 2026-02-23 frei",calParse:"Parsen & importieren",calReset:"Zurücksetzen",calHint:"Datumsbereiche und Schlüsselwörter werden unterstützt.",calModeNL:"Natürliche Sprache",calModeText:"Textformat",calHintText:"Eine Zeile pro Eintrag: 2026-10-01~2026-10-07,Feiertag = Ferienbereich; Ausgleich 2026-10-10 = Arbeitstag.",calPhText:"2026-10-01~2026-10-07,Feiertag\nAusgleich 2026-10-10",del:"Löschen",cancel:"Abbrechen",ok:"OK",importSubT:"Unterpunkte importieren",subTarget:"Zielaufgabe",subContent:"Eins pro Zeile, optional Eigner,Dauer",subFile:"Oder aus CSV-Datei importieren",editTask:"Aufgabe bearbeiten",newTask:"Neue Aufgabe",newGroup:"Neue Gruppe",newMs:"Neuer Meilenstein",fName:"Name",fType:"Typ",tTask:"Aufgabe",tMs:"Meilenstein",tGroup:"Gruppe",fGroup:"Gruppe",fStart:"Startdatum",fDur:"Dauer (Arbeitstage)",fDeps:"Vorgänger (IDs, Typen & Versatz)",fDepsHint:"Format: ID+Typ+Versatztage, z.B. 3FS,5SS+2d; -2d = 2 Arbeitstage früher; Standard FS (Ende→Start). Typen: FS Ende→Start, SS Start→Start, FF Ende→Ende, SF Start→Ende",fDeadline:"Frist",deadlineWarn:"Enddatum liegt nach der Frist",criticalPath:"Kritischer Pfad",floatCol:"Gesamtpuffer",fOwner:"Eigner",fOutput:"Ergebnis",fProg:"Fortschritt %",fRemarks:"Bemerkungen",fColor:"Farbe",needName:"Name erforderlich",fromPlanOk:"Aus Plan importiert",noPlan:"Keine Plandaten",calApplied:"Kalender aktualisiert",cycleWarn:"Zirkuläre Abhängigkeit ignoriert",importOk:"Import OK",subOk:"Unterpunkte importiert",topGroup:"Oberste",planGroupMs:"Kundenmeilensteine",planGroupRec:"Empfohlene Aufgaben",planGroupSup:"Lieferantenknoten",planGroupCustom:"Eigene Aufgaben",saveBaseline:"Basisplan speichern",showBaseline:"Basisvergleich",baselineConfirm:"Bestehende Basis überschreiben?",baselineSaved:"Basisplan gespeichert",varianceCol:"Abweichung",manualSched:"Manuelle Planung",resWarn:"Ressourcenwarnung",resWarnTip:"Verantwortlicher hat überlappende Aufgaben",colSettings:"Spalten",colFixed:"Fest",colReset:"Doppelklick auf Kopfrand setzt Breite zurück",oemAutoImport:"Meilensteine für {0} importiert",oemNoData:"Keine Meilensteindaten für diesen OEM",oemImportConfirm:"OEM-Wechsel importiert Meilensteine neu und ersetzt aktuelle Aufgaben. Fortfahren?",tplBtn:"Vorlagen",tplConfirm:"Vorlagenaufgaben in den aktuellen Plan einfügen?",tplOk:"Vorlage eingefügt",expXml:"XML-Export",impXml:"XML-Import",impXmlConfirm:"Der Import ersetzt die aktuellen Aufgaben. Fortfahren?"}};
+var lang = "zh";
+function tr(k){ return (I18N[lang] && I18N[lang][k]) || I18N.zh[k] || k; }
+function applyLang(){ if(typeof syncCalModeSel === "function" && document.getElementById("calModeSel")) setTimeout(syncCalModeSel, 0);
+  document.querySelectorAll("[data-i18n]").forEach(function(el){ el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(function(el){ el.placeholder = tr(el.dataset.i18nPh); });
+  document.querySelectorAll(".langbtns button").forEach(function(b){ b.classList.toggle("on", b.dataset.lang === lang); });
+  document.title = tr("appTitle");
+  if(typeof calMode !== "undefined" && calMode === "text") setCalMode("text");
+}
+function toast(m){ var t = document.getElementById("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(function(){ t.style.display = "none"; }, 2200); }
+/* ============ 日期工具 ============ */
+function fmtD(d){ var m = d.getMonth()+1, dd = d.getDate(); return d.getFullYear() + "-" + (m<10?"0":"")+m + "-" + (dd<10?"0":"")+dd; }
+function parseD(s){ if(!s) return null; var p = String(s).split("-"); if(p.length < 3) return null; var d = new Date(+p[0], +p[1]-1, +p[2]); return isNaN(d) ? null : d; }
+function addDays(d, n){ var r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function diffDays(a, b){ return Math.round((b - a) / 86400000); }
+/* ============ 工作日历 ============ */
+var HOLIDAYS_2026 = { // 默认2026法定节假日
+  "2026-01-01":"元旦","2026-01-02":"元旦","2026-01-03":"元旦",
+  "2026-02-15":"春节","2026-02-16":"春节","2026-02-17":"春节","2026-02-18":"春节","2026-02-19":"春节","2026-02-20":"春节","2026-02-21":"春节","2026-02-22":"春节","2026-02-23":"春节",
+  "2026-04-04":"清明","2026-04-05":"清明","2026-04-06":"清明",
+  "2026-05-01":"劳动节","2026-05-02":"劳动节","2026-05-03":"劳动节","2026-05-04":"劳动节","2026-05-05":"劳动节",
+  "2026-06-19":"端午","2026-06-20":"端午","2026-06-21":"端午",
+  "2026-09-25":"中秋","2026-09-26":"中秋","2026-09-27":"中秋",
+  "2026-10-01":"国庆","2026-10-02":"国庆","2026-10-03":"国庆","2026-10-04":"国庆","2026-10-05":"国庆","2026-10-06":"国庆","2026-10-07":"国庆"
+};
+var MAKEUP_2026 = ["2026-01-04","2026-02-14","2026-02-28","2026-05-09","2026-09-20","2026-10-10"];
+var cal = WORKCAL.load(); /* 工作日历持久化（gantt-workcal-v1，计划页共用） */
+function resetCal(){ var d = WORKCAL.defaults(cal.mode); cal.holidays = d.holidays; cal.makeup = d.makeup; }
+function isWorkday(d){ return WORKCAL.isWork(fmtD(d), cal); }
+function holName(s){ return WORKCAL.holName(s, cal); }
+function nextWorkday(d){ var r = new Date(d); do{ r = addDays(r, 1); }while(!isWorkday(r)); return r; }
+function addWorkdays(d, n){ // 支持负数：向前/向后数 n 个工作日（lag 计算用）
+  var r = new Date(d);
+  if(n >= 0){ var c = 0; while(c < n){ r = addDays(r, 1); if(isWorkday(r)) c++; } }
+  else { var c2 = 0; while(c2 > n){ r = addDays(r, -1); if(isWorkday(r)) c2--; } }
+  return r;
+}
+function subWorkdays(d, n){ return addWorkdays(d, -n); }
+function snapWorkday(d){ var r = new Date(d); while(!isWorkday(r)) r = addDays(r, 1); return r; }
+function workdaysBetween(a, b){ // a→b 工作日数（含b不含a）
+  var c = 0, r = new Date(a);
+  while(r < b){ r = addDays(r, 1); if(isWorkday(r)) c++; }
+  return c;
+}
+function workdayDiff(a, b){ // a→b 带符号工作日数（b<a 为负），总浮时用
+  if(!a || !b) return null;
+  if(fmtD(a) === fmtD(b)) return 0;
+  var sign = b > a ? 1 : -1, r = new Date(a), c = 0, guard = 0;
+  while(fmtD(r) !== fmtD(b) && guard++ < 40000){ r = addDays(r, sign); if(isWorkday(r)) c += sign; }
+  return c;
+}
+/* ============ 里程碑计划数据（与计划页同源，用于全量导入） ============ */
+const OEM_PHASE_SYS = {"BENZ(奔驰)":"vda","BMW(宝马)":"vda","SVW(上汽大众)":"vda","DRAC(东风雷诺)":"anpqp","Nissan(尼桑)":"anpqp","Ford(福特)":"apqp","JAC(江淮)":"apqp","DYK(东风悦达起亚)":"apqp","Chery(奇瑞)":"apqp","SGMW(上汽通用五菱)":"apqp","Geely(吉利)":"apqp","SGM(上汽通用)":"apqp","DPCA(东风标致雪铁龙)":"apqp","Volvo(沃尔沃)":"apqp","PSA":"apqp","CJLR(奇瑞捷豹路虎)":"apqp"};
+
+const OEM_PHASES = {"BENZ(奔驰)":{"ML3":"Data Release","ML4":"First OTS","ML5":"PT1","ML6":"100% Green Release","ML7":"SOP"},"Ford(福特)":{"APQP2":"VP（Verification Prototype）","APQP3":"HB（homologation build）","APQP4":"PP （Pilot Production）","APQP5":"MP/job1（Master Production）"},"JAC(江淮)":{"APQP1":"G2","APQP2":"G7-G8","APQP3":"G9-G12","APQP5":"G13"},"DYK(东风悦达起亚)":{"APQP2":"PROTO","APQP3":"P1","APQP4":"T","APQP5":"SOP"},"Chery(奇瑞)":{"APQP1":"P1","APQP2":"P2","APQP3":"OTS","APQP4":"PVS","APQP5":"SOP"},"SGMW(上汽通用五菱)":{"APQP1":"VPI","APQP2":"LLP T1","APQP3":"OTS","APQP4":"NS","APQP5":"SOP"},"Geely(吉利)":{"APQP1":"PS(Program Start)","APQP2":"VP(Verification Prototype)","APQP3":"TT(Tooling Trail)","APQP4":"PP(Poilt Production)","APQP5":"J1(Job 1)"},"BMW(宝马)":{"ML3":"BBG（Pilot Phase/Bestätigungsbaugruppe）","ML4":"Auflegetage","ML5":"VS1（Pre Series/Vorserie）","ML6":"ISIR（Initial Sample Inspection Release）","ML7":"SOP（Start of Production）","VS0":"PVL/VS0（Process Pre Runners/Prozessvorläufer）","VS2":"VS2（Pre Series/Vorserie）","PrePZS":"Pre-PZS","PZS":"PZS（Process Series/Prozess Series）"},"SVW(上汽大众)":{"ML3":"DF(D-Freigabe)","ML4":"LF(Launch-Freigabe)","ML5":"VFF装车(Vorserien Freigabefahrzeuge)","ML6":"0S装车(0-Serie)","ML7":"SOP(Start Of Production )"},"SGM(上汽通用)":{"APQP1":"PFI","APQP2":"VDR","APQP3":"IVER","APQP4":"PPV","APQP5":"SOPR"},"Nissan(尼桑)":{"ANPQP1":"Customer Awarding","ANPQP2":"Drawing issue and data release","ANPQP3":"VC-LOT","ANPQP4":"PT-LOT","ANPQP5":"SOP"},"CJLR(奇瑞捷豹路虎)":{"APQP2":"1st VP(DV)","APQP3":"1st VP(PV)","APQP4":"PP","APQP5":"MP1/Job1"},"DRAC(东风雷诺)":{"ANPQP3":"TGA","ANPQP4":"AB-PT1","ANPQP5":"SOP"},"DPCA(东风标致雪铁龙)":{"APQP1":"INIT meeing","APQP2":"IOD","APQP3":"VRS样件","APQP4":"EL 造车","APQP5":"AMC"},"Volvo(沃尔沃)":{"APQP1":"Pre-PS","APQP2":"VP","APQP3":"LR","APQP4":"OKTB","APQP5":"J1/MP1"},"PSA":{"APQP1":"PCM","APQP2":"SFR","APQP3":"TKOM","APQP4":"PPMM","APQP5":"SOP"}};
+
+/* OEM ↔ URL slug：BMW(宝马) ↔ bmw（照抄计划页实现，归一化匹配以 OEM_PHASE_SYS 的 key 为准） */
+function oemSlug(oem){ var m = String(oem || '').match(/^([A-Za-z0-9]+)/); return m ? m[1].toLowerCase() : ''; }
+function oemFromSlug(slug){
+  slug = String(slug || '').toLowerCase();
+  for(var k in OEM_PHASE_SYS){ if(oemSlug(k) === slug) return k; }
+  return '';
+}
+
+/* 执行页工具条 OEM 下拉：选项与里程碑页一致（OEM_PHASE_SYS 全部 16 个 key） */
+function buildOemOptions(){
+  var sel = document.getElementById("oemSelect");
+  sel.innerHTML = '<option value="">' + esc(tr("oemPlaceholder")) + "</option>" + Object.keys(OEM_PHASE_SYS).map(function(o){
+    return '<option value="' + esc(o) + '">' + esc(o) + "</option>";
+  }).join("");
+}
+function syncOemSelect(){
+  var sel = document.getElementById("oemSelect");
+  if(sel) sel.value = state.planOem || "";
+}
+
+/* 阶段体系名称（三语）：色带标注用。只含标准阶段键（ML0-7/APQP1-5/ANPQP1-5），
+   OEM_PHASES 中的非标准键（如 BMW 的 VS0/VS2/PrePZS/PZS）不参与色带 */
+const PHASE_NAMES = {
+  vda:{
+    ML0:{zh:"创新批准",en:"Innovation Release",de:"Innovationsfreigabe"},
+    ML1:{zh:"合同授予需求管理",en:"Requirements Management for Contract Award",de:"Anforderungsmanagement für Vergabe"},
+    ML2:{zh:"确定供应链/下订单",en:"Determination of Supply Chain / Placing of Orders",de:"Festlegung der Lieferkette / Vergabe"},
+    ML3:{zh:"技术规格释放",en:"Release of Technical Specifications",de:"Freigabe technische Spezifikation"},
+    ML4:{zh:"生产规划完成",en:"Production Planning Completed",de:"Produktionsplanung abgeschlossen"},
+    ML5:{zh:"量产件与工装就绪",en:"Production-Level Parts & Tools Available",de:"Serienwerkzeugfallende Teile verfügbar"},
+    ML6:{zh:"产品与过程批准",en:"Product & Process Approval",de:"Produkt- und Prozessfreigabe"},
+    ML7:{zh:"移交生产",en:"Handover to Production",de:"Übergabe an Serie"}
+  },
+  apqp:{
+    APQP1:{zh:"策划",en:"Planning",de:"Planung"},
+    APQP2:{zh:"产品设计和开发",en:"Product Design and Development",de:"Produktdesign und -entwicklung"},
+    APQP3:{zh:"过程设计和开发",en:"Process Design and Development",de:"Prozessdesign und -entwicklung"},
+    APQP4:{zh:"产品和过程确认",en:"Product and Process Validation",de:"Produkt- und Prozessvalidierung"},
+    APQP5:{zh:"生产",en:"Production",de:"Produktion"}
+  },
+  anpqp:{
+    ANPQP1:{zh:"策划",en:"Plan and Define Program",de:"Planung und Programmdefinition"},
+    ANPQP2:{zh:"产品设计和开发",en:"Product Design and Development",de:"Produktdesign und -entwicklung"},
+    ANPQP3:{zh:"过程设计和开发",en:"Process Design and Development",de:"Prozessdesign und -entwicklung"},
+    ANPQP4:{zh:"产品和过程确认",en:"Product and Process Validation",de:"Produkt- und Prozessvalidierung"},
+    ANPQP5:{zh:"生产",en:"Production",de:"Produktion"}
+  }
+};
+
+const REC_TASKS = [{"id":"r1","phase":{"apqp":"APQP2","vda":"ML3","anpqp":"ANPQP2"},"so":-3,"eo":0,"name":{"zh":"产品数据冻结","en":"Product data freeze","de":"Produktdaten-Freeze"},"desc":{"zh":"","en":"","de":""}},{"id":"r2","phase":{"apqp":"APQP2","vda":"ML3","anpqp":"ANPQP2"},"so":-10,"eo":-8,"name":{"zh":"数据释放","en":"Data release","de":"Datenfreigabe"},"desc":{"zh":"","en":"","de":""}},{"id":"r3","phase":{"apqp":"APQP2","vda":"ML3","anpqp":"ANPQP2"},"so":-8,"eo":-6,"name":{"zh":"DV样件制造","en":"DV prototype build","de":"DV-Musterbau"},"desc":{"zh":"","en":"","de":""}},{"id":"r4","phase":{"apqp":"APQP2","vda":"ML3","anpqp":"ANPQP2"},"so":-6,"eo":-2,"name":{"zh":"DV试验及报告","en":"DV testing & report","de":"DV-Erprobung und Bericht"},"desc":{"zh":"","en":"","de":""}},{"id":"r5","phase":{"apqp":"APQP3","vda":"ML5","anpqp":"ANPQP3"},"so":-20,"eo":-18,"name":{"zh":"量产数据释放","en":"Mass production data release","de":"Seriendatenfreigabe"},"desc":{"zh":"","en":"","de":""}},{"id":"r6","phase":{"apqp":"APQP3","vda":"ML5","anpqp":"ANPQP3"},"so":-16,"eo":-14,"name":{"zh":"模具/工装发包","en":"Tooling sourcing & order placement","de":"Werkzeugvergabe"},"desc":{"zh":"","en":"","de":""}},{"id":"r7","phase":{"apqp":"APQP3","vda":"VS0","anpqp":"ANPQP3"},"so":-8,"eo":-2,"name":{"zh":"T1试模及整改","en":"T1 tooling tryout & rework","de":"T1-Werkzeugerprobung und Nacharbeit"},"desc":{"zh":"","en":"","de":""}},{"id":"r8","phase":{"apqp":"APQP3","vda":"ML5","anpqp":"ANPQP3"},"so":-8,"eo":-5,"name":{"zh":"PV样件制造","en":"PV prototype build","de":"PV-Musterbau"},"desc":{"zh":"","en":"","de":""}},{"id":"r9","phase":{"apqp":"APQP3","vda":"ML5","anpqp":"ANPQP3"},"so":0,"eo":6,"name":{"zh":"PV试验及报告","en":"PV testing & report","de":"PV-Erprobung und Bericht"},"desc":{"zh":"","en":"","de":""}},{"id":"r10","phase":{"apqp":"APQP3","vda":"PrePZS","anpqp":"ANPQP3"},"so":-4,"eo":-1,"name":{"zh":"OTS样件提交客户认可","en":"OTS sample submission for customer approval","de":"OTS-Mustervorlage zur Kundenfreigabe"},"desc":{"zh":"","en":"","de":""}},{"id":"r11","phase":{"apqp":"APQP4","vda":"PZS","anpqp":"ANPQP4"},"so":1,"eo":5,"name":{"zh":"试生产准备","en":"Trial production preparation","de":"Vorbereitung des Probelaufs"},"desc":{"zh":"","en":"","de":""}},{"id":"r12","phase":{"apqp":"APQP4","vda":"ML6","anpqp":"ANPQP4"},"so":-6,"eo":-2,"name":{"zh":"PPAP文件包准备与提交","en":"PPAP package preparation & submission","de":"PPAP-Unterlagen vorbereiten und einreichen"},"desc":{"zh":"","en":"","de":""}},{"id":"r13","phase":{"apqp":"APQP5","vda":"ML7","anpqp":"ANPQP5"},"so":-4,"eo":-1,"name":{"zh":"产能爬坡验证","en":"Capacity ramp-up verification","de":"Verifizierung des Kapazitätshochlaufs"},"desc":{"zh":"","en":"","de":""}}];
+
+const REC_DEFAULTS = {"r1":{"so":-3,"eo":0},"r2":{"so":-10,"eo":-8},"r3":{"so":-8,"eo":-6},"r4":{"so":-6,"eo":-2},"r5":{"so":-20,"eo":-18},"r6":{"so":-16,"eo":-14},"r7":{"so":-8,"eo":-2},"r8":{"so":-8,"eo":-5},"r9":{"so":0,"eo":6},"r10":{"so":-4,"eo":-1},"r11":{"so":1,"eo":5},"r12":{"so":-6,"eo":-2},"r13":{"so":-4,"eo":-1}};
+
+/* ============ 交付物模板库：APQP / VDA-MLA / ANPQP（三语名称） ============ */
+const TPL_APQP = [
+  {key:"APQP1", name:{zh:"计划和确定项目",en:"Plan and Define Program",de:"Programm planen und definieren"}, items:[
+    {zh:"项目计划",en:"Program Plan",de:"Projektplan"},
+    {zh:"初始过程流程图",en:"Initial Process Flow Diagram",de:"Initialer Prozessflussplan"},
+    {zh:"产品设计输入要求",en:"Product Design Input Requirements",de:"Produktdesign-Eingangsanforderungen"},
+    {zh:"设计目标",en:"Design Goals",de:"Designziele"},
+    {zh:"产品保证计划",en:"Product Assurance Plan",de:"Produktsicherungsplan"},
+    {zh:"初始物料清单",en:"Initial Bill of Materials",de:"Initiale Stückliste"}
+  ]},
+  {key:"APQP2", name:{zh:"产品设计和开发",en:"Product Design and Development",de:"Produktdesign und -entwicklung"}, items:[
+    {zh:"产品设计",en:"Product Design",de:"Produktdesign"},
+    {zh:"设计失效模式及后果分析(DFMEA)",en:"Design FMEA",de:"Design-FMEA"},
+    {zh:"可制造性与装配设计",en:"Design for Manufacturability & Assembly",de:"Fertigungs- und montagegerechte Gestaltung"},
+    {zh:"图纸与技术规范",en:"Drawings & Specifications",de:"Zeichnungen und Spezifikationen"},
+    {zh:"设计验证计划",en:"Design Verification Plan",de:"Design-Verifikationsplan"},
+    {zh:"新设备与工装需求",en:"New Equipment & Tooling Requirements",de:"Anforderungen neuer Anlagen und Werkzeuge"}
+  ]},
+  {key:"APQP3", name:{zh:"过程设计和开发",en:"Process Design and Development",de:"Prozessdesign und -entwicklung"}, items:[
+    {zh:"过程流程图",en:"Process Flow Diagram",de:"Prozessflussplan"},
+    {zh:"过程失效模式及后果分析(PFMEA)",en:"Process FMEA",de:"Prozess-FMEA"},
+    {zh:"过程控制计划",en:"Process Control Plan",de:"Prozesslenkungsplan"},
+    {zh:"过程规格",en:"Process Specifications",de:"Prozessspezifikationen"},
+    {zh:"测量系统分析计划",en:"MSA Plan",de:"MSA-Plan"},
+    {zh:"试生产控制计划",en:"Pilot Control Plan",de:"Probefertigungs-Lenkungsplan"},
+    {zh:"包装标准",en:"Packaging Standards",de:"Verpackungsstandards"}
+  ]},
+  {key:"APQP4", name:{zh:"产品和过程确认",en:"Product and Process Validation",de:"Produkt- und Prozessvalidierung"}, items:[
+    {zh:"测量系统分析",en:"Measurement System Analysis",de:"Messsystemanalyse"},
+    {zh:"初始过程能力研究",en:"Initial Process Capability Study",de:"Initiale Prozessfähigkeitsstudie"},
+    {zh:"生产件批准(PPAP)",en:"PPAP",de:"Produktionsprozess- und Produktfreigabe (PPAP)"},
+    {zh:"生产确认运行",en:"Production Validation Run",de:"Produktionsvalidierungslauf"},
+    {zh:"产能验证",en:"Capacity Verification",de:"Kapazitätsprüfung"},
+    {zh:"质量认定",en:"Quality Sign-off",de:"Qualitätsfreigabe"}
+  ]},
+  {key:"APQP5", name:{zh:"生产",en:"Production",de:"Produktion"}, items:[
+    {zh:"生产控制计划",en:"Production Control Plan",de:"Produktionslenkungsplan"},
+    {zh:"过程监控",en:"Process Monitoring",de:"Prozessüberwachung"},
+    {zh:"产能爬坡",en:"Capacity Ramp-up",de:"Kapazitätshochlauf"},
+    {zh:"顾客反馈与纠正措施",en:"Customer Feedback & Corrective Action",de:"Kundenfeedback und Korrekturmaßnahmen"},
+    {zh:"过程审核",en:"Process Audit",de:"Prozessaudit"},
+    {zh:"持续改进",en:"Continual Improvement",de:"Kontinuierliche Verbesserung"}
+  ]}
+];
+const TPL_MLA = [
+  {key:"ML1", name:{zh:"创新批准",en:"Innovation Release",de:"Innovationsfreigabe"}, items:[
+    {zh:"创新批准申请",en:"Innovation Approval Application",de:"Antrag auf Innovationsfreigabe"},
+    {zh:"项目目标定义",en:"Project Objectives Definition",de:"Projektzieldefinition"},
+    {zh:"初始项目计划",en:"Initial Project Plan",de:"Initialer Projektplan"},
+    {zh:"里程碑计划",en:"Milestone Plan",de:"Meilensteinplan"}
+  ]},
+  {key:"ML2", name:{zh:"合同授予需求管理",en:"Requirements Management for Contract Award",de:"Anforderungsmanagement für Vergabe"}, items:[
+    {zh:"需求清单",en:"Requirements List",de:"Anforderungsliste"},
+    {zh:"项目目标协议",en:"Project Target Agreement",de:"Projektzielvereinbarung"},
+    {zh:"技术规范草案",en:"Draft Technical Specification",de:"Entwurf der technischen Spezifikation"},
+    {zh:"项目组织与职责",en:"Project Organization & Responsibilities",de:"Projektorganisation und Verantwortlichkeiten"}
+  ]},
+  {key:"ML3", name:{zh:"技术规格释放",en:"Release of Technical Specifications",de:"Freigabe technische Spezifikation"}, items:[
+    {zh:"技术规格书",en:"Technical Specification",de:"Technische Spezifikation"},
+    {zh:"设计冻结",en:"Design Freeze",de:"Design-Freeze"},
+    {zh:"CAD数据释放",en:"CAD Data Release",de:"CAD-Datenfreigabe"},
+    {zh:"初始物料清单",en:"Initial Bill of Materials",de:"Initiale Stückliste"},
+    {zh:"下单计划",en:"Ordering Plan",de:"Vergabeplan"}
+  ]},
+  {key:"ML4", name:{zh:"生产规划完成",en:"Production Planning Completed",de:"Produktionsplanung abgeschlossen"}, items:[
+    {zh:"生产规划",en:"Production Planning",de:"Produktionsplanung"},
+    {zh:"工装规划",en:"Tooling Planning",de:"Werkzeugplanung"},
+    {zh:"物流规划",en:"Logistics Planning",de:"Logistikplanung"},
+    {zh:"产能规划",en:"Capacity Planning",de:"Kapazitätsplanung"},
+    {zh:"质量规划",en:"Quality Planning",de:"Qualitätsplanung"}
+  ]},
+  {key:"ML5", name:{zh:"量产件与工装就绪",en:"Production-Level Parts & Tools Available",de:"Serienwerkzeugreife Teile verfügbar"}, items:[
+    {zh:"工装就绪",en:"Tools Ready",de:"Werkzeuge fertiggestellt"},
+    {zh:"样件制造",en:"Sample Parts Build",de:"Musterteilefertigung"},
+    {zh:"过程验证",en:"Process Validation",de:"Prozessvalidierung"},
+    {zh:"初始样品检验",en:"Initial Sample Inspection",de:"Erstmusterprüfung"},
+    {zh:"测量系统分析",en:"Measurement System Analysis",de:"Messsystemanalyse"}
+  ]},
+  {key:"ML6", name:{zh:"产品与过程批准",en:"Product & Process Approval",de:"Produkt- und Prozessfreigabe"}, items:[
+    {zh:"PPAP文件包",en:"PPAP Package",de:"PPAP-Unterlagen"},
+    {zh:"过程审核报告",en:"Process Audit Report",de:"Prozessaudit-Bericht"},
+    {zh:"产品批准",en:"Product Approval",de:"Produktfreigabe"},
+    {zh:"过程批准",en:"Process Approval",de:"Prozessfreigabe"},
+    {zh:"批量生产放行",en:"Release for Series Production",de:"Freigabe für Serienproduktion"}
+  ]},
+  {key:"ML7", name:{zh:"移交生产",en:"Handover to Production",de:"Übergabe an Serie"}, items:[
+    {zh:"移交文件",en:"Handover Documentation",de:"Übergabedokumentation"},
+    {zh:"SOP准备",en:"SOP Preparation",de:"SOP-Vorbereitung"},
+    {zh:"产能爬坡计划",en:"Ramp-up Plan",de:"Hochlaufplan"},
+    {zh:"培训完成",en:"Training Completed",de:"Schulung abgeschlossen"},
+    {zh:"生产启动",en:"Production Start",de:"Produktionsstart"}
+  ]}
+];
+const TPL_ANPQP = [
+  {key:"ANPQP1", name:{zh:"策划",en:"Plan and Define Program",de:"Planung und Programmdefinition"}, items:[
+    {zh:"项目计划",en:"Program Plan",de:"Projektplan"},
+    {zh:"质量策划大纲",en:"Quality Planning Outline",de:"Qualitätsplanungsüberblick"},
+    {zh:"初始过程流程图",en:"Initial Process Flow Diagram",de:"Initialer Prozessflussplan"},
+    {zh:"产品设计输入要求",en:"Product Design Input Requirements",de:"Produktdesign-Eingangsanforderungen"},
+    {zh:"项目里程碑计划",en:"Project Milestone Plan",de:"Projekt-Meilensteinplan"}
+  ]},
+  {key:"ANPQP2", name:{zh:"产品设计和开发",en:"Product Design and Development",de:"Produktdesign und -entwicklung"}, items:[
+    {zh:"产品设计",en:"Product Design",de:"Produktdesign"},
+    {zh:"设计失效模式分析(DFMEA)",en:"Design FMEA",de:"Design-FMEA"},
+    {zh:"设计验证计划",en:"Design Verification Plan",de:"Design-Verifikationsplan"},
+    {zh:"图纸与技术规范",en:"Drawings & Specifications",de:"Zeichnungen und Spezifikationen"},
+    {zh:"样件制造计划",en:"Prototype Build Plan",de:"Prototypenfertigungsplan"}
+  ]},
+  {key:"ANPQP3", name:{zh:"过程设计和开发",en:"Process Design and Development",de:"Prozessdesign und -entwicklung"}, items:[
+    {zh:"过程流程图",en:"Process Flow Diagram",de:"Prozessflussplan"},
+    {zh:"过程失效模式分析(PFMEA)",en:"Process FMEA",de:"Prozess-FMEA"},
+    {zh:"过程控制计划",en:"Process Control Plan",de:"Prozesslenkungsplan"},
+    {zh:"过程规格",en:"Process Specifications",de:"Prozessspezifikationen"},
+    {zh:"测量系统分析计划",en:"MSA Plan",de:"MSA-Plan"}
+  ]},
+  {key:"ANPQP4", name:{zh:"产品和过程确认",en:"Product and Process Validation",de:"Produkt- und Prozessvalidierung"}, items:[
+    {zh:"试生产运行",en:"Trial Production Run",de:"Probelauf"},
+    {zh:"过程能力研究",en:"Process Capability Study",de:"Prozessfähigkeitsstudie"},
+    {zh:"生产件批准(PPAP)",en:"PPAP",de:"Produktionsprozess- und Produktfreigabe (PPAP)"},
+    {zh:"质量确认",en:"Quality Validation",de:"Qualitätsvalidierung"},
+    {zh:"产能验证",en:"Capacity Verification",de:"Kapazitätsprüfung"}
+  ]},
+  {key:"ANPQP5", name:{zh:"生产",en:"Production",de:"Produktion"}, items:[
+    {zh:"生产控制计划",en:"Production Control Plan",de:"Produktionslenkungsplan"},
+    {zh:"过程监控",en:"Process Monitoring",de:"Prozessüberwachung"},
+    {zh:"过程审核",en:"Process Audit",de:"Prozessaudit"},
+    {zh:"持续改进",en:"Continual Improvement",de:"Kontinuierliche Verbesserung"},
+    {zh:"顾客反馈处理",en:"Customer Feedback Handling",de:"Kundenfeedback-Bearbeitung"}
+  ]}
+];
+/* ============ 数据模型与状态 ============ */
+var LS_KEY = "gantt-exec-v1";
+var COLORS = ["#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#dc2626","#4f46e5","#0d9488"];
+var state = { tasks:[], seq:1, view:"day", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{} };
+/* 列模型：ID 与任务名称为冻结固定列（常显不可隐藏），其余列可显隐、可拖拽调宽 */
+var COLS = [
+  {key:'id',    cls:'c-id',    defW:36, fixed:true},
+  {key:'name',  cls:'c-name',  defW:0,  fixed:true, i18n:'cName'},
+  {key:'owner', cls:'c-owner', defW:64, i18n:'cOwner'},
+  {key:'dur',   cls:'c-dur',   defW:52, i18n:'cDur'},
+  {key:'prog',  cls:'c-prog',  defW:56, i18n:'cProg'},
+  {key:'start', cls:'c-start', defW:86, i18n:'cStart'},
+  {key:'end',   cls:'c-end',   defW:86, i18n:'cEnd'},
+  {key:'var',   cls:'c-var',   defW:52, i18n:'varianceCol'},
+  {key:'float', cls:'c-float', defW:64, i18n:'floatCol'},
+  {key:'output', cls:'c-output', defW:120, i18n:'fOutput'},
+  {key:'remarks', cls:'c-remarks', defW:120, i18n:'fRemarks', hide:true}
+];
+var COL_MIN_W = 24, COL_MAX_W = 600, NAME_MIN_W = 80;
+function colVis(key){ return !state.colVis || state.colVis[key] !== false; }
+function colWOf(key){ // 合法范围内的列宽；未设置返回 null（用默认宽）
+  var w = state.colW ? state.colW[key] : null;
+  if(typeof w !== 'number' || isNaN(w)) return null;
+  var min = key === 'name' ? NAME_MIN_W : COL_MIN_W;
+  return Math.min(COL_MAX_W, Math.max(min, w));
+}
+function setColW(key, w){ // w=null 表示恢复默认宽
+  state.colW = state.colW || {};
+  if(w == null) delete state.colW[key];
+  else state.colW[key] = Math.round(w);
+}
+function newId(){ return "t" + (state.seq++); }
+function mkTask(o){
+  o = o || {};
+  return { id:o.id||newId(), name:o.name||"", type:o.type||"task",
+    group:o.group||"", start:o.start||(o.type==="group"?"":fmtD(new Date())), dur:o.dur!=null?o.dur:(o.type==="group"?0:5),
+    end:o.end||"", deps:o.deps||[], deadline:o.deadline||"", owner:o.owner||"", output:o.output||"",
+    progress:o.progress||0, remarks:o.remarks||"", color:o.color||COLORS[0],
+    manual:!!o.manual, source:o.source||"manual", subs:o.subs||[] };
+}
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} WORKCAL.save(cal); }
+function load(){
+  try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
+  seedSample();
+}
+function seedSample(){
+  state.tasks = [
+    {id:"g1",name:"项目启动",type:"group",group:"",start:"",dur:0,end:"",deps:[],owner:"",output:"",progress:0,remarks:"",color:"",source:"sample",subs:[]},
+    mkTask({name:"需求分析",group:"g1",start:"2026-10-12",dur:5,owner:"张三",progress:100,source:"sample"}),
+    mkTask({name:"原型设计",group:"g1",start:"2026-10-19",dur:4,owner:"李四",progress:60,source:"sample"}),
+    mkTask({name:"UI设计",group:"g1",start:"2026-10-23",dur:6,progress:20,source:"sample"}),
+    mkTask({name:"后端开发",group:"g1",start:"2026-10-23",dur:15,owner:"王五",progress:10,source:"sample"}),
+    mkTask({name:"上线发布",type:"milestone",group:"g1",start:"2026-11-30",dur:0,source:"sample"})
+  ];
+  state.tasks[2].deps = [{id:state.tasks[1].id, type:"FS", lag:0}];
+  state.tasks[3].deps = [{id:state.tasks[2].id, type:"FS", lag:0}];
+  state.tasks[4].deps = [{id:state.tasks[2].id, type:"FS", lag:0}];
+  state.tasks[5].deps = [{id:state.tasks[3].id, type:"FS", lag:0}, {id:state.tasks[4].id, type:"FS", lag:0}];
+  state.seq = 100;
+}
+/* ============ 排期引擎 ============ */
+function taskEnd(t){ // 按工期算结束日（含开始日）
+  if(t.type === "milestone") return t.start;
+  if(t.dur <= 0) return t.start;
+  var d = parseD(t.start); if(!d) return t.start;
+  return fmtD(addWorkdays(d, t.dur - 1));
+}
+/* 依赖数据：deps 存为 [{id,type,lag}]；兼容旧数据（纯 ID 字符串数组，视为 FS+0） */
+function normDeps(deps){
+  var out = [];
+  (deps||[]).forEach(function(d){
+    if(d == null) return;
+    if(typeof d === "string" || typeof d === "number"){
+      var id = String(d).trim();
+      if(id) out.push({id:id, type:"FS", lag:0});
+    } else if(d && d.id){
+      out.push({ id:String(d.id).trim(), type:String(d.type||"FS").toUpperCase(), lag:+d.lag||0 });
+    }
+  });
+  return out;
+}
+/* 文本格式解析：'3FS,5SS+2d,7FF-1d' → [{id,type,lag}]（默认 FS+0；纯数字 ID 自动补 t 前缀） */
+function parseDepsText(str){
+  var out = [];
+  String(str||"").split(/[,，;；\n]+/).forEach(function(tok){
+    tok = tok.trim(); if(!tok) return;
+    var m = tok.match(/^(\d+|t\d+)\s*(FS|SS|FF|SF)?\s*([+-]?\s*\d+\s*d?)?$/i);
+    if(!m) return;
+    var id = m[1].toLowerCase();
+    if(/^\d+$/.test(id)) id = "t" + id;
+    var lag = 0;
+    if(m[3]) lag = parseInt(String(m[3]).replace(/[d\s]/gi, ""), 10) || 0;
+    out.push({id:id, type:(m[2]||"FS").toUpperCase(), lag:lag});
+  });
+  return out;
+}
+function depsToText(deps){
+  return normDeps(deps).map(function(d){
+    var s = String(d.id).replace(/^t/i, "") + (d.type || "FS");
+    if(d.lag) s += (d.lag > 0 ? "+" : "") + d.lag + "d";
+    return s;
+  }).join(",");
+}
+function normalizeState(){ // 旧数据 deps 字符串数组 → 对象数组；补 deadline / manual 默认值
+  state.tasks.forEach(function(t){
+    t.deps = normDeps(t.deps);
+    if(!t.deadline) t.deadline = "";
+    if(typeof t.manual !== "boolean") t.manual = false;
+  });
+}
+function topoSort(tasks){ // 前置拓扑排序，返回 {order, cyclic}
+  var byId = {}, indeg = {}, adj = {};
+  tasks.forEach(function(t){ byId[t.id] = t; indeg[t.id] = 0; adj[t.id] = []; });
+  tasks.forEach(function(t){
+    normDeps(t.deps).forEach(function(d){
+      if(byId[d.id] && d.id !== t.id){ adj[d.id].push(t.id); indeg[t.id]++; }
+    });
+  });
+  var q = tasks.filter(function(t){ return indeg[t.id] === 0; }).map(function(t){ return t.id; });
+  var order = [], cyclic = [];
+  while(q.length){ var id = q.shift(); order.push(id); adj[id].forEach(function(n){ if(--indeg[n] === 0) q.push(n); }); }
+  tasks.forEach(function(t){ if(indeg[t.id] > 0) cyclic.push(t.id); });
+  return { order:order, cyclic:cyclic };
+}
+function depSpan(t){ return t.type === "milestone" ? 0 : Math.max((t.dur||0) - 1, 0); }
+/* 单条依赖约束：前置任务 p 按依赖 d（类型+滞后，工作日历跳过节假日）对本任务 t 产生的最早开始日
+   FS=前置完成→后续开始；SS=前置开始→后续开始；FF=前置完成→后续完成；SF=前置开始→后续完成 */
+function depCand(t, p, d){
+  var ps = parseD(p.start), pe = ps ? parseD(taskEnd(p)) : null;
+  if(!ps) return null;
+  var lag = +d.lag || 0, c = null;
+  switch(d.type){
+    case "SS": c = addWorkdays(ps, lag); break;
+    case "FF": if(!pe) return null; c = subWorkdays(addWorkdays(pe, lag), depSpan(t)); break;
+    case "SF": c = subWorkdays(addWorkdays(ps, lag), depSpan(t)); break;
+    default: c = addWorkdays(pe || ps, 1 + lag);
+  }
+  return c ? snapWorkday(c) : null;
+}
+function scheduleAll(){
+  var ts = state.tasks.filter(function(t){ return t.type !== "group"; });
+  var r = topoSort(ts);
+  if(r.cyclic.length){ toast(tr("cycleWarn")); }
+  var byId = {}; ts.forEach(function(t){ byId[t.id] = t; });
+  r.order.forEach(function(id){
+    var t = byId[id]; if(!t) return;
+    if(t.manual){ t.end = taskEnd(t); return; } // 手动排程：不重排日期，但其日期仍作为后续任务的前置约束
+    var latest = null;
+    normDeps(t.deps).forEach(function(d){
+      var p = byId[d.id]; if(!p || d.id === t.id) return;
+      var c = depCand(t, p, d);
+      if(c && (!latest || c > latest)) latest = c;
+    });
+    if(latest){
+      var cur = parseD(t.start);
+      if(!cur || cur < latest){ t.start = fmtD(latest); }
+    }
+    t.end = taskEnd(t);
+  });
+  computeFloats(ts, r, byId);
+}
+/* 关键路径：正向 ES=排程开始、反向 LF/LS 遍历，总浮时=ES→LS 工作日数；≤0 为关键任务 */
+var floatMap = {};
+function computeFloats(ts, r, byId){
+  floatMap = {};
+  var succ = {};
+  r.order.forEach(function(id){ succ[id] = []; });
+  r.order.forEach(function(id){
+    var t = byId[id];
+    normDeps(t.deps).forEach(function(d){ if(succ[d.id]) succ[d.id].push({ s:id, d:d }); });
+  });
+  var ES = {}, EF = {};
+  r.order.forEach(function(id){
+    var t = byId[id];
+    ES[id] = parseD(t.start);
+    EF[id] = ES[id] ? parseD(taskEnd(t)) : null;
+  });
+  var pend = null;
+  r.order.forEach(function(id){ if(EF[id] && (!pend || EF[id] > pend)) pend = EF[id]; });
+  if(!pend) return;
+  var LF = {}, LS = {};
+  for(var i = r.order.length - 1; i >= 0; i--){
+    var id = r.order[i], t = byId[id];
+    var lf = new Date(pend);
+    succ[id].forEach(function(su){
+      var sLS = LS[su.s], sLF = LF[su.s];
+      if(!sLS || !sLF) return;
+      var c = null;
+      switch(su.d.type){
+        case "SS": c = addWorkdays(subWorkdays(sLS, +su.d.lag || 0), depSpan(t)); break;
+        case "FF": c = subWorkdays(sLF, +su.d.lag || 0); break;
+        case "SF": c = subWorkdays(sLS, +su.d.lag || 0); break;
+        default: c = subWorkdays(sLS, 1 + (+su.d.lag || 0));
+      }
+      if(c && c < lf) lf = c;
+    });
+    LF[id] = lf;
+    LS[id] = subWorkdays(lf, depSpan(t));
+    if(ES[id]) floatMap[id] = workdayDiff(ES[id], LS[id]);
+  }
+}
+function visibleTasks(){
+  var out = [], skipGroup = null;
+  state.tasks.forEach(function(t){
+    if(t.type === "group"){
+      out.push(t);
+      skipGroup = state.collapsed[t.id] ? t.id : null;
+      return;
+    }
+    if(skipGroup && t.group === skipGroup) return;
+    out.push(t);
+  });
+  return out;
+}
+function flatTasks(){ return state.tasks.filter(function(t){ return t.type !== "group"; }); }
+
+/* ============ 基线快照 ============ */
+function baselineMap(){ // state.baseline（[{id,start,end}]）→ {taskId:{start,end}}
+  var m = {};
+  (state.baseline || []).forEach(function(b){ if(b && b.id) m[b.id] = b; });
+  return m;
+}
+function varianceOf(t, bmap){ // 开始日期相对基线的偏差天数（+晚于基线 / -早于基线）；无基线返回 null
+  if(!bmap) bmap = baselineMap();
+  var b = bmap[t.id];
+  if(!b || !b.start || !t.start) return null;
+  var bs = parseD(b.start), cs = parseD(t.start);
+  if(!bs || !cs) return null;
+  return diffDays(bs, cs);
+}
+function fmtVar(v){ return v === 0 ? "—" : (v > 0 ? "+" + v : String(v)); }
+function saveBaseline(){
+  if(state.baseline && !confirm(tr("baselineConfirm"))) return;
+  state.baseline = flatTasks().filter(function(t){ return !!t.start; }).map(function(t){
+    return { id:t.id, start:t.start, end:t.type === "milestone" ? t.start : taskEnd(t) };
+  });
+  save(); render(); toast(tr("baselineSaved"));
+}
+/* ============ 资源预警 ============ */
+var resWarnMap = {};
+function computeResWarn(){ // 同一负责人同日≥2个任务区间重叠 → 相关任务的负责人单元格标黄⚠（只预警不自动平衡）
+  resWarnMap = {};
+  if(!state.resWarn) return;
+  var byOwner = {};
+  flatTasks().forEach(function(t){
+    if(!t.owner) return;
+    var s = parseD(t.start), e = parseD(taskEnd(t));
+    if(!s || !e) return;
+    (byOwner[t.owner] = byOwner[t.owner] || []).push({ id:t.id, s:s, e:e });
+  });
+  Object.keys(byOwner).forEach(function(owner){
+    var list = byOwner[owner], dayIdx = {};
+    list.forEach(function(it, i){
+      for(var d = new Date(it.s); d <= it.e; d = addDays(d, 1)){
+        var k = fmtD(d);
+        (dayIdx[k] = dayIdx[k] || []).push(i);
+      }
+    });
+    Object.keys(dayIdx).forEach(function(k){
+      if(dayIdx[k].length >= 2) dayIdx[k].forEach(function(i){ resWarnMap[list[i].id] = 1; });
+    });
+  });
+}
+
+/* 文本格式解析（hark 兼容）：一行一条
+   2026-10-01~2026-10-07,国庆   → 放假区间（名称可选）
+   2026-10-08,国庆              → 放假单日
+   补班 2026-10-10 / 调休 2026-10-10 → 调休上班 */
+function parseCalText(text){
+  var holidays = {}, makeup = [];
+  text.split("\n").forEach(function(line){
+    line = line.trim(); if(!line) return;
+    var m = line.match(/^(?:补班|调休|make-up|makeup|ausgleich)\s*[,，]?\s*(\d{4}-\d{2}-\d{2})$/i);
+    if(m){ makeup.push(m[1]); return; }
+    var p = line.split(/[,，]/), range = (p[0] || "").trim(), name = (p[1] || "节假日").trim() || "节假日";
+    var r = range.split("~"), a = r[0].trim(), b = (r[1] || r[0]).trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(a)) return;
+    var g = 0;
+    while(a <= b && g++ < 400){ holidays[a] = name; a = fmtD(addDays(parseD(a), 1)); }
+  });
+  return { holidays:holidays, makeup:makeup };
+}
+function calToText(){ // 当前日历 → 文本格式
+  var lines = [], groups = {}, ks = Object.keys(cal.holidays).sort();
+  ks.forEach(function(k){
+    var n = cal.holidays[k], prev = lines.length ? lines[lines.length-1] : null;
+    if(prev && prev.end && fmtD(addDays(parseD(prev.end), 1)) === k && prev.name === n){
+      prev.end = k;
+    } else lines.push({ start:k, end:k, name:n });
+  });
+  var out = lines.map(function(l){
+    return l.start === l.end ? l.start + "," + l.name : l.start + "~" + l.end + "," + l.name;
+  });
+  Object.keys(cal.makeup).sort().forEach(function(k){ out.push("补班 " + k); });
+  return out.join("\n");
+}
+/* 自然语言解析：中文日期表达 → 节假日/调休 */
+function parseCalNL(text){
+  var year = new Date().getFullYear();
+  var ym = text.match(/(\d{4})\s*年/); if(ym) year = +ym[1];
+  var holidays = {}, makeup = [];
+  function dstr(m, d){ return year + "-" + (m<10?"0":"")+m + "-" + (d<10?"0":"")+d; }
+  // 区间：X月X日到/至X月X日 / X月X日-X月X日
+  var re = /(\d{1,2})月(\d{1,2})[日号]?\s*(?:到|至|-|~)\s*(\d{1,2})月(\d{1,2})[日号]?/g, m;
+  var ranges = [];
+  while((m = re.exec(text))){
+    var a = new Date(year, +m[1]-1, +m[2]), b = new Date(year, +m[3]-1, +m[4]);
+    if(b < a) b = new Date(year+1, +m[3]-1, +m[4]);
+    ranges.push([a, b, m.index]);
+  }
+  // 同月区间：X月X日到X日
+  var re2 = /(\d{1,2})月(\d{1,2})[日号]?\s*(?:到|至)\s*(\d{1,2})[日号]/g;
+  while((m = re2.exec(text))){
+    if(ranges.some(function(r){ return Math.abs(r[2]-m.index) < 4; })) continue;
+    ranges.push([new Date(year, +m[1]-1, +m[2]), new Date(year, +m[1]-1, +m[3]), m.index]);
+  }
+  // 单日：X月X日（排除已在区间内的）
+  var re3 = /(\d{1,2})月(\d{1,2})[日号]/g, singles = [];
+  while((m = re3.exec(text))){
+    var d = new Date(year, +m[1]-1, +m[2]);
+    if(ranges.some(function(r){ return d >= r[0] && d <= r[1]; })) continue;
+    singles.push([d, m.index]);
+  }
+  // 判断每个日期片段是放假还是调休：看附近关键词
+  function kindAt(idx){
+    var ctx = text.slice(Math.max(0, idx-12), idx+16);
+    if(/调休|补班|上班/.test(ctx)) return "makeup";
+    return "holiday";
+  }
+  ranges.forEach(function(r){
+    var k = kindAt(r[2]);
+    var d = new Date(r[0]);
+    while(d <= r[1]){ if(k === "makeup") makeup.push(fmtD(d)); else holidays[fmtD(d)] = 1; d = addDays(d, 1); }
+  });
+  singles.forEach(function(s){
+    if(kindAt(s[1]) === "makeup") makeup.push(fmtD(s[0])); else holidays[fmtD(s[0])] = 1;
+  });
+  return { holidays:holidays, makeup:makeup };
+}
+/* ============ 渲染 ============ */
+var PX_DAY = 28, PX_MONTH = 64, ROW_H = 34;
+// 月视图表头月份简写（三语常量数组，索引=月份）
+var MON_ABBR = {
+  zh:["","1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"],
+  en:["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+  de:["","Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"]
+};
+function monthLabel(d){ // 月视图列表头：zh '2026年10月' / en 'Oct 2026' / de 'Okt 2026'
+  var ab = MON_ABBR[lang] || MON_ABBR.zh, m = d.getMonth() + 1;
+  return lang === "zh" ? d.getFullYear() + "年" + ab[m] : ab[m] + " " + d.getFullYear();
+}
+function dateRange(){
+  var ts = flatTasks(), min = null, max = null;
+  ts.forEach(function(t){
+    var s = parseD(t.start), e = parseD(taskEnd(t));
+    if(s && (!min || s < min)) min = s;
+    if(e && (!max || e > max)) max = e;
+  });
+  if(state.showBaseline){ // 基线对比时把基线日期也纳入视野，避免灰条画在屏幕外
+    var bmapR = baselineMap();
+    ts.forEach(function(t){
+      var b = bmapR[t.id]; if(!b) return;
+      var s = parseD(b.start), e = parseD(b.end);
+      if(s && (!min || s < min)) min = s;
+      if(e && (!max || e > max)) max = e;
+    });
+  }
+  if(!min){ min = new Date(); min.setHours(0,0,0,0); }
+  if(!max) max = addDays(min, 30);
+  min = addDays(min, -7); max = addDays(max, 14);
+  return { min:min, max:max };
+}
+function X(d, min){ return diffDays(min, d) * PX_DAY; }
+function render(){
+  scheduleAll(); save(); autoSyncBack();
+  computeResWarn();
+  renderTable(); renderGantt();
+  updateCalSummary();
+}
+/* ============ 任务表表头（动态生成：冻结列 + 列宽手柄 + 显隐） ============ */
+function renderHead(){
+  var head = document.querySelector(".table-head"), html = "";
+  COLS.forEach(function(c){
+    if(!c.fixed && !colVis(c.key)) return;
+    var lbl = c.key === "id" ? "ID" : '<span data-i18n="' + c.i18n + '">' + esc(tr(c.i18n)) + "</span>";
+    html += '<div class="' + c.cls + '">' + lbl + '<div class="col-resize" data-col="' + c.key + '" title="' + esc(tr("colReset")) + '"></div></div>';
+  });
+  head.innerHTML = html;
+  head.querySelectorAll(".col-resize").forEach(function(h){ bindResize(h, h.dataset.col); });
+}
+/* 把 state.colW 应用到表头与全部表体单元格（内联宽 + 冻结列 sticky 偏移） */
+function applyColWidths(){
+  var idW = colWOf("id") || 36;
+  COLS.forEach(function(c){
+    var els = document.querySelectorAll("." + c.cls);
+    if(!els.length) return;
+    Array.prototype.forEach.call(els, function(el){
+      if(c.key === "name"){ // 名称列默认 flex:1 吸收余宽，用户调过则固定
+        var w = colWOf("name");
+        if(w){ el.style.flex = "none"; el.style.width = w + "px"; }
+        else { el.style.flex = ""; el.style.width = ""; }
+        el.style.left = idW + "px"; // 冻结在 ID 列右侧
+      } else {
+        el.style.width = (colWOf(c.key) || c.defW) + "px";
+        if(c.key === "id") el.style.left = "0px";
+      }
+    });
+  });
+}
+/* 表头右边缘拖拽调列宽（mousedown 起，不触发其他行为）；双击恢复默认宽 */
+function bindResize(handle, key){
+  handle.addEventListener("mousedown", function(ev){
+    ev.preventDefault(); ev.stopPropagation();
+    var startX = ev.clientX, startW = handle.parentElement.getBoundingClientRect().width;
+    var min = key === "name" ? NAME_MIN_W : COL_MIN_W;
+    document.body.classList.add("resizing");
+    function mv(e2){
+      var w = Math.min(COL_MAX_W, Math.max(min, startW + (e2.clientX - startX)));
+      state.colW = state.colW || {};
+      state.colW[key] = w;
+      applyColWidths(); // 拖拽中只改宽度，不重渲染，避免打断拖拽
+    }
+    function up(){
+      document.removeEventListener("mousemove", mv);
+      document.removeEventListener("mouseup", up);
+      document.body.classList.remove("resizing");
+      save(); render();
+    }
+    document.addEventListener("mousemove", mv);
+    document.addEventListener("mouseup", up);
+  });
+  handle.addEventListener("dblclick", function(ev){
+    ev.preventDefault(); ev.stopPropagation();
+    if(!colWOf(key)) return; // 已是默认宽
+    setColW(key, null);
+    save(); render();
+  });
+}
+/* ============ 列设置菜单（显隐；ID/任务名称常显不可取消） ============ */
+function toggleColMenu(){
+  var m = document.getElementById("colMenu");
+  if(m.style.display === "block"){ closeColMenu(); return; }
+  var html = '<h4>' + esc(tr("colSettings")) + "</h4>";
+  COLS.forEach(function(c){
+    if(c.fixed){
+      html += '<label class="dis" title="' + esc(tr("colFixed")) + '"><input type="checkbox" checked disabled> ' + esc(tr(c.i18n)) + "</label>";
+    } else {
+      html += '<label><input type="checkbox" data-col="' + c.key + '"' + (colVis(c.key) ? " checked" : "") + "> " + esc(tr(c.i18n)) + "</label>";
+    }
+  });
+  m.innerHTML = html;
+  var r = document.getElementById("btnCols").getBoundingClientRect();
+  m.style.display = "block";
+  m.style.top = (r.bottom + 4) + "px";
+  m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 170)) + "px";
+  m.querySelectorAll("input[data-col]").forEach(function(ck){
+    ck.addEventListener("change", function(){
+      state.colVis = state.colVis || {};
+      state.colVis[ck.dataset.col] = ck.checked;
+      save(); render();
+    });
+  });
+}
+function closeColMenu(){ var m = document.getElementById("colMenu"); if(m) m.style.display = "none"; }
+/* ============ 交付物模板库（模板下拉菜单） ============ */
+var TPL_LIBS = [["APQP", TPL_APQP], ["VDA-MLA", TPL_MLA], ["ANPQP", TPL_ANPQP]];
+function findTemplate(key){
+  var hit = null;
+  TPL_LIBS.forEach(function(lib){ lib[1].forEach(function(tp){ if(!hit && tp.key === key) hit = tp; }); });
+  return hit;
+}
+function menuBtnOf(target, id){ var b = document.getElementById(id); return !!(b && (b === target || b.contains(target))); }
+function toggleTplMenu(){
+  var m = document.getElementById("tplMenu");
+  if(m.style.display === "block"){ closeTplMenu(); return; }
+  var html = '<h4>' + esc(tr("tplBtn")) + "</h4>";
+  html += '<div class="tpl-g">ASTEMO</div><button class="tpl-ast tpl-it" id="tplAstemoIt"><span>' + esc(tr("tplAstemo")) + '</span><span class="tpl-n">57</span></button>';
+  TPL_LIBS.forEach(function(lib){
+    html += '<div class="tpl-g">' + esc(lib[0]) + "</div>";
+    lib[1].forEach(function(tp){
+      html += '<button class="tpl-it" data-key="' + esc(tp.key) + '"><span>' + esc(tp.key + " " + planPickName(tp.name)) + '</span><span class="tpl-n">' + tp.items.length + "</span></button>";
+    });
+  });
+  m.innerHTML = html;
+  document.getElementById("tplAstemoIt").addEventListener("click", function(){ closeTplMenu(); loadAstemoTemplate(); });
+  m.querySelectorAll(".tpl-it:not(.tpl-ast)").forEach(function(b){
+    b.addEventListener("click", function(){
+      closeTplMenu();
+      var tp = findTemplate(b.dataset.key);
+      if(tp && confirm(tr("tplConfirm"))) insertTemplate(tp);
+    });
+  });
+  var r = document.getElementById("btnTPL").getBoundingClientRect();
+  m.style.display = "block";
+  m.style.top = (r.bottom + 4) + "px";
+  m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 300)) + "px";
+}
+function closeTplMenu(){ var m = document.getElementById("tplMenu"); if(m) m.style.display = "none"; }
+/* 插入模板：新建分组承载交付物，任务名=交付物名，工期默认5天、开始=今天、负责人空、前置空 */
+function insertTemplate(tp){
+  var g = mkTask({ name:tp.key + " " + planPickName(tp.name), type:"group", start:"", dur:0 });
+  state.tasks.push(g);
+  var today = fmtD(snapWorkday(new Date())); /* 避开周末/节假日 */
+  tp.items.forEach(function(it){
+    state.tasks.push(mkTask({ name:planPickName(it), type:"task", group:g.id, start:today, dur:5, owner:"", deps:[] }));
+  });
+  save(); render();
+  toast(tr("tplOk") + " · " + tp.items.length);
+}
+function renderTable(){
+  var el = document.getElementById("taskList"), html = "";
+  var bmap = baselineMap();
+  visibleTasks().forEach(function(t){
+    var cls = "trow" + (t.type === "group" ? " group" : "") + (selId === t.id ? " sel" : "");
+    var crit = state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
+    var warn = t.type !== "group" && t.deadline && taskEnd(t) > t.deadline;
+    var warnHtml = warn ? '<span class="dl-warn" title="' + esc(tr("deadlineWarn")) + '">⚠</span>' : "";
+    var nm = t.type === "group"
+      ? (state.collapsed[t.id] ? "▶ " : "▼ ") + esc(t.name)
+      : t.type === "milestone" ? '<span class="ms-diamond">◆</span>&nbsp;' + esc(t.name) + warnHtml : esc(t.name) + warnHtml;
+    if(t.type !== "group" && t.manual) nm += '<span class="manual-badge" title="' + esc(tr("manualSched")) + '">📌</span>';
+    var ow = esc(t.owner || "");
+    if(t.type !== "group" && resWarnMap[t.id]) ow += '<span class="ow-warn" title="' + esc(tr("resWarnTip")) + '">⚠️</span>';
+    var vv = "—";
+    if(t.type !== "group"){ var v = varianceOf(t, bmap); if(v !== null) vv = fmtVar(v); }
+    var prog = t.type === "group" ? "" : '<div class="progbar"><i style="width:' + t.progress + '%"></i></div>';
+    var fv = t.type === "group" ? "" : (floatMap[t.id] === undefined ? "—" : floatMap[t.id]);
+    html += '<div class="' + cls + '" data-id="' + t.id + '">'
+      + '<div class="c-id">' + (t.type === "group" ? "" : t.id.replace("t","")) + "</div>"
+      + '<div class="c-name">' + nm + "</div>"
+      + (colVis("owner") ? '<div class="c-owner">' + ow + "</div>" : "")
+      + (colVis("dur") ? '<div class="c-dur">' + (t.type === "group" ? "" : t.type === "milestone" ? "◆" : t.dur) + "</div>" : "")
+      + (colVis("prog") ? '<div class="c-prog">' + prog + "</div>" : "")
+      + (colVis("start") ? '<div class="c-start">' + (t.start || "") + "</div>" : "")
+      + (colVis("end") ? '<div class="c-end">' + (t.type === "group" ? "" : taskEnd(t)) + "</div>" : "")
+      + (colVis("var") ? '<div class="c-var">' + vv + "</div>" : "")
+      + (colVis("float") ? '<div class="c-float' + (crit ? " crit" : "") + '">' + fv + "</div>" : "")
+      + (colVis("output") ? '<div class="c-output" title="' + esc(t.output || "") + '">' + (t.type === "group" ? "" : esc(t.output || "")) + "</div>" : "")
+      + (colVis("remarks") ? '<div class="c-remarks" title="' + esc(t.remarks || "") + '">' + (t.type === "group" ? "" : esc(t.remarks || "")) + "</div>" : "")
+      + "</div>";
+  });
+  el.innerHTML = html || '<div style="padding:20px;color:var(--tx3)">—</div>';
+  renderHead();
+  applyColWidths();
+  el.querySelectorAll(".trow").forEach(function(r){
+    r.addEventListener("click", function(){
+      var t = byId(this.dataset.id);
+      if(t && t.type === "group"){ state.collapsed[t.id] = !state.collapsed[t.id]; render(); return; }
+      selId = this.dataset.id; renderTable(); openModal(this.dataset.id);
+    });
+  });
+}
+function byId(id){ return state.tasks.find(function(t){ return t.id === id; }); }
+function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+/* 阶段色带锚点：按 OEM 标准阶段体系（ML0-7/APQP1-5/ANPQP1-5）解析锚点客户里程碑日期。
+   无日期的阶段跳过；按日期排序。BMW 等 OEM 的非标准阶段键（VS0/VS2/PrePZS/PZS）不参与。 */
+function phaseAnchors(){
+  if(state.showPhase === false) return [];
+  if(!state.planOem) return [];
+  var sys = (typeof OEM_PHASE_SYS !== "undefined" && OEM_PHASE_SYS[state.planOem]) || "";
+  var names = (typeof PHASE_NAMES !== "undefined" && PHASE_NAMES[sys]) || null;
+  if(!names) return [];
+  var phases = (typeof OEM_PHASES !== "undefined" && OEM_PHASES[state.planOem]) || {};
+  var ms = state.tasks.filter(function(t){ return t.type === "milestone" && String(t.source || "").indexOf("ms:") === 0; });
+  var out = [];
+  Object.keys(names).forEach(function(pid){
+    var an = phases[pid]; if(!an) return;
+    var hit = null;
+    ms.forEach(function(t){ if(!hit && planResolveAnchor(an, [t.name])) hit = t; });
+    if(!hit || !hit.start) return;
+    var d = parseD(hit.start); if(!d) return;
+    out.push({ pid:pid, d:d });
+  });
+  out.sort(function(a, b){ return a.d - b.d; });
+  return out;
+}
+function bandShade(i, n){ // 钢蓝系渐变 #dbe7f3 → #9fc0dd
+  var c1 = [219, 231, 243], c2 = [159, 192, 221];
+  var t = n <= 1 ? 0 : i / (n - 1);
+  var c = c1.map(function(v, k){ return Math.round(v + (c2[k] - v) * t); });
+  return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+}
+function renderGantt(){
+  var R = dateRange(), min = R.min, max = R.max;
+  var days = diffDays(min, max) + 1;
+  PX_DAY = state.view === "week" ? 10 : (state.view === "month" ? PX_MONTH / 30 : 28);
+  var W = days * PX_DAY;
+  var vis = visibleTasks();
+  var bmap = baselineMap();
+  // 表头：日视图每列两行（M/D + 星期）；周视图在每周第一列画跨周宽度的 M/D~M/D 标签；
+  // 月视图每列一个月，列宽按当月实际天数（30天月=PX_MONTH），与 X() 按天映射对齐
+  var hh = "";
+  if(state.view === "month"){
+    var moCur = new Date(min.getFullYear(), min.getMonth(), 1), moI = 0;
+    while(moCur <= max){
+      var moFirst = moCur < min ? min : moCur;
+      var moLast = new Date(moCur.getFullYear(), moCur.getMonth() + 1, 0); // 当月最后一天
+      if(moLast > max) moLast = max;
+      var moX = X(moFirst, min), moW = (diffDays(moFirst, moLast) + 1) * PX_DAY;
+      hh += '<div class="gh-wk" style="left:' + moX + 'px;width:' + moW + 'px;background:' + (moI % 2 ? "#f9fafb" : "transparent") + ';border-right:1px solid var(--line)">' + monthLabel(moCur) + "</div>";
+      moCur = new Date(moCur.getFullYear(), moCur.getMonth() + 1, 1);
+      moI++;
+    }
+  } else {
+    for(var i = 0; i < days; i++){
+      var d = addDays(min, i), x = i * PX_DAY;
+      var isWk = d.getDay() === 0 || d.getDay() === 6, s = fmtD(d);
+      var isHol = holName(s);
+      hh += '<div class="day-cell" style="left:' + x + 'px;width:' + PX_DAY + 'px;background:' + (isHol ? "#fef2f2" : isWk ? "#f9fafb" : "transparent") + '"></div>';
+    }
+    var wdNames = tr("weekdayNames");
+    if(state.view === "week"){
+      for(var wi = 0; wi < days; wi++){
+        var dw = addDays(min, wi);
+        if(wi > 0 && dw.getDay() !== 1) continue; // 每周第一列（周一起）
+        var we = wi;
+        while(we + 1 < days && addDays(min, we + 1).getDay() !== 1) we++;
+        var dEnd = addDays(min, we);
+        hh += '<div class="gh-wk" style="left:' + (wi * PX_DAY) + 'px;width:' + ((we - wi + 1) * PX_DAY) + 'px">'
+          + (dw.getMonth()+1) + "/" + dw.getDate() + "~" + (dEnd.getMonth()+1) + "/" + dEnd.getDate() + "</div>";
+      }
+    } else {
+      for(var di = 0; di < days; di++){
+        var dd = addDays(min, di);
+        hh += '<div class="gh-day" style="left:' + (di * PX_DAY) + 'px;width:' + PX_DAY + 'px">'
+          + '<div class="gh-date">' + (dd.getMonth()+1) + "/" + dd.getDate() + '</div>'
+          + '<div class="gh-wd">' + wdNames[(dd.getDay() + 6) % 7] + "</div></div>";
+      }
+    }
+  }
+  document.getElementById("ganttHead").innerHTML = '<div style="position:relative;width:' + W + 'px;height:44px">' + hh + "</div>";
+  // 内容
+  var inner = document.getElementById("ganttInner");
+  inner.style.width = W + "px";
+  var html = "", today = new Date(); today.setHours(0,0,0,0);
+  // 阶段色带（从里程碑计划导入后显示；未导入时不画）
+  var bands = phaseAnchors();
+  var BAND_H = bands.length ? 30 : 0;
+  // 周末/节假日底纹
+  for(var j = 0; j < days; j++){
+    var dd = addDays(min, j), ss = fmtD(dd), xx = j * PX_DAY;
+    if(holName(ss)) html += '<div class="g-holiday" style="left:' + xx + 'px;width:' + PX_DAY + 'px"></div>';
+    else if(dd.getDay() === 0 || dd.getDay() === 6) html += '<div class="g-weekend" style="left:' + xx + 'px;width:' + PX_DAY + 'px"></div>';
+  }
+  // today线
+  if(today >= min && today <= max) html += '<div class="g-today" style="left:' + X(today, min) + 'px"></div>';
+  // 阶段色带行：位于日期表头下方、任务行上方，全宽；每个色带从本锚点画到下一锚点，最后一个延伸到图表 max
+  if(bands.length){
+    var sys = OEM_PHASE_SYS[state.planOem];
+    html += '<div class="g-bandrow" style="width:' + W + 'px;height:' + BAND_H + 'px">';
+    for(var bi = 0; bi < bands.length; bi++){
+      var ba = bands[bi], bb = bands[bi + 1];
+      var bx1 = X(ba.d, min), bx2 = bb ? X(bb.d, min) : X(max, min);
+      var bw = bx2 - bx1;
+      if(bw <= 0) continue;
+      var meta = PHASE_NAMES[sys][ba.pid];
+      var label = ba.pid + " " + (meta[lang] || meta.zh);
+      var maxCh = Math.max(3, Math.floor(bw / 6.5));
+      var showLbl = label.length > maxCh ? label.slice(0, Math.max(1, maxCh - 1)) + "…" : label;
+      var tip = label + " · " + fmtD(ba.d) + (bb ? " ~ " + fmtD(bb.d) : " ~ " + fmtD(max));
+      html += '<div class="g-band" style="left:' + bx1 + 'px;width:' + Math.max(bw, 2) + 'px;background:' + bandShade(bi, bands.length) + '" title="' + esc(tip) + '"><span>' + esc(showLbl) + "</span></div>";
+    }
+    html += "</div>";
+  }
+  // 依赖线 SVG（按类型取锚点：FS 完成→开始 / SS 开始→开始 / FF 完成→完成 / SF 开始→完成）
+  var depSvg = "";
+  vis.forEach(function(t, ri){
+    if(t.type === "group") return;
+    var nd = normDeps(t.deps);
+    if(!nd.length) return;
+    var s = parseD(t.start); if(!s) return;
+    var te = parseD(taskEnd(t));
+    var y1 = BAND_H + ri * ROW_H + ROW_H / 2;
+    nd.forEach(function(d){
+      var p = byId(d.id); if(!p) return;
+      var pi = vis.indexOf(p); if(pi < 0) return;
+      var ps = parseD(p.start), pe = ps ? parseD(taskEnd(p)) : null;
+      if(!ps) return;
+      var x1, x2;
+      switch(d.type){
+        case "SS": x1 = X(ps, min); x2 = X(s, min); break;
+        case "FF": x1 = X(pe || ps, min); x2 = X(te || s, min); break;
+        case "SF": x1 = X(ps, min); x2 = X(te || s, min); break;
+        default: x1 = X(pe ? addDays(pe, 1) : ps, min); x2 = X(s, min);
+      }
+      var y2 = y1, ym = BAND_H + pi * ROW_H + ROW_H / 2;
+      depSvg += '<path class="dep-line" d="M' + x1 + ',' + ym + ' C' + (x1+20) + ',' + ym + ' ' + (x2-20) + ',' + y2 + ' ' + x2 + ',' + y2 + '"/>';
+    });
+  });
+  if(depSvg) html += '<svg class="g-dep" style="left:0;top:0" width="' + W + '" height="' + (BAND_H + vis.length * ROW_H) + '">' + depSvg + "</svg>";
+  // 色带行占位：任务行整体下移
+  if(BAND_H) html += '<div style="height:' + BAND_H + 'px"></div>';
+  // 任务条
+  vis.forEach(function(t, ri){
+    var y = BAND_H + ri * ROW_H;
+    html += '<div class="g-row' + (t.type === "group" ? " group" : "") + '" style="height:' + ROW_H + 'px"></div>';
+    if(t.type === "group") return;
+    var s = parseD(t.start); if(!s) return;
+    var crit = state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
+    var late = t.deadline && taskEnd(t) > t.deadline;
+    var tip = esc(t.name) + (late ? " ⚠ " + tr("deadlineWarn") : "");
+    if(t.type === "milestone"){
+      var mx = X(s, min) - 8;
+      html += '<div class="g-ms' + (crit ? " crit" : "") + '" data-id="' + t.id + '" style="left:' + mx + 'px;top:' + y + 'px;background:' + (t.color || "#dc2626") + '" title="' + tip + '"></div>';
+    } else {
+      var e = parseD(taskEnd(t));
+      var bx = X(s, min), bw = Math.max((diffDays(s, e) + 1) * PX_DAY - 4, 8);
+      html += '<div class="g-bar' + (crit ? " crit" : "") + '" data-id="' + t.id + '" style="left:' + bx + 'px;top:' + y + 'px;width:' + bw + 'px;background:' + (t.color || "#2563eb") + '" title="' + tip + '">'
+        + '<div class="fill" style="width:' + t.progress + '%"></div>'
+        + '<span class="lbl">' + esc(t.name) + " " + t.progress + '%</span></div>';
+    }
+    // 基线灰条（基线对比开启时，画在任务条下方；里程碑画小灰菱形）
+    if(state.showBaseline){
+      var bb = bmap[t.id];
+      if(bb && bb.start){
+        var bsd = parseD(bb.start);
+        if(bsd){
+          if(t.type === "milestone"){
+            html += '<div class="g-base-ms" style="left:' + (X(bsd, min) - 4) + 'px;top:' + (y + 25) + 'px"></div>';
+          } else {
+            var bed = parseD(bb.end) || bsd;
+            var bbw = Math.max((diffDays(bsd, bed) + 1) * PX_DAY - 4, 4);
+            html += '<div class="g-base" style="left:' + X(bsd, min) + 'px;top:' + (y + 28) + 'px;width:' + bbw + 'px"></div>';
+          }
+        }
+      }
+    }
+  });
+  inner.innerHTML = html;
+  inner.style.height = (BAND_H + vis.length * ROW_H) + "px";
+  // 拖拽条
+  inner.querySelectorAll(".g-bar,.g-ms").forEach(function(b){
+    b.addEventListener("mousedown", function(ev){
+      ev.preventDefault();
+      var t = byId(b.dataset.id); if(!t) return;
+      var sx = ev.clientX, orig = t.start, moved = false;
+      function mv(e2){
+        var dx = Math.round((e2.clientX - sx) / PX_DAY);
+        if(dx !== 0) moved = true;
+        var ns = addDays(parseD(orig), dx);
+        while(!isWorkday(ns)) ns = addDays(ns, dx > 0 ? 1 : -1);
+        t._tmp = fmtD(ns);
+        b.style.opacity = ".6";
+      }
+      function up(){
+        document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
+        b.style.opacity = "";
+        if(moved && t._tmp){ t.start = t._tmp; }
+        delete t._tmp; render();
+      }
+      document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+    });
+  });
+  // 表格与图表行高同步滚动（双向；表头与表体共用同一滚动容器，竖分割线始终对齐）
+  var body = document.getElementById("ganttBody"), ts = document.querySelector(".table-scroll");
+  body.onscroll = function(){ ts.scrollTop = body.scrollTop; document.getElementById("ganttHead").scrollLeft = body.scrollLeft; };
+  ts.onscroll = function(){ body.scrollTop = ts.scrollTop; };
+}
+
+/* ============ 编辑弹窗 ============ */
+var selId = null, editId = null;
+function openModal(id){
+  editId = id;
+  var t = id ? byId(id) : null;
+  var isNew = !t;
+  if(isNew) t = { type:"task", name:"", group:"", start:fmtD(new Date()), dur:5, deps:[], owner:"", output:"", progress:0, remarks:"", color:COLORS[0] };
+  document.getElementById("modalTitle").textContent = isNew ? tr("newTask") : tr("editTask");
+  document.getElementById("modalDel").style.display = isNew ? "none" : "";
+  var groups = state.tasks.filter(function(x){ return x.type === "group"; });
+  var gOpts = '<option value="">' + tr("topGroup") + "</option>" + groups.map(function(g){
+    return '<option value="' + g.id + '"' + (t.group === g.id ? " selected" : "") + ">" + esc(g.name) + "</option>";
+  }).join("");
+  var allT = flatTasks().filter(function(x){ return !id || x.id !== id; });
+  var curDeps = normDeps(t.deps);
+  var depOpts = allT.map(function(x){
+    var cur = null;
+    curDeps.forEach(function(d){ if(d.id === x.id) cur = d; });
+    var spec = cur ? cur.type + (cur.lag ? (cur.lag > 0 ? "+" : "") + cur.lag + "d" : "") : "";
+    return '<label style="display:inline-block;margin:2px 8px 2px 0;font-size:12px"><input type="checkbox" class="depCk" value="' + x.id + '"' + (cur?" checked":"") + "> " + esc(x.name) + (spec ? ' <span style="color:var(--tx3);font-size:11px">' + spec + "</span>" : "") + "</label>";
+  }).join("");
+  document.getElementById("modalBody").innerHTML =
+    '<div class="frow"><label>' + tr("fName") + '</label><input id="fName" value="' + esc(t.name) + '"></div>'
+    + '<div class="frow2"><div class="frow"><label>' + tr("fType") + '</label><select id="fType">'
+    + '<option value="task"' + (t.type==="task"?" selected":"") + ">" + tr("tTask") + "</option>"
+    + '<option value="milestone"' + (t.type==="milestone"?" selected":"") + ">" + tr("tMs") + "</option>"
+    + '<option value="group"' + (t.type==="group"?" selected":"") + ">" + tr("tGroup") + "</option></select></div>"
+    + '<div class="frow"><label>' + tr("fGroup") + '</label><select id="fGroup">' + gOpts + "</select></div></div>"
+    + '<div class="frow2"><div class="frow"><label>' + tr("fStart") + '</label><input id="fStart" type="date" value="' + (t.start||"") + '"></div>'
+    + '<div class="frow"><label>' + tr("fDur") + '</label><input id="fDur" type="number" min="0" value="' + t.dur + '"></div></div>'
+    + '<div class="frow2"><div class="frow"><label>' + tr("fDeadline") + '</label><input id="fDeadline" type="date" value="' + (t.deadline||"") + '"></div>'
+    + '<div class="frow"><label>' + tr("fProg") + '</label><input id="fProg" type="number" min="0" max="100" value="' + t.progress + '"></div></div>'
+    + '<div class="frow"><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="fManual"' + (t.manual ? " checked" : "") + ' style="width:auto;accent-color:var(--accent)"> ' + tr("manualSched") + '</label></div>'
+    + '<div class="frow"><label>' + tr("fDeps") + '</label><input id="fDepsText" value="' + esc(depsToText(t.deps)) + '" placeholder="3FS,5SS+2d">'
+    + '<div style="margin-top:6px;max-height:120px;overflow:auto">' + (depOpts || "—") + "</div>"
+    + '<div class="hint" data-i18n="fDepsHint" style="font-size:11px;color:var(--tx3);margin-top:4px">' + tr("fDepsHint") + "</div></div>"
+    + '<div class="frow2"><div class="frow"><label>' + tr("fOwner") + '</label><input id="fOwner" value="' + esc(t.owner||"") + '"></div>'
+    + '<div class="frow"><label>' + tr("fOutput") + '</label><input id="fOutput" value="' + esc(t.output||"") + '"></div></div>'
+    + '<div class="frow"><label>' + tr("fRemarks") + '</label><input id="fRemarks" value="' + esc(t.remarks||"") + '"></div>'
+    + '<div class="frow"><label>' + tr("fColor") + '</label><input id="fColor" type="color" value="' + (t.color||"#2563eb") + '" style="height:36px;padding:2px"></div>';
+  // 依赖文本框 ↔ 复选框双向同步：文本支持 '3FS,5SS+2d' 格式（类型/滞后）
+  document.getElementById("fDepsText").addEventListener("input", function(){
+    var set = {};
+    parseDepsText(this.value).forEach(function(d){ set[d.id] = 1; });
+    document.querySelectorAll(".depCk").forEach(function(c){ c.checked = !!set[c.value]; });
+  });
+  document.querySelectorAll(".depCk").forEach(function(c){
+    c.addEventListener("change", function(){
+      var cur = {};
+      parseDepsText(document.getElementById("fDepsText").value).forEach(function(d){ cur[d.id] = d; });
+      var out = Array.prototype.map.call(document.querySelectorAll(".depCk:checked"), function(c2){
+        return cur[c2.value] || { id:c2.value, type:"FS", lag:0 };
+      });
+      document.getElementById("fDepsText").value = depsToText(out);
+    });
+  });
+  document.getElementById("modalBg").classList.add("show");
+  setTimeout(function(){ var i = document.getElementById("fName"); if(i) i.focus(); }, 50);
+}
+function closeModal(){ document.getElementById("modalBg").classList.remove("show"); editId = null; }
+function saveModal(){
+  var name = document.getElementById("fName").value.trim();
+  if(!name){ toast(tr("needName")); return; }
+  var deps = parseDepsText(document.getElementById("fDepsText").value);
+  var data = { name:name, type:document.getElementById("fType").value, group:document.getElementById("fGroup").value,
+    start:document.getElementById("fStart").value, dur:+document.getElementById("fDur").value || 0, deps:deps,
+    deadline:document.getElementById("fDeadline").value || "",
+    manual:document.getElementById("fManual").checked,
+    owner:document.getElementById("fOwner").value.trim(), output:document.getElementById("fOutput").value.trim(),
+    progress:Math.min(100, Math.max(0, +document.getElementById("fProg").value || 0)),
+    remarks:document.getElementById("fRemarks").value.trim(), color:document.getElementById("fColor").value };
+  if(editId){
+    var t = byId(editId); if(t) Object.assign(t, data);
+  } else {
+    state.tasks.push(mkTask(data));
+  }
+  closeModal(); render();
+}
+/* ============ 细项导入 ============ */
+function openSubModal(){
+  var sel = document.getElementById("subTask");
+  sel.innerHTML = flatTasks().map(function(t){ return '<option value="' + t.id + '"' + (t.id === selId ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("");
+  document.getElementById("subText").value = "";
+  document.getElementById("subModalBg").classList.add("show");
+}
+function doSubImport(){
+  var tid = document.getElementById("subTask").value;
+  var parent = byId(tid); if(!parent){ toast(tr("needName")); return; }
+  var lines = document.getElementById("subText").value.split("\n").map(function(s){ return s.trim(); }).filter(Boolean);
+  if(!lines.length){ closeSub(); return; }
+  var pg = parent.group;
+  lines.forEach(function(ln){
+    var parts = ln.split(/[,，]/).map(function(s){ return s.trim(); });
+    var sub = mkTask({ name:parts[0], group:pg, start:parent.start, dur:parts[2] ? (+parts[2]||3) : 3,
+      owner:parts[1]||"", source:"sub:" + parent.id });
+    // 插入到父任务后面
+    var idx = state.tasks.indexOf(parent);
+    state.tasks.splice(idx + 1 + (parent._subCount||0), 0, sub);
+    parent._subCount = (parent._subCount||0) + 1;
+  });
+  // 细项默认前置链：第一条前置=父，第二条前置=第一条...
+  document.getElementById("subModalBg").classList.remove("show");
+  render(); toast(tr("subOk"));
+}
+function closeSub(){ document.getElementById("subModalBg").classList.remove("show"); }
+/* ============ 导入/导出 ============ */
+function exportJSON(){
+  var blob = new Blob([JSON.stringify({ app:"gantt-exec", version:1, state:state, cal:{mode:cal.mode, holidays:cal.holidays, makeup:Object.keys(cal.makeup)} }, null, 2)], {type:"application/json"});
+  var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "exec-plan-" + fmtD(new Date()).replace(/-/g,"") + ".json"; a.click();
+}
+function importJSONFile(f){
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var d = JSON.parse(r.result);
+      // 支持计划工具导出的 JSON（含 state 字段）→ 转为执行层初始任务
+      if((d.app === "gantt-tool" && d.dates) || (d.state && d.state.dates)){ fromPlanData(d.state || d); return; }
+      if(d.cal){ cal = WORKCAL.norm(d.cal); WORKCAL.save(cal); syncCalModeSel(); }
+      var st = d.state || d;
+      if(st.tasks){ state = st; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(!state.seq) state.seq = 1000; if(!state.collapsed) state.collapsed = {}; if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); syncOemSelect(); document.getElementById("ckPhase").checked = state.showPhase !== false; document.getElementById("ckCrit").checked = state.showCrit === true; render(); toast(tr("importOk")); }
+    }catch(e){ toast("JSON parse error"); }
+  };
+  r.readAsText(f);
+}
+function exportCSV(){
+  var rows = [["ID","Name","Type","Group","Start","Dur","End","Deps","Deadline","Float","Owner","Output","Progress","Remarks"]];
+  flatTasks().forEach(function(t){
+    rows.push([t.id, t.name, t.type, (byId(t.group)||{}).name||"", t.start, t.dur, taskEnd(t), depsToText(t.deps), t.deadline||"", t.type==="milestone"||floatMap[t.id]===undefined?"":floatMap[t.id], t.owner, t.output, t.progress, t.remarks]);
+  });
+  var csv = "\ufeff" + rows.map(function(r){ return r.map(function(c){ return '"' + String(c==null?"":c).replace(/"/g,'""') + '"'; }).join(","); }).join("\n");
+  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"}));
+  a.download = "exec-plan.csv"; a.click();
+}
+/* ============ 导出 Excel（HTML 表格 + mso-number-format，存为 .xls，Excel/WPS 双击打开，含甘特图） ============ */
+var XLS_DAY_LIMIT = 180; /* 甘特跨度超过该天数自动切换为按周显示 */
+function xlsHeadKey(k){ return k === "id" ? "ID" : ({name:"cName",owner:"cOwner",dur:"cDur",start:"cStart",end:"cEnd",float:"floatCol"})[k]; }
+function exportXLS(){
+  var vis = visibleTasks();
+  /* 甘特日期范围：所有任务起止的最小/最大日期 */
+  var min = null, max = null;
+  flatTasks().forEach(function(t){
+    var s = parseD(t.start), e = parseD(taskEnd(t));
+    if(s && (!min || s < min)) min = s;
+    if(e && (!max || e > max)) max = e;
+  });
+  if(!min){ min = new Date(); min.setHours(0,0,0,0); }
+  if(!max) max = addDays(min, 30);
+  var weekly = diffDays(min, max) + 1 > XLS_DAY_LIMIT;
+  /* 任务信息列：ID/任务名称常显，其余仅取 state.colVis 中可见的列 */
+  var infoKeys = ["id","name","owner","dur","start","end","float"];
+  var keys = infoKeys.filter(function(k){ return colVis(k); });
+  /* 甘特列：按天展开；跨度超限则按周（一周一列，任务覆盖该周即着色） */
+  var cols = [], c = new Date(min);
+  if(weekly) c.setDate(c.getDate() - ((c.getDay() + 6) % 7)); /* 对齐到周一 */
+  while(c <= max){ cols.push(new Date(c)); c = addDays(c, weekly ? 7 : 1); }
+  function md(d){ return (d.getMonth() + 1) + "/" + d.getDate(); }
+  var L = [];
+  L.push('<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">');
+  L.push('<head><meta charset="UTF-8">');
+  L.push('<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>' + esc(planProjectName().slice(0, 31)) + '</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->');
+  L.push('<style>');
+  L.push('table{border-collapse:collapse}');
+  L.push('td{border:1px solid #9ca3af;padding:1px 4px;font-size:10pt;white-space:nowrap;mso-number-format:"\\@"}');
+  L.push('.ttl{font-size:14pt;font-weight:bold;text-align:center;background:#1e3a52;color:#ffffff}');
+  L.push('.hd{font-weight:bold;text-align:center;background:#1e3a52;color:#ffffff}');
+  L.push('.hdg{font-weight:bold;text-align:center;background:#e8eef5;color:#1e3a52}');
+  L.push('.grp{background:#e8eef5;font-weight:bold}');
+  L.push('.bar{background:#2563eb;font-weight:bold}');
+  L.push('.ms{background:#dc2626;font-weight:bold}');
+  L.push('.c{text-align:center}');
+  L.push('</style></head><body><table>');
+  /* 第一行：项目标题；第二行：列头（信息列 + 日期 M/D） */
+  L.push('<tr><td class="ttl" colspan="' + (keys.length + cols.length) + '">' + esc(planProjectName()) + '</td></tr>');
+  var h = keys.map(function(k){
+    var center = k !== "name" && k !== "owner";
+    return '<td class="hd' + (center ? ' c' : '') + '">' + esc(tr(xlsHeadKey(k))) + '</td>';
+  });
+  cols.forEach(function(d){ h.push('<td class="hdg c">' + esc(md(d)) + '</td>'); });
+  L.push('<tr>' + h.join("") + '</tr>');
+  /* 数据行：任务起止区间内的日期单元格填充任务条颜色（里程碑日红色），其余留白 */
+  vis.forEach(function(t){
+    var isG = t.type === "group", isMs = t.type === "milestone";
+    var s = isG ? null : parseD(t.start), e = isG ? null : parseD(taskEnd(t));
+    var r = keys.map(function(k){
+      var v = "", center = true;
+      if(k === "id") v = isG ? "" : t.id.replace("t", "");
+      else if(k === "name"){
+        v = isG ? (state.collapsed[t.id] ? "▶ " : "▼ ") + t.name : (isMs ? "◆ " : "") + t.name;
+        center = false;
+      }
+      else if(k === "owner") v = isG ? "" : (t.owner || "");
+      else if(k === "dur") v = isG ? "" : (isMs ? "◆" : (t.dur == null ? "" : String(t.dur)));
+      else if(k === "start") v = t.start || "";
+      else if(k === "end") v = isG ? "" : taskEnd(t);
+      else if(k === "float") v = isG ? "" : (floatMap[t.id] === undefined ? "—" : String(floatMap[t.id]));
+      return '<td class="' + (center ? 'c ' : '') + (isG ? 'grp' : '') + '">' + esc(v) + '</td>';
+    });
+    cols.forEach(function(d){
+      var hit = false, red = false;
+      if(s && e){
+        if(weekly){
+          var we = addDays(d, 6);
+          hit = s <= we && e >= d;          /* 任务覆盖该周即着色 */
+          red = isMs && s >= d && s <= we;  /* 里程碑落在该周 */
+        } else {
+          hit = s <= d && e >= d;
+          red = isMs && fmtD(s) === fmtD(d);/* 里程碑日单元格红色 */
+        }
+      }
+      r.push(red ? '<td class="ms">&nbsp;</td>' : (hit ? '<td class="bar">&nbsp;</td>' : '<td>&nbsp;</td>'));
+    });
+    L.push('<tr>' + r.join("") + '</tr>');
+  });
+  L.push('</table></body></html>');
+  dlURL(URL.createObjectURL(new Blob(["\ufeff" + L.join("\n")], { type:"application/vnd.ms-excel" })), planProjectName() + "_" + fmtD(new Date()).replace(/-/g, "") + ".xls");
+}
+/* ============ MS Project XML（MSPDI）导入/导出 ============ */
+/* 依赖类型 ↔ MSPDI PredecessorLink/Type 映射（约定：0=FF, 1=FS, 2=SF, 3=SS） */
+var MSPDI_DEP = { FF:0, FS:1, SF:2, SS:3 };
+var MSPDI_DEP_R = { "0":"FF", "1":"FS", "2":"SF", "3":"SS" };
+function planProjectName(){
+  var plan = null;
+  try{ plan = JSON.parse(localStorage.getItem('gantt-tool-v1')); }catch(e){}
+  var nm = (plan && plan.projectName || '').trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
+  return nm || 'exec-plan';
+}
+function xmlTag(name, val){ return "<" + name + ">" + esc(val) + "</" + name + ">"; }
+function isoDT(d){ return fmtD(d) + "T00:00:00"; }
+function exportXML(){
+  var ts = flatTasks();
+  var uidOf = {};
+  ts.forEach(function(t, i){ uidOf[t.id] = i + 1; });
+  var L = [];
+  L.push('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
+  L.push('<Project xmlns="http://schemas.microsoft.com/project">');
+  L.push(xmlTag("SaveVersion", "14"));
+  L.push(xmlTag("Name", planProjectName()));
+  L.push(xmlTag("CreationDate", isoDT(new Date())));
+  L.push("<Tasks>");
+  ts.forEach(function(t){
+    var uid = uidOf[t.id];
+    var s = parseD(t.start);
+    var e = t.type === "milestone" ? s : parseD(taskEnd(t));
+    var durH = t.type === "milestone" ? 0 : Math.max(+t.dur || 0, 0) * 8;
+    L.push("<Task>");
+    L.push(xmlTag("UID", uid));
+    L.push(xmlTag("ID", uid));
+    L.push(xmlTag("Name", t.name));
+    if(t.type === "milestone") L.push(xmlTag("Milestone", "1"));
+    if(s) L.push(xmlTag("Start", isoDT(s)));
+    if(e) L.push(xmlTag("Finish", isoDT(e)));
+    L.push(xmlTag("Duration", "PT" + durH + "H0M0S"));
+    normDeps(t.deps).forEach(function(d){
+      var pu = uidOf[d.id];
+      if(pu == null) return;
+      L.push("<PredecessorLink>");
+      L.push(xmlTag("PredecessorUID", pu));
+      L.push(xmlTag("Type", MSPDI_DEP[d.type] != null ? MSPDI_DEP[d.type] : 1));
+      L.push(xmlTag("CrossProject", "0"));
+      L.push(xmlTag("LinkLag", (+d.lag || 0) * 480)); /* 滞后工作日 → 分钟 */
+      L.push(xmlTag("LagFormat", "7"));
+      L.push("</PredecessorLink>");
+    });
+    L.push("</Task>");
+  });
+  L.push("</Tasks>");
+  L.push("</Project>");
+  dlURL(URL.createObjectURL(new Blob([L.join("\n")], { type:"application/xml" })), planProjectName() + "_" + fmtD(new Date()).replace(/-/g, "") + ".xml");
+}
+function xmlTagText(parent, tag){
+  var els = parent.getElementsByTagName(tag);
+  return els.length ? String(els[0].textContent || "").trim() : "";
+}
+function importXMLFile(f){
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var doc = new DOMParser().parseFromString(String(r.result), "text/xml");
+      if(doc.getElementsByTagName("parsererror").length){ toast("XML parse error"); return; }
+      var taskEls = doc.getElementsByTagName("Task");
+      if(!taskEls.length){ toast("No tasks found in XML"); return; }
+      if(!confirm(tr("impXmlConfirm"))) return;
+      var uidMap = {}, imported = [];
+      Array.prototype.forEach.call(taskEls, function(el){
+        var name = xmlTagText(el, "Name");
+        if(!name) return;
+        var uid = xmlTagText(el, "UID") || xmlTagText(el, "ID");
+        var s = parseD(xmlTagText(el, "Start").slice(0, 10));
+        var fi = parseD(xmlTagText(el, "Finish").slice(0, 10));
+        var ms = xmlTagText(el, "Milestone") === "1" || xmlTagText(el, "Milestone") === "true";
+        var dur = 0;
+        if(s && fi) dur = workdaysBetween(s, fi) + 1;
+        var dm = xmlTagText(el, "Duration").match(/PT\s*(?:(\d+)H)?(?:(\d+)M)?/);
+        if(dm){ var dd = Math.round(((+dm[1] || 0) + (+dm[2] || 0) / 60) / 8); if(dd > dur) dur = dd; }
+        if(!s) s = new Date();
+        if(!fi || fi <= s){ ms = true; dur = 0; }
+        var t = mkTask({ name:name, type: ms ? "milestone" : "task", start:fmtD(s), dur: ms ? 0 : dur, owner:"", deps:[] });
+        t.source = "xml";
+        if(uid) uidMap[uid] = t.id;
+        imported.push({ t:t, el:el });
+      });
+      imported.forEach(function(it){
+        Array.prototype.forEach.call(it.el.getElementsByTagName("PredecessorLink"), function(lEl){
+          var pid = uidMap[xmlTagText(lEl, "PredecessorUID")];
+          var ty = MSPDI_DEP_R[xmlTagText(lEl, "Type")];
+          if(!pid || !ty) return;
+          var lag = Math.round((parseInt(xmlTagText(lEl, "LinkLag"), 10) || 0) / 480); /* 分钟 → 工作日 */
+          it.t.deps.push({ id:pid, type:ty, lag:lag });
+        });
+      });
+      state.tasks = imported.map(function(it){ return it.t; });
+      state.collapsed = {};
+      var _p = null; try{ _p = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e2){}
+      if(_p && _p.oem) mergeFromPlan(_p); /* 合并版：导入 XML 后保留客户节点行 */
+      normalizeState();
+      save(); render();
+      toast(tr("importOk") + " · " + imported.length);
+    }catch(e){ toast("XML parse error"); }
+  };
+  r.readAsText(f);
+}
+/* ============ 导出：甘特图 → PDF / JPG / 预览（风格与计划页统一：600dpi、双层表头、标题、图例、页脚日期） ============ */
+var $ = function(id){ return document.getElementById(id); };
+var EXPORT_DPI = 600;
+function exportScale(cssW, cssH){
+  var s = EXPORT_DPI / 96;
+  var maxPx = 80000000; /* 浏览器 canvas 安全上限，超大图表自动降档 */
+  if(cssW * cssH * s * s > maxPx) s = Math.sqrt(maxPx / (cssW * cssH));
+  return s;
+}
+function dlURL(url, filename){
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 4000);
+}
+function expFont(sz, bold){
+  return (bold ? '700 ' : '') + sz + 'px -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+}
+function rr(ctx, x, y, w, h, r){ /* 圆角矩形路径 */
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function fitText(ctx, text, maxW){ /* 超宽截断加省略号 */
+  text = String(text == null ? '' : text);
+  if(maxW < 1) return '';
+  if(ctx.measureText(text).width <= maxW) return text;
+  while(text.length > 1 && ctx.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+  return text + '…';
+}
+function exportFileBase(){
+  return planProjectName() + '_' + fmtD(new Date()).replace(/-/g, '');
+}
+/* 把执行页甘特图（左侧任务表：任务名称/负责人/工期/进度/开始/结束 + 右侧时间轴：任务条/里程碑菱形/阶段色带/依赖线）绘制到 canvas */
+function renderExportCanvas(cb){
+  var vis = visibleTasks();
+  var rows = vis.length;
+  var R = dateRange(), min = R.min, max = R.max;
+  var days = diffDays(min, max) + 1;
+  var pxDay = state.view === 'week' ? 10 : (state.view === 'month' ? PX_MONTH / 30 : 28);
+  var W = days * pxDay;
+  var bands = phaseAnchors();
+  var BAND_H = bands.length ? 30 : 0;
+  var bmap = baselineMap();
+  var TABLE_W = 608 + (colVis('output') ? 120 : 0) + (colVis('remarks') ? 120 : 0), HEAD_H = 44, ROW_H = 34;
+  var TITLE_H = 80, LEGEND_H = 44, FOOT_H = 26;
+  var bodyH = HEAD_H + BAND_H + rows * ROW_H;
+  var cssW = TABLE_W + W, cssH = TITLE_H + bodyH + LEGEND_H + FOOT_H;
+  var scale = exportScale(cssW, cssH);
+  var c = document.createElement('canvas');
+  c.width = Math.round(cssW * scale);
+  c.height = Math.round(cssH * scale);
+  var ctx = c.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cssW, cssH);
+  function X(d){ return diffDays(min, d) * pxDay; }
+  var hx = TABLE_W;               /* 时间轴原点 x */
+  var bodyY = TITLE_H;            /* 表头区顶部 */
+  var bandY = TITLE_H + HEAD_H; /* 阶段色带行顶部 */
+  var rowY0 = bandY + BAND_H;   /* 任务行起始 y */
+  var bodyBot = rowY0 + rows * ROW_H;
+  var sys = state.planOem ? OEM_PHASE_SYS[state.planOem] : '';
+  /* 列显隐与页面一致：隐藏列不画；TABLE_W 不变，名称列吸收余宽 */
+  var EXP_W = { id:36, owner:64, dur:52, prog:56, start:86, end:86, var:52, float:56, output:120, remarks:120 };
+  var NAME_W = TABLE_W - 36;
+  COLS.forEach(function(c){ if(!c.fixed && colVis(c.key)) NAME_W -= EXP_W[c.key]; });
+  NAME_W = Math.max(NAME_W, 40);
+  var CX = { id:18, name:36 };
+  var cxAcc = 36 + NAME_W;
+  COLS.forEach(function(c){
+    if(c.fixed || !colVis(c.key)) return;
+    CX[c.key] = cxAcc; cxAcc += EXP_W[c.key];
+  });
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+
+  /* ---- 标题（优先取计划页项目名） ---- */
+  var plan = null;
+  try{ plan = JSON.parse(localStorage.getItem('gantt-tool-v1')); }catch(e){}
+  var title = (plan && plan.projectName) || tr('appTitle');
+  ctx.fillStyle = '#111827';
+  ctx.textAlign = 'center';
+  ctx.font = expFont(24, true);
+  ctx.fillText(title, cssW / 2, TITLE_H - 32);
+  ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(24, TITLE_H - 14); ctx.lineTo(cssW - 24, TITLE_H - 14); ctx.stroke();
+
+  /* ---- 左侧任务表表头（钢蓝，MS Project 风格） ---- */
+  ctx.fillStyle = '#1e3a52';
+  ctx.fillRect(0, bodyY, TABLE_W, HEAD_H);
+  ctx.font = expFont(11, true);
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  var heads = [
+    { t:'ID', x:0, w:36, ctr:true },
+    { t:tr('cName'), x:CX.name, w:NAME_W, ctr:false }
+  ];
+  COLS.forEach(function(c){
+    if(c.fixed || !colVis(c.key)) return;
+    heads.push({ t:tr(c.i18n), x:CX[c.key], w:EXP_W[c.key], ctr:c.key !== 'owner' && c.key !== 'output' && c.key !== 'remarks' });
+  });
+  heads.forEach(function(hd){
+    ctx.textAlign = hd.ctr ? 'center' : 'left';
+    ctx.fillText(hd.t, hd.ctr ? hd.x + hd.w / 2 : hd.x + 6, bodyY + HEAD_H / 2);
+  });
+
+  /* ---- 右侧双层日期表头（年行 + 月行） ---- */
+  ctx.fillStyle = '#7BA7BC';
+  ctx.fillRect(hx, bodyY, W, 22);
+  ctx.fillStyle = '#BDD5E5';
+  ctx.fillRect(hx, bodyY + 22, W, 22);
+  ctx.textAlign = 'center';
+  var yStart = min.getFullYear(), yEnd = max.getFullYear();
+  ctx.font = expFont(13, true);
+  ctx.fillStyle = '#ffffff';
+  for(var yy = yStart; yy <= yEnd; yy++){
+    var ysD = new Date(Math.max(new Date(yy, 0, 1).getTime(), min.getTime()));
+    var yeD = new Date(Math.min(new Date(yy + 1, 0, 1).getTime(), max.getTime()));
+    var yx1 = hx + X(ysD), yx2 = hx + X(yeD);
+    ctx.fillText(String(yy), (yx1 + yx2) / 2, bodyY + 11);
+    if(yy > yStart){
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(yx1, bodyY); ctx.lineTo(yx1, bodyY + 22); ctx.stroke();
+    }
+  }
+  var monthXs = [];
+  ctx.font = expFont(11, false);
+  ctx.fillStyle = '#374151';
+  var cur = new Date(min.getFullYear(), min.getMonth(), 1);
+  var endM = new Date(max.getFullYear(), max.getMonth(), 1);
+  var monAb = MON_ABBR[lang] || MON_ABBR.zh;
+  while(cur <= endM){
+    var mx1 = hx + X(cur);
+    var nM = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    var mx2 = hx + X(nM > max ? max : nM);
+    monthXs.push(mx1);
+    var mName = lang === 'zh' ? (cur.getMonth() + 1) + '月' : monAb[cur.getMonth() + 1];
+    ctx.fillText(mName, (mx1 + mx2) / 2, bodyY + 33);
+    cur = nM;
+  }
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+  monthXs.forEach(function(mx){
+    ctx.beginPath(); ctx.moveTo(mx, bodyY + 22); ctx.lineTo(mx, bodyY + 44); ctx.stroke();
+  });
+  ctx.textBaseline = 'alphabetic';
+  /* 表头内日分隔线（日/周视图） */
+  if(state.view !== 'month'){
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+    for(var di = 0; di <= days; di++){
+      var dx = hx + di * pxDay;
+      ctx.beginPath(); ctx.moveTo(dx, bodyY); ctx.lineTo(dx, bodyY + HEAD_H); ctx.stroke();
+    }
+  }
+  /* 表头/主体分界 + 表-轴分界 */
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.beginPath(); ctx.moveTo(0, bodyY + HEAD_H - .5); ctx.lineTo(cssW, bodyY + HEAD_H - .5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(TABLE_W - .5, bodyY); ctx.lineTo(TABLE_W - .5, bodyBot); ctx.stroke();
+
+  /* ---- 周末/节假日底纹 ---- */
+  for(var j = 0; j < days; j++){
+    var dd = addDays(min, j), ss = fmtD(dd), xx = hx + j * pxDay;
+    if(holName(ss)){ ctx.fillStyle = '#fef2f2'; ctx.fillRect(xx, bodyY + HEAD_H, pxDay, bodyBot - bodyY - HEAD_H); }
+    else if(dd.getDay() === 0 || dd.getDay() === 6){ ctx.fillStyle = '#f3f4f6'; ctx.fillRect(xx, bodyY + HEAD_H, pxDay, bodyBot - bodyY - HEAD_H); }
+  }
+  /* ---- 竖向网格线（日视图按日，其余按月界） ---- */
+  ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  if(state.view === 'day'){
+    for(var gi = 0; gi <= days; gi++){
+      var gx = hx + gi * pxDay;
+      ctx.beginPath(); ctx.moveTo(gx, bodyY + HEAD_H); ctx.lineTo(gx, bodyBot); ctx.stroke();
+    }
+  } else {
+    monthXs.forEach(function(mx){
+      ctx.beginPath(); ctx.moveTo(mx, bodyY + HEAD_H); ctx.lineTo(mx, bodyBot); ctx.stroke();
+    });
+  }
+  ctx.setLineDash([]);
+
+  /* ---- 阶段色带行（从里程碑计划导入后显示） ---- */
+  if(bands.length){
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, bandY, TABLE_W, BAND_H);
+    for(var bi = 0; bi < bands.length; bi++){
+      var ba = bands[bi], bb = bands[bi + 1];
+      var bx1 = hx + X(ba.d), bx2 = bb ? hx + X(bb.d) : hx + X(max);
+      var bw = bx2 - bx1;
+      if(bw <= 0) continue;
+      ctx.fillStyle = bandShade(bi, bands.length);
+      ctx.fillRect(bx1, bandY, Math.max(bw, 2), BAND_H);
+      var meta = PHASE_NAMES[sys] ? PHASE_NAMES[sys][ba.pid] : null;
+      var label = ba.pid + ' ' + (meta ? (meta[lang] || meta.zh) : ba.pid);
+      ctx.font = expFont(10, false);
+      ctx.fillStyle = '#1e3a52';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.save();
+      ctx.beginPath(); ctx.rect(bx1, bandY, Math.max(bw, 2), BAND_H); ctx.clip();
+      ctx.fillText(fitText(ctx, label, Math.max(bw - 8, 0)), bx1 + 4, bandY + BAND_H / 2);
+      ctx.restore();
+    }
+    ctx.textBaseline = 'alphabetic';
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.beginPath(); ctx.moveTo(0, bandY + BAND_H - .5); ctx.lineTo(cssW, bandY + BAND_H - .5); ctx.stroke();
+  }
+
+  /* ---- 任务行：表格单元格 + 时间轴任务条/里程碑菱形 ---- */
+  vis.forEach(function(t, ri){
+    var ry = rowY0 + ri * ROW_H;
+    var isGroup = t.type === 'group';
+    var cy = ry + ROW_H / 2;
+    if(isGroup){
+      ctx.fillStyle = '#e8eef5';
+      ctx.fillRect(0, ry, cssW, ROW_H);
+    }
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, ry + ROW_H - .5); ctx.lineTo(cssW, ry + ROW_H - .5); ctx.stroke();
+    ctx.textBaseline = 'middle';
+    /* ID */
+    ctx.font = expFont(12, false);
+    ctx.fillStyle = '#6b7280';
+    ctx.textAlign = 'center';
+    if(!isGroup) ctx.fillText(String(t.id).replace('t', ''), CX.id, cy);
+    /* 任务名称 */
+    ctx.textAlign = 'left';
+    if(isGroup){
+      ctx.font = expFont(12, true);
+      ctx.fillStyle = '#1f2937';
+      ctx.fillText(fitText(ctx, (state.collapsed[t.id] ? '▶ ' : '▼ ') + t.name, NAME_W - 12), CX.name + 6, cy);
+    } else if(t.type === 'milestone'){
+      ctx.save();
+      ctx.translate(CX.name + 11, cy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(-5, -5, 10, 10);
+      ctx.restore();
+      ctx.font = expFont(12, false);
+      ctx.fillStyle = '#1f2937';
+      ctx.fillText(fitText(ctx, t.name, NAME_W - 26), CX.name + 20, cy);
+    } else {
+      ctx.font = expFont(12, false);
+      ctx.fillStyle = '#1f2937';
+      ctx.fillText(fitText(ctx, (t.manual ? '📌 ' : '') + t.name, NAME_W - 12), CX.name + 6, cy);
+    }
+    /* 负责人 */
+    if(colVis('owner')){
+      ctx.font = expFont(12, false);
+      ctx.fillStyle = '#4b5563';
+      ctx.fillText(fitText(ctx, t.owner || '', EXP_W.owner - 12), CX.owner + 6, cy);
+    }
+    /* 工期 */
+    if(colVis('dur')){
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#4b5563';
+      ctx.fillText(isGroup ? '' : (t.type === 'milestone' ? '◆' : String(t.dur)), CX.dur + EXP_W.dur / 2, cy);
+    }
+    /* 进度条 */
+    if(colVis('prog') && !isGroup){
+      var px = CX.prog + 6, pw = EXP_W.prog - 12;
+      ctx.fillStyle = '#e5e7eb';
+      rr(ctx, px, cy - 4, pw, 8, 4); ctx.fill();
+      if(t.progress > 0){
+        ctx.fillStyle = '#2563eb';
+        rr(ctx, px, cy - 4, Math.max(pw * t.progress / 100, 2), 8, 4); ctx.fill();
+      }
+    }
+    /* 开始/结束/偏差/总浮时 */
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#4b5563';
+    if(colVis('start')) ctx.fillText(t.start || '', CX.start + EXP_W.start / 2, cy);
+    if(colVis('end')) ctx.fillText(isGroup ? '' : taskEnd(t), CX.end + EXP_W.end / 2, cy);
+    if(colVis('var')) ctx.fillText(isGroup ? '' : (function(){ var v = varianceOf(t, bmap); return v === null ? '—' : fmtVar(v); })(), CX.var + EXP_W.var / 2, cy);
+    var fv = isGroup ? '' : (floatMap[t.id] === undefined ? '—' : String(floatMap[t.id]));
+    var isCrit = state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0;
+    ctx.fillStyle = isCrit ? '#dc2626' : '#4b5563';
+    if(isCrit){ ctx.font = expFont(12, true); }
+    if(colVis('float')) ctx.fillText(fv, CX.float + EXP_W.float / 2, cy);
+    if(isCrit){ ctx.font = expFont(12, false); }
+    ctx.textAlign = 'left'; ctx.fillStyle = '#4b5563';
+    if(colVis('output') && !isGroup) ctx.fillText(fitText(ctx, t.output || '', EXP_W.output - 12), CX.output + 6, cy);
+    if(colVis('remarks') && !isGroup) ctx.fillText(fitText(ctx, t.remarks || '', EXP_W.remarks - 12), CX.remarks + 6, cy);
+    ctx.textBaseline = 'alphabetic';
+    /* 时间轴内容 */
+    if(!isGroup){
+      var s = parseD(t.start);
+      if(s){
+        if(t.type === 'milestone'){
+          var mx = hx + X(s);
+          ctx.save();
+          ctx.translate(mx, ry + 17);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = t.color || '#dc2626';
+          ctx.fillRect(-8, -8, 16, 16);
+          if(state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0){
+            ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 2;
+            ctx.strokeRect(-8, -8, 16, 16);
+          }
+          ctx.restore();
+        } else {
+          var e = parseD(taskEnd(t));
+          var bx = hx + X(s);
+          var bw = Math.max((diffDays(s, e) + 1) * pxDay - 4, 8);
+          var by = ry + 7, bh = 20;
+          ctx.fillStyle = t.color || '#2563eb';
+          rr(ctx, bx, by, bw, bh, 4); ctx.fill();
+          if(t.progress > 0){
+            ctx.save();
+            rr(ctx, bx, by, bw, bh, 4); ctx.clip();
+            ctx.fillStyle = 'rgba(255,255,255,.35)';
+            ctx.fillRect(bx, by, bw * t.progress / 100, bh);
+            ctx.restore();
+          }
+          if(state.showCrit && floatMap[t.id] !== undefined && floatMap[t.id] <= 0){
+            ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 2;
+            rr(ctx, bx, by, bw, bh, 4); ctx.stroke();
+          }
+          ctx.font = expFont(11, false);
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+          ctx.fillText(fitText(ctx, t.name + ' ' + t.progress + '%', Math.max(bw - 10, 0)), bx + 6, by + bh / 2);
+          ctx.restore();
+          ctx.textBaseline = 'alphabetic';
+        }
+        /* 基线灰条（基线对比开启时与任务条同步绘制：任务=灰条，里程碑=灰菱形） */
+        if(state.showBaseline){
+          var bb = bmap[t.id];
+          if(bb && bb.start){
+            var bsd = parseD(bb.start);
+            if(bsd){
+              if(t.type === 'milestone'){
+                ctx.save();
+                ctx.translate(hx + X(bsd), ry + 29);
+                ctx.rotate(Math.PI / 4);
+                ctx.fillStyle = '#9ca3af';
+                ctx.fillRect(-4, -4, 8, 8);
+                ctx.restore();
+              } else {
+                var bed = parseD(bb.end) || bsd;
+                var bbw = Math.max((diffDays(bsd, bed) + 1) * pxDay - 4, 4);
+                ctx.fillStyle = '#9ca3af';
+                rr(ctx, hx + X(bsd), ry + 28, bbw, 5, 2); ctx.fill();
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  /* ---- 依赖线（前置 → 本任务，贝塞尔曲线） ---- */
+  ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5;
+  vis.forEach(function(t, ri){
+    if(t.type === 'group') return;
+    var nd = normDeps(t.deps);
+    if(!nd.length) return;
+    var s = parseD(t.start); if(!s) return;
+    var te = parseD(taskEnd(t));
+    var y2 = rowY0 + ri * ROW_H + ROW_H / 2;
+    var x2 = hx + X(s);
+    nd.forEach(function(d){
+      var p = byId(d.id); if(!p || p.type === 'group') return;
+      var pi = vis.indexOf(p); if(pi < 0) return;
+      var ps = parseD(p.start), pe = ps ? parseD(taskEnd(p)) : null;
+      if(!ps) return;
+      var y1 = rowY0 + pi * ROW_H + ROW_H / 2;
+      var x1, x2;
+      switch(d.type){
+        case 'SS': x1 = hx + X(ps); x2 = hx + X(s); break;
+        case 'FF': x1 = hx + X(pe || ps); x2 = hx + X(te || s); break;
+        case 'SF': x1 = hx + X(ps); x2 = hx + X(te || s); break;
+        default: x1 = hx + X(pe ? addDays(pe, 1) : ps); x2 = hx + X(s);
+      }
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.bezierCurveTo(x1 + 20, y1, x2 - 20, y2, x2, y2);
+      ctx.stroke();
+    });
+  });
+
+  /* ---- 今天线 ---- */
+  if(today >= min && today <= max){
+    var tx = hx + X(today);
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath(); ctx.moveTo(tx, bodyY + HEAD_H); ctx.lineTo(tx, bodyBot); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = expFont(10, true);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(tr('today'), Math.min(Math.max(tx, hx + 24), cssW - 24), bodyY + 11);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  /* ---- 图例（按实际内容动态生成） ---- */
+  var items = [], hasMs = false, hasRec = false, hasSup = false, hasCustom = false, hasOther = false, otherColor = '#2563eb';
+  vis.forEach(function(t){
+    if(t.type === 'group') return;
+    var src = String(t.source || '');
+    if(t.type === 'milestone'){
+      if(src.indexOf('sup:') === 0) hasSup = true; else hasMs = true;
+    } else if(src.indexOf('rec:') === 0) hasRec = true;
+    else if(src === 'custom') hasCustom = true;
+    else { hasOther = true; otherColor = t.color || otherColor; }
+  });
+  if(hasMs) items.push({ c:'#dc2626', t:tr('planGroupMs'), diamond:true });
+  if(bands.length) items.push({ c:'#bfdbfe', t:tr('legendPhase'), border:'#60a5fa' });
+  if(state.showBaseline && vis.some(function(t){ return bmap[t.id]; })) items.push({ c:'#9ca3af', t:tr('showBaseline') });
+  if(hasRec) items.push({ c:'#2563eb', t:tr('planGroupRec') });
+  if(hasSup) items.push({ c:'#9333ea', t:tr('planGroupSup'), diamond:true });
+  if(hasCustom) items.push({ c:'#16a34a', t:tr('planGroupCustom') });
+  if(hasOther) items.push({ c:otherColor, t:tr('legendTask') });
+  if(state.showCrit && vis.some(function(t){ return floatMap[t.id] !== undefined && floatMap[t.id] <= 0; })) items.push({ c:'#ffffff', t:tr('criticalPath'), border:'#7f1d1d' });
+  if(items.length){
+    var legendY = TITLE_H + bodyH + 22;
+    ctx.font = expFont(12, false);
+    var gap = 26, widths = [], total = 0;
+    items.forEach(function(it){
+      var tw = ctx.measureText(it.t).width;
+      widths.push(tw); total += 22 + tw + gap;
+    });
+    total -= gap;
+    var lx = Math.max((cssW - total) / 2, 8), ly = legendY;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    items.forEach(function(it, i){
+      if(it.diamond){
+        ctx.save();
+        ctx.translate(lx + 7, ly);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = it.c;
+        ctx.fillRect(-6, -6, 12, 12);
+        ctx.restore();
+      } else if(it.border){
+        ctx.fillStyle = it.c;
+        ctx.fillRect(lx, ly - 6, 14, 12);
+        ctx.strokeStyle = it.border; ctx.lineWidth = 1;
+        ctx.strokeRect(lx, ly - 6, 14, 12);
+      } else {
+        ctx.fillStyle = it.c;
+        ctx.fillRect(lx, ly - 6, 14, 12);
+      }
+      ctx.fillStyle = '#374151';
+      ctx.fillText(it.t, lx + 22, ly);
+      lx += 22 + widths[i] + gap;
+    });
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  /* ---- 页脚：日期 ---- */
+  var footY = TITLE_H + bodyH + LEGEND_H + FOOT_H / 2;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#6b7280';
+  ctx.font = expFont(11, false);
+  ctx.textBaseline = 'middle';
+  var dLab = tr('expDate') + ':';
+  ctx.fillText(dLab, 20, footY);
+  ctx.fillText(fmtD(new Date()), 20 + ctx.measureText(dLab).width + 6, footY);
+  ctx.textBaseline = 'alphabetic';
+
+  cb(c, cssW, cssH);
+}
+/* 极简 PDF：单页 + 单张 JPEG 图；页面按 CSS 尺寸（96dpi），图片按导出 DPI = 高分辨率（与计划页同一实现） */
+function buildPdf(jpeg, w, h, dispW, dispH){
+  var pw = (dispW * 0.75).toFixed(2), ph = (dispH * 0.75).toFixed(2);
+  var out = [];
+  function bs(s){ for(var i = 0; i < s.length; i++) out.push(s.charCodeAt(i) & 255); }
+  function bb(u8){ for(var j = 0; j < u8.length; j++) out.push(u8[j]); }
+  function strBytes(s){ var a = new Uint8Array(s.length); for(var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 255; return a; }
+  var offsets = [0];
+  function obj(n, dict, streamU8){
+    offsets[n] = out.length;
+    bs(n + ' 0 obj\n' + dict + '\nstream\n');
+    if(streamU8) bb(streamU8);
+    bs('\nendstream\nendobj\n');
+  }
+  bs('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n');
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pw + ' ' + ph + '] /Resources << /XObject << /Im0 4 0 R >> /ProcSet [/PDF /ImageC] >> /Contents 5 0 R >>');
+  obj(4, '<< /Type /XObject /Subtype /Image /Width ' + w + ' /Height ' + h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>', jpeg);
+  var content = 'q\n' + pw + ' 0 0 ' + ph + ' 0 0 cm\n/Im0 Do\nQ\n';
+  obj(5, '<< /Length ' + content.length + ' >>', strBytes(content));
+  var xrefAt = out.length, n = 6;
+  bs('xref\n0 ' + n + '\n');
+  bs('0000000000 65535 f \n');
+  for(var k = 1; k < n; k++){
+    var o = String(offsets[k]);
+    while(o.length < 10) o = '0' + o;
+    bs(o + ' 00000 n \n');
+  }
+  bs('trailer\n<< /Size ' + n + ' /Root 1 0 R >>\nstartxref\n' + xrefAt + '\n%%EOF');
+  return new Uint8Array(out);
+}
+function exportPDF(){
+  renderExportCanvas(function(canvas, cssW, cssH){
+    canvas.toBlob(function(blob){
+      if(!blob) return;
+      var fr = new FileReader();
+      fr.onload = function(){
+        var pdf = buildPdf(new Uint8Array(fr.result), canvas.width, canvas.height, cssW, cssH);
+        dlURL(URL.createObjectURL(new Blob([pdf], { type:'application/pdf' })), exportFileBase() + '.pdf');
+      };
+      fr.readAsArrayBuffer(blob);
+    }, 'image/jpeg', 0.95);
+  });
+}
+function exportJPG(){
+  renderExportCanvas(function(canvas){
+    canvas.toBlob(function(blob){
+      if(!blob) return;
+      dlURL(URL.createObjectURL(blob), exportFileBase() + '.jpg');
+    }, 'image/jpeg', 0.95);
+  });
+}
+/* ---------- 预览：与导出一致的画布渲染，模态框展示 ---------- */
+function exportPreview(){
+  renderExportCanvas(function(canvas){
+    $('pvImg').src = canvas.toDataURL('image/jpeg', 0.95);
+    $('pvModal').classList.add('open');
+  });
+}
+function closePreview(){
+  var m = $('pvModal');
+  if(!m || !m.classList.contains('open')) return;
+  m.classList.remove('open');
+  $('pvImg').removeAttribute('src');
+}
+/* 从里程碑计划导入：客户里程碑 + 推荐任务 + 供应商节点排 + 自定义任务，全量带入 */
+function planRecCfg(p, id){
+  var d = (typeof REC_DEFAULTS !== "undefined" && REC_DEFAULTS[id]) || {so:0, eo:0};
+  var o = (p.recTasks && p.recTasks[id]) || {};
+  return {
+    on: o.on !== undefined ? !!o.on : true,
+    so: (typeof o.so === "number" && !isNaN(o.so)) ? o.so : d.so,
+    eo: (typeof o.eo === "number" && !isNaN(o.eo)) ? o.eo : d.eo
+  };
+}
+function planResolveAnchor(name, nodeNames){
+  if(!name) return null;
+  var i;
+  for(i = 0; i < nodeNames.length; i++){ if(nodeNames[i] === name) return nodeNames[i]; }
+  var norm = function(x){ return String(x).toLowerCase().replace(/\s+/g, ""); };
+  var target = norm(name);
+  for(i = 0; i < nodeNames.length; i++){ if(norm(nodeNames[i]) === target) return nodeNames[i]; }
+  return null;
+}
+function planPickName(o){ return (o && (o[lang] || o.zh)) || ""; }
+function fromPlan(){
+  var plan = null;
+  try{ plan = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e){}
+  if(!plan || !plan.oem){ toast(tr("noPlan")); return; }
+  fromPlanData(plan);
+}
+function fromPlanData(p, silent){ // 清空后按计划重建（手动"从计划导入"/切换 OEM 时用）
+  if(!p || !p.oem){ toast(tr("noPlan")); return; }
+  state.tasks = []; state.seq = 1; state.collapsed = {};
+  var n = mergeFromPlan(p);
+  if(!silent) toast(tr("fromPlanOk") + " · " + n);
+  syncOemSelect(); render();
+}
+/* ============ 合并版核心：客户节点 → 执行甘特图 增量同步 ============
+   受管任务按 source 识别：ms:<节点> / rec:<rN> / sup:<排名>|<序号> / custom:<序号>；分组 source 为 grp:ms / grp:rec / grp:sup:<排名> / grp:custom。
+   规则：节点改了，受管任务跟着改日期；用户手动改过日期/工期的推荐任务和自定义任务（与上次同步值不同）保留用户的值；
+   负责人、输出成果、进度、备注、依赖等用户字段永远保留；用户自己加的任务不动。 */
+function planWanted(p){
+  var out = [], nodeNames = Object.keys(p.dates || {});
+  nodeNames.forEach(function(nm){
+    if(p.excluded && p.excluded[nm]) return;
+    if(!p.dates[nm] || !parseD(p.dates[nm])) return;
+    out.push({ key:"ms:" + nm, grp:"grp:ms", gname:tr("planGroupMs"), name:nm, type:"milestone", start:fmtD(parseD(p.dates[nm])), dur:0, color:"#dc2626" });
+  });
+  var sys = (typeof OEM_PHASE_SYS !== "undefined" && OEM_PHASE_SYS[p.oem]) || "apqp";
+  var phases = (typeof OEM_PHASES !== "undefined" && OEM_PHASES[p.oem]) || {};
+  (typeof REC_TASKS !== "undefined" ? REC_TASKS : []).forEach(function(rt){
+    var cfg = planRecCfg(p, rt.id);
+    if(!cfg.on) return;
+    var pk = (rt.phase && (rt.phase[sys] || rt.phase.apqp)) || "";
+    var anchor = planResolveAnchor(phases[pk], nodeNames);
+    if(!anchor || (p.excluded && p.excluded[anchor]) || !p.dates[anchor]) return;
+    var ad = parseD(p.dates[anchor]); if(!ad) return;
+    var sd = addDays(ad, cfg.so * 7), ed = addDays(ad, cfg.eo * 7);
+    if(ed < sd) return;
+    var sn = WORKCAL.snapRange(fmtD(sd), fmtD(ed), cal);
+    sd = parseD(sn.s); ed = parseD(sn.e);
+    out.push({ key:"rec:" + rt.id, grp:"grp:rec", gname:tr("planGroupRec"), name:planPickName(rt.name), type:"task",
+      start:fmtD(sd), dur:Math.max(workdaysBetween(sd, ed) + 1, 1), color:"#2563eb" });
+  });
+  (p.customMs || []).forEach(function(row){
+    if(!row || !row.dates || !row.dates.length) return;
+    var rn = row.name || tr("planGroupSup");
+    row.dates.forEach(function(it, i){
+      if(!it || !it.d || !parseD(it.d)) return;
+      out.push({ key:"sup:" + rn + "|" + i, grp:"grp:sup:" + rn, gname:rn, name:it.n || rn, type:"milestone", start:fmtD(parseD(it.d)), dur:0, color:"#9333ea" });
+    });
+  });
+  (p.tasks || []).forEach(function(ct, i){
+    if(!ct || !ct.name || !ct.start || !ct.end) return;
+    var sd = parseD(ct.start), ed = parseD(ct.end);
+    if(!sd || !ed || ed < sd) return;
+    out.push({ key:"custom:" + i, grp:"grp:custom", gname:tr("planGroupCustom"), name:ct.name, type:"task",
+      start:fmtD(sd), dur:workdaysBetween(sd, ed) + 1, color:"#16a34a" });
+  });
+  return out;
+}
+function isManaged(src){ src = String(src || ""); return /^(ms:|rec:|sup:|custom)/.test(src); }
+function mergeFromPlan(p){
+  if(!p || !p.oem) return 0;
+  state.planOem = p.oem;
+  var want = planWanted(p), used = {}, groups = {};
+  /* 现有分组：优先 source；兼容旧数据（无 source 的分组 → 看其下受管任务的类型） */
+  state.tasks.forEach(function(t){ if(t.type === "group" && /^grp:/.test(t.source || "")) groups[t.source] = t; });
+  state.tasks.forEach(function(t){
+    var s = String(t.source || ""); if(!isManaged(s) || !t.group) return;
+    var g = byId(t.group); if(!g || g.source) return;
+    var gk = s.indexOf("ms:") === 0 ? "grp:ms" : s.indexOf("rec:") === 0 ? "grp:rec" : s.indexOf("custom") === 0 ? "grp:custom" : "grp:sup:" + s.slice(4).split("|")[0];
+    if(!groups[gk]){ g.source = gk; groups[gk] = g; }
+  });
+  function ensureGroup(w){
+    var g = groups[w.grp];
+    if(!g){
+      g = mkTask({ name:w.gname, type:"group", source:w.grp });
+      if(w.grp === "grp:ms") state.tasks.unshift(g); /* 客户节点永远在最上面 */
+      else {
+        /* 放在最后一个受管分组块之后、用户任务之前 */
+        var at = -1;
+        state.tasks.forEach(function(t, i){ var s = String(t.source || ""); if(/^grp:/.test(s) || isManaged(s)) at = i; });
+        state.tasks.splice(at + 1, 0, g);
+      }
+      groups[w.grp] = g;
+    }
+    if(w.grp !== "grp:ms" && w.grp !== "grp:rec" && w.grp !== "grp:custom") g.name = w.gname;
+    return g;
+  }
+  var n = 0;
+  want.forEach(function(w){
+    var g = ensureGroup(w);
+    var t = null;
+    for(var i = 0; i < state.tasks.length; i++){ if(state.tasks[i].source === w.key && !used[state.tasks[i].id]){ t = state.tasks[i]; break; } }
+    if(!t && w.key.indexOf("sup:") === 0){ /* 旧数据 source=sup:<排名>（无序号）→ 按顺序认领 */
+      var legacy = w.key.split("|")[0];
+      for(var j = 0; j < state.tasks.length; j++){ var x = state.tasks[j]; if(x.source === legacy && !used[x.id]){ t = x; t.source = w.key; break; } }
+    }
+    if(!t && w.key.indexOf("custom:") === 0){
+      for(var k = 0; k < state.tasks.length; k++){ var y = state.tasks[k]; if(y.source === "custom" && !used[y.id] && y.name === w.name){ t = y; t.source = w.key; break; } }
+    }
+    if(t){
+      var userMoved = t.type !== "milestone" && t.syncStart && (t.start !== t.syncStart || t.dur !== t.syncDur);
+      if(t.type === "milestone" || !userMoved){ t.start = w.start; t.dur = w.dur; }
+      t.name = w.name;
+      if(t.group !== g.id) t.group = g.id;
+      if(t.type === "milestone") t.manual = true; /* 客户节点是外部约束，不被依赖推移 */
+    } else {
+      t = mkTask({ name:w.name, type:w.type, group:g.id, start:w.start, dur:w.dur, source:w.key, color:w.color, manual:w.type === "milestone" });
+      var last = state.tasks.indexOf(g);
+      state.tasks.forEach(function(z, idx){ if(z.group === g.id) last = idx; });
+      state.tasks.splice(last + 1, 0, t);
+    }
+    if(t.type !== "milestone"){ t.syncStart = w.start; t.syncDur = w.dur; }
+    used[t.id] = 1; n++;
+  });
+  /* 删除不再需要的受管任务、空的受管分组 */
+  var gone = {};
+  state.tasks.forEach(function(t){ if(isManaged(t.source) && !used[t.id]) gone[t.id] = 1; });
+  state.tasks.forEach(function(t){
+    if(t.type === "group" && /^grp:/.test(t.source || "") && !gone[t.id]){
+      var has = state.tasks.some(function(z){ return z.group === t.id && !gone[z.id]; });
+      if(!has) gone[t.id] = 1;
+    }
+  });
+  if(Object.keys(gone).length){
+    state.tasks = state.tasks.filter(function(t){ return !gone[t.id]; });
+    state.tasks.forEach(function(t){ if(t.deps) t.deps = t.deps.filter(function(d){ return !gone[d.id]; }); if(gone[t.group]) t.group = ""; });
+  }
+  return n;
+}
+/* 执行页里拖动/编辑了客户节点里程碑 → 自动写回节点日期（只在有变化时写，避免来回触发） */
+function autoSyncBack(){
+  var plan = null;
+  try{ plan = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e){}
+  if(!plan || !plan.dates) return;
+  var changed = false;
+  state.tasks.forEach(function(t){
+    if(t.type !== "milestone") return;
+    var src = String(t.source || "");
+    if(src.indexOf("ms:") === 0){
+      var nm = src.slice(3);
+      if(plan.dates[nm] !== undefined && t.start && plan.dates[nm] !== t.start){ plan.dates[nm] = t.start; changed = true; }
+    } else if(src.indexOf("sup:") === 0){
+      var parts = src.slice(4).split("|"), row = (plan.customMs || []).filter(function(r){ return (r.name || tr("planGroupSup")) === parts[0]; })[0];
+      var it = row && row.dates && row.dates[+parts[1]];
+      if(it && t.start && it.d !== t.start){ it.d = t.start; changed = true; }
+    }
+  });
+  if(!changed) return;
+  plan.execSyncAt = Date.now();
+  try{ localStorage.setItem("gantt-tool-v1", JSON.stringify(plan)); }catch(e){}
+}
+/* ============ ASTEMO 摩擦件开发模板（来源：ASTEMO 摩擦件开发项目甘特图；偏移为相对开始日的自然日，载入时换算为工作日） ============ */
+var ASTEMO_TPL = [{"n":"ASTEMO Project Milestone","t":[["Quotation",0,10,"ASTEMO","Quotation Plan","#16a34a"],["Kick-off",11,12,"OEM & ASTEMO","Kick-off Meeting","#16a34a"],["Pre-selection",13,35,"Supplier","Report","#2563eb"],["Supplier Friction nomination",36,42,"Supplier","Nomination","#2563eb"],["DV phase (C sample validation)",43,90,"ASTEMO","C Sample","#9333ea"],["C sample released",91,93,"ASTEMO","Release","#9333ea"],["PV phase (D/PPAP validation)",94,140,"Supplier","PPAP D Sample","#ea580c"],["PSW",141,145,"Supplier","PSW Sign","#ea580c"],["Supplier SOP",146,150,"Supplier","SOP","#0d9488"],["Astemo SOP",151,155,"ASTEMO","Astemo SOP","#0d9488"]]},{"n":"Friction · Quotation Phase","t":[["1. DVP & SPEC (option) creation",2,6,"ASTEMO","DVP & Spec","#16a34a"],["2. TR review with supplier for DVP deviation",7,9,"Supplier&ASTEMO","TR Review","#16a34a"],["3. Formula recommendation report",8,12,"Supplier","Formula Report","#16a34a"]]},{"n":"Friction · Pre-selection Phase (B sample)","t":[["1. Pre-selection supplier recommendation",13,17,"Supplier","Recommendation","#2563eb"],["2. SDR with A/B/C supplier",18,21,"ASTEMO","SDR Report","#2563eb"],["3. Supplier project development schedule",20,28,"Supplier","Schedule","#2563eb"],["3.1 shim preparation",22,24,"Supplier","Shim prep","#475569"],["3.2 BP Mold development period",22,26,"Supplier","BP Mold","#475569"],["3.3 Pressure Mold development period",23,27,"Supplier","Mold","#475569"],["3.4 B sample preparation period",25,30,"Supplier","B Sample","#475569"],["3.5 Pre-selection dyno fixture building",28,32,"Supplier","Fixture","#475569"],["3.6 Pre-selection test schedule",31,35,"Supplier","Test Schedule","#475569"],["4. Supplier project team member",15,18,"Supplier","Team List","#2563eb"],["5. Test Inertia discussion with customer",19,22,"OEM&ASTEMO","Inertia Data","#2563eb"],["6. Surrounding parts collection & delivery",24,29,"Supplier","Parts Delivery","#2563eb"],["7. PDS confirmation with B sample",30,33,"ASTEMO","PDS Confirmed","#2563eb"],["8. Pre-selection test schedule progress",32,36,"Supplier","Progress","#2563eb"],["9. Test equipment list for project",16,20,"Supplier","Equipment List","#2563eb"],["10. Test report collection and checking",35,40,"ASTEMO","Test Report","#2563eb"],["11. Vehicle Groan evaluation",38,43,"OEM","Groan Report","#2563eb"],["12. Supplier OTL (need evidence)",40,44,"Supplier","OTL Evidence","#2563eb"],["13. Technical review with supplier",41,45,"ASTEMO","Tech Review","#2563eb"],["14. Pre-selection summary report",44,48,"ASTEMO","Summary Report","#2563eb"],["15. Test equipment list for project",22,25,"Supplier","Equipment","#2563eb"],["16. Supplier nomination",46,50,"ASTEMO","Nomination","#2563eb"]]},{"n":"Friction · DV Phase (C sample)","t":[["1. DVP & SPEC confirm and updated",51,55,"ASTEMO","Updated Spec","#9333ea"],["2. SDR (drawing and technical review)",56,60,"ASTEMO","SDR Report","#9333ea"],["3. Supplier technical meeting",61,63,"Supplier&ASTEMO","Minutes","#9333ea"],["4. Inertia discussion with customer",64,67,"OEM","Inertia","#9333ea"],["5. Surrounding parts collection & delivery",65,70,"Supplier","Parts","#9333ea"],["6. Supplier project development schedule",68,74,"Supplier","Schedule","#9333ea"],["7. Supplier tooling preparation",72,82,"Supplier","Tooling","#9333ea"],["8. Fixture building up",75,80,"Supplier","Fixture","#9333ea"],["9. Trail run batch (C0) and validation",83,88,"Supplier","C0 Batch","#9333ea"],["10. Supplier C1 sample production",89,95,"Supplier","C1 Sample","#9333ea"]]},{"n":"Friction · PPAP Phase (D sample)","t":[["1. PVP preparation",96,100,"ASTEMO","PVP Plan","#ea580c"],["2. Surrounding parts collection",101,106,"Supplier","Parts","#ea580c"],["3. Supplier D0 sample production",105,112,"Supplier","D0 Sample","#ea580c"],["4. D0 Test planning & report collection",113,120,"ASTEMO","Test Report","#ea580c"]]},{"n":"Friction · Safe Launch (for IOEM)","t":[["1. Safe launch Test report collection",121,128,"ASTEMO","SL Report","#0d9488"],["2. SL1 report submit (physical + Dyno)",129,133,"Supplier","SL1 Report","#0d9488"],["3. SL2 report submit (physical + Dyno)",134,138,"Supplier","SL2 Report","#0d9488"],["4. SL3 report submit (physical + Dyno)",139,143,"Supplier","SL3 Report","#0d9488"],["5. SL4 report submit (physical + Dyno)",144,148,"Supplier","SL4 Report","#0d9488"],["6. SL5 report submit (physical + Dyno)",149,153,"Supplier","SL5 Report","#0d9488"],["7. Technical report for SL release",154,157,"ASTEMO","Tech Report","#0d9488"],["8. Spec review for SL release",158,160,"ASTEMO","Spec Review","#0d9488"]]}];
+function loadAstemoTemplate(){
+  if(state.tasks.length && !confirm(tr("astConfirm"))) return;
+  var def = fmtD(snapWorkday(new Date())), v = prompt(tr("tplAsk"), def);
+  if(v === null) return;
+  var base = parseD(String(v).trim()); if(!base){ toast("YYYY-MM-DD"); return; }
+  state.tasks = []; state.seq = 1; state.collapsed = {}; state.baseline = null;
+  var n = 0;
+  ASTEMO_TPL.forEach(function(g){
+    var grp = mkTask({ name:g.n, type:"group", source:"tpl:astemo" }); state.tasks.push(grp);
+    g.t.forEach(function(r){
+      var sn = WORKCAL.snapRange(fmtD(addDays(base, r[1])), fmtD(addDays(base, r[2])), cal);
+      var sd = parseD(sn.s), ed = parseD(sn.e);
+      state.tasks.push(mkTask({ name:r[0], type:"task", group:grp.id, start:sn.s, dur:workdaysBetween(sd, ed) + 1,
+        owner:r[3], output:r[4], color:r[5] || COLORS[0], source:"tpl:astemo" }));
+      n++;
+    });
+  });
+  var _p = null; try{ _p = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e){}
+  if(_p && _p.oem) mergeFromPlan(_p);
+  render(); save(); toast(tr("astOk") + " · " + n);
+}
+/* ============ 回写里程碑计划（手动双向同步：执行页 → 计划页） ============ */
+function syncBack(){
+  var plan = null;
+  try{ plan = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e){}
+  if(!plan){ toast(tr("syncBackFail")); return; }
+  var n = 0;
+  state.tasks.forEach(function(t){
+    if(t.type !== "milestone") return;
+    var src = String(t.source || "");
+    if(src.indexOf("ms:") !== 0) return;
+    var nm = src.slice(3);
+    var d = parseD(t.start);
+    if(!d) return;
+    if(plan.dates){ plan.dates[nm] = fmtD(d); n++; }
+  });
+  if(!n){ toast(tr("syncBackEmpty")); return; }
+  plan.execSyncAt = Date.now();
+  try{ localStorage.setItem("gantt-tool-v1", JSON.stringify(plan)); }catch(e){ toast(tr("syncBackFail")); return; }
+  toast(tr("syncBackOk"));
+}
+/* ============ 工作日历面板 ============ */
+function updateCalSummary(){
+  var h = Object.keys(cal.holidays).length, m = Object.keys(cal.makeup).length;
+  var L = WORKCAL.NOTE[lang] || WORKCAL.NOTE.zh;
+  document.getElementById("calSummary").textContent = (L[cal.mode] || "") + " · " + (lang === "zh" ? "自定义/预置放假 " + h + " 天 · 调休上班 " + m + " 天" : "listed holidays " + h + " · make-up days " + m);
+}
+function syncCalModeSel(){
+  var sel = document.getElementById("calModeSel"); if(!sel) return;
+  var L = WORKCAL.LABEL[lang] || WORKCAL.LABEL.zh;
+  sel.innerHTML = ["CN","DE","WE","OFF"].map(function(k){ return '<option value="' + k + '">' + L[k] + "</option>"; }).join("");
+  sel.value = cal.mode;
+}
+var calMode = "nl";
+function setCalMode(m){
+  calMode = m;
+  document.getElementById("calModeNL").classList.toggle("on", m === "nl");
+  document.getElementById("calModeText").classList.toggle("on", m === "text");
+  document.querySelector(".cal-panel .hint[data-i18n]").textContent = tr(m === "text" ? "calHintText" : "calHint");
+  document.getElementById("calInput").placeholder = tr(m === "text" ? "calPhText" : "calPh");
+  if(m === "text") document.getElementById("calInput").value = calToText();
+  document.getElementById("calPreview").innerHTML = "";
+}
+function doCalParse(){
+  var text = document.getElementById("calInput").value.trim();
+  if(!text) return;
+  var r = calMode === "text" ? parseCalText(text) : parseCalNL(text);
+  var hks = Object.keys(r.holidays), mks = r.makeup;
+  var html = "";
+  if(hks.length) html += "<div>放假 " + hks.length + " 天：" + hks.slice(0, 12).join("、") + (hks.length > 12 ? "…" : "") + "</div>";
+  if(mks.length) html += "<div>调休上班 " + mks.length + " 天：" + mks.join("、") + "</div>";
+  if(!hks.length && !mks.length) html = "<div>未识别出日期</div>";
+  else html += '<div style="margin-top:6px"><button id="btnCalApply" style="background:var(--accent)">确认应用</button></div>';
+  document.getElementById("calPreview").innerHTML = html;
+  var b = document.getElementById("btnCalApply");
+  if(b) b.addEventListener("click", function(){
+    hks.forEach(function(k){ cal.holidays[k] = r.holidays[k] || 1; });
+    mks.forEach(function(k){ cal.makeup[k] = 1; });
+    document.getElementById("calPreview").innerHTML = "";
+    document.getElementById("calInput").value = "";
+    save(); render(); toast(tr("calApplied"));
+  });
+}
+/* ============ 初始化 ============ */
+function init(){
+  var urlOem = "";
+  try{
+    var u = new URL(location.href), lg = u.searchParams.get("lang");
+    if(lg === "zh" || lg === "en" || lg === "de") lang = lg;
+    urlOem = oemFromSlug(u.searchParams.get("oem"));
+  }catch(e){}
+  load(); applyLang();
+  buildOemOptions();
+  document.getElementById("ckPhase").checked = state.showPhase !== false;
+  document.getElementById("ckCrit").checked = state.showCrit === true;
+  document.getElementById("ckBaseline").checked = state.showBaseline === true;
+  document.getElementById("ckResWarn").checked = state.resWarn !== false;
+  /* OEM 初始化顺序：URL ?oem= > localStorage 计划数据的 oem > 已保存的 state.planOem */
+  var plan = null;
+  try{ plan = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e){}
+  var planOem = (plan && plan.oem) || "";
+  if(urlOem || planOem){
+    if(plan){
+      if(urlOem && plan.oem !== urlOem) plan = Object.assign({}, plan, {oem:urlOem});
+      mergeFromPlan(plan);
+    } else {
+      state.planOem = urlOem || planOem;
+      toast(tr("noPlan"));
+    }
+  }
+  syncOemSelect();
+  render();
+  document.querySelectorAll(".langbtns button").forEach(function(b){
+    b.addEventListener("click", function(){ lang = b.dataset.lang; applyLang(); buildOemOptions(); syncOemSelect(); closeTplMenu(); render(); });
+  });
+  document.getElementById("btnBack").addEventListener("click", function(){ location.href = "index.html?lang=" + lang; });
+  document.getElementById("btnCols").addEventListener("click", function(e){ e.stopPropagation(); toggleColMenu(); });
+  document.addEventListener("click", function(e){ // 列/模板菜单点击外部自动关闭
+    var m = document.getElementById("colMenu");
+    if(m && m.style.display === "block" && !m.contains(e.target) && !menuBtnOf(e.target, "btnCols")) closeColMenu();
+    var tm = document.getElementById("tplMenu");
+    if(tm && tm.style.display === "block" && !tm.contains(e.target) && !menuBtnOf(e.target, "btnTPL")) closeTplMenu();
+  });
+  document.getElementById("btnAdd").addEventListener("click", function(){ selId = null; openModal(null); });
+  document.getElementById("btnAddGroup").addEventListener("click", function(){
+    var t = mkTask({ name:"新分组", type:"group" }); state.tasks.push(t); render();
+  });
+  document.getElementById("btnAddMs").addEventListener("click", function(){
+    selId = null; editId = null;
+    openModal(null);
+    setTimeout(function(){ var s = document.getElementById("fType"); if(s) s.value = "milestone"; }, 60);
+  });
+  document.querySelectorAll(".viewbtns button").forEach(function(b){
+    b.addEventListener("click", function(){
+      state.view = b.dataset.view;
+      document.querySelectorAll(".viewbtns button").forEach(function(x){ x.classList.toggle("on", x === b); });
+      render();
+    });
+  });
+  document.getElementById("btnFromPlan").addEventListener("click", fromPlan);
+  document.getElementById("oemSelect").addEventListener("change", function(){
+    /* 切换 OEM：阶段色带随之切换；若里程碑计划（gantt-tool-v1）的 oem 与所选一致，自动重新导入里程碑 */
+    var newOem = this.value;
+    state.planOem = newOem;
+    save();
+    if(!newOem){ render(); return; } // 清空选择 = 仅去掉色带
+    var plan = null;
+    try{ plan = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(e){}
+    if(plan && plan.oem && (plan.oem === newOem || oemSlug(plan.oem) === oemSlug(newOem))){
+      if(state.tasks.length && !confirm(tr("oemImportConfirm"))){ render(); return; } // 有任务时先确认，避免 fromPlanData 清空当前任务
+      fromPlanData(plan, true);
+      toast(tr("oemAutoImport").replace("{0}", newOem));
+      return;
+    }
+    toast(tr("oemNoData"));
+    render();
+  });
+  document.getElementById("ckPhase").addEventListener("change", function(){
+    state.showPhase = this.checked;
+    save(); render();
+  });
+  document.getElementById("ckCrit").addEventListener("change", function(){
+    state.showCrit = this.checked;
+    save(); render();
+  });
+  document.getElementById("btnBaseline").addEventListener("click", saveBaseline);
+  document.getElementById("ckBaseline").addEventListener("change", function(){
+    state.showBaseline = this.checked;
+    save(); render();
+  });
+  document.getElementById("ckResWarn").addEventListener("change", function(){
+    state.resWarn = this.checked;
+    save(); render();
+  });
+  document.getElementById("btnSyncBack").addEventListener("click", syncBack);
+  document.getElementById("btnImportSub").addEventListener("click", openSubModal);
+  document.getElementById("btnExport").addEventListener("click", exportJSON);
+  document.getElementById("btnPDF").addEventListener("click", exportPDF);
+  document.getElementById("btnJPG").addEventListener("click", exportJPG);
+  document.getElementById("btnPreview").addEventListener("click", exportPreview);
+  document.getElementById("pvClose").addEventListener("click", closePreview);
+  document.getElementById("pvModal").addEventListener("click", function(e){ if(e.target === this) closePreview(); });
+  document.getElementById("btnCSV").addEventListener("click", exportCSV);
+  document.getElementById("btnXls").addEventListener("click", exportXLS);
+  document.getElementById("btnExpXML").addEventListener("click", exportXML);
+  document.getElementById("btnImpXML").addEventListener("click", function(){ document.getElementById("fileXML").click(); });
+  document.getElementById("fileXML").addEventListener("change", function(){ if(this.files[0]) importXMLFile(this.files[0]); this.value = ""; });
+  document.getElementById("btnTPL").addEventListener("click", function(e){ e.stopPropagation(); toggleTplMenu(); });
+  document.getElementById("btnImport").addEventListener("click", function(){ document.getElementById("fileJSON").click(); });
+  document.getElementById("fileJSON").addEventListener("change", function(){ if(this.files[0]) importJSONFile(this.files[0]); this.value = ""; });
+  document.getElementById("btnCal").addEventListener("click", function(){
+    var p = document.getElementById("calPanel"); p.style.display = p.style.display === "none" ? "" : "none";
+  });
+  document.getElementById("btnCalParse").addEventListener("click", doCalParse);
+  document.getElementById("btnCalReset").addEventListener("click", function(){
+    resetCal(); updateCalSummary(); save(); render(); toast(tr("calApplied"));
+    if(calMode === "text") document.getElementById("calInput").value = calToText();
+    document.getElementById("calPreview").innerHTML = "";
+  });
+  document.getElementById("calModeNL").addEventListener("click", function(){ setCalMode("nl"); });
+  document.getElementById("calModeText").addEventListener("click", function(){ setCalMode("text"); });
+  setCalMode("nl");
+  syncCalModeSel();
+  document.getElementById("calModeSel").addEventListener("change", function(){
+    cal.mode = this.value; resetCal(); updateCalSummary(); save(); render(); toast(tr("calApplied"));
+    if(calMode === "text") document.getElementById("calInput").value = calToText();
+  });
+
+  /* ===== 合并版：与「客户节点」页实时联动 ===== */
+  window.addEventListener("storage", function(e){
+    if(e.key === "gantt-tool-v1"){
+      var p = null; try{ p = JSON.parse(e.newValue || "null"); }catch(x){}
+      if(p && p.oem){ mergeFromPlan(p); syncOemSelect(); render(); }
+    } else if(e.key === "gantt-workcal-v1"){
+      cal = WORKCAL.load();
+      var p2 = null; try{ p2 = JSON.parse(localStorage.getItem("gantt-tool-v1")); }catch(x){}
+      if(p2 && p2.oem) mergeFromPlan(p2);
+      render();
+    }
+  });
+  window.addEventListener("message", function(e){
+    var d = e.data || {};
+    if(d.t === "lang"){ var b = document.querySelector('.langbtns button[data-lang="' + d.v + '"]'); if(b) b.click(); }
+    else if(d.t === "resize"){ render(); }
+  });
+  updateCalSummary();
+  document.getElementById("modalX").addEventListener("click", closeModal);
+  document.getElementById("modalCancel").addEventListener("click", closeModal);
+  document.getElementById("modalOk").addEventListener("click", saveModal);
+  document.getElementById("modalDel").addEventListener("click", function(){
+    if(editId){ state.tasks = state.tasks.filter(function(t){ return t.id !== editId; }); }
+    closeModal(); render();
+  });
+  document.getElementById("modalBg").addEventListener("click", function(e){ if(e.target === this) closeModal(); });
+  document.getElementById("subX").addEventListener("click", closeSub);
+  document.getElementById("subCancel").addEventListener("click", closeSub);
+  document.getElementById("subOk").addEventListener("click", doSubImport);
+  document.getElementById("subModalBg").addEventListener("click", function(e){ if(e.target === this) closeSub(); });
+  document.getElementById("subFile").addEventListener("change", function(){
+    var f = this.files[0]; if(!f) return;
+    var r = new FileReader();
+    r.onload = function(){ document.getElementById("subText").value = r.result; };
+    r.readAsText(f); this.value = "";
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape"){ closeModal(); closeSub(); closePreview(); closeColMenu(); closeTplMenu(); } });
+}
+if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+else init();
+})();
+
+</script>
+</body>
+</html>
