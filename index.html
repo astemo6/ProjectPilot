@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汽车零部件项目甘特图</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#eef1f5;color:#1f2937}
+#top{height:46px;background:#1e3a52;color:#fff;display:flex;align-items:center;gap:8px;padding:0 12px;overflow-x:auto;white-space:nowrap}
+#top h1{font-size:15px;font-weight:600;margin-right:6px}
+.tabs{display:flex;gap:4px}
+.tabs button,.tb{border:1px solid #4b6a85;background:#2b4d6a;color:#fff;border-radius:6px;padding:0 14px;height:32px;min-height:32px;font-size:13px;cursor:pointer}
+.tabs button.on{background:#fff;color:#1e3a52;border-color:#fff;font-weight:600}
+.tb:hover,.tabs button:hover{background:#3a6283}
+.tabs button.on:hover{background:#fff}
+.sp{flex:1}
+.lang button{padding:0 9px}
+.lang button.on,.tabs.lang button.on:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+#hint{display:none;background:#fff7e6;color:#92400e;font-size:12px;padding:5px 14px;border-bottom:1px solid #fde3b0}
+#hint.show{display:block}
+#stage{position:relative;height:calc(100% - 46px)}
+#hint.show + #stage{height:calc(100% - 46px - 27px)}
+#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+#stage iframe.off{left:-20000px;visibility:hidden}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+#toast.show{opacity:.92}
+@media (max-width:700px){
+  #top{height:auto;min-height:52px;flex-wrap:wrap;padding:6px 8px;white-space:normal}
+  #top h1{display:none}
+  .tabs button,.tb{height:44px;min-height:44px;min-width:44px}
+  #stage{height:calc(100% - 108px)}
+  #hint.show + #stage{height:calc(100% - 135px)}
+}
+</style>
+</head>
+<body>
+<div id="top">
+  <h1 data-t="title">汽车零部件项目甘特图</h1>
+  <div class="tabs">
+    <button data-view="exec" data-t="tabExec">项目甘特图</button>
+    <button data-view="plan" data-t="tabPlan">客户节点</button>
+  </div>
+  <span class="sp"></span>
+  <div class="tabs lang"><button class="tb" data-lang="zh">中文</button><button class="tb" data-lang="en">EN</button><button class="tb" data-lang="de">DE</button></div>
+  <button class="tb" id="btnExp" data-t="exp">导出项目</button>
+  <button class="tb" id="btnImp" data-t="imp">导入项目</button>
+  <button class="tb" id="btnClr" data-t="clr">清空</button>
+  <input type="file" id="fileImp" accept=".json,application/json" style="display:none">
+</div>
+<div id="hint"></div>
+<div id="stage">
+  <iframe id="fExec" title="项目甘特图"></iframe>
+  <iframe id="fPlan" title="客户节点"></iframe>
+</div>
+<div id="toast"></div>
+<script>
+(function(){
+/* 一个项目 = 三份本地数据：客户节点(gantt-tool-v1)、执行任务(gantt-exec-v1)、工作日历(gantt-workcal-v1)。
+   两个视图实时联动：改客户节点 → 项目甘特图里的里程碑和推荐任务自动更新；在项目甘特图里拖动客户里程碑 → 节点日期自动回写。 */
+var KEYS = ["gantt-tool-v1", "gantt-exec-v1", "gantt-workcal-v1"];
+var T = {
+  zh:{title:"汽车零部件项目甘特图", tabExec:"项目甘特图", tabPlan:"客户节点", exp:"导出项目", imp:"导入项目", clr:"清空",
+      hintPlan:"在这里选主机厂、填客户节点日期，项目甘特图里的里程碑和推荐任务会自动跟着变。这一页的导出就是给主机厂的节点报告。",
+      hintExec:"还没有客户节点：先到「客户节点」选主机厂并填日期，或者直接在这里加任务、载入 ASTEMO 模板。",
+      clrAsk:"清空整个项目（客户节点、任务、工作日历）？", impOk:"项目已导入", impBad:"不是有效的项目文件", expOk:"项目已导出"},
+  en:{title:"Auto Parts Project Gantt", tabExec:"Project Gantt", tabPlan:"Customer Milestones", exp:"Export project", imp:"Import project", clr:"Clear",
+      hintPlan:"Pick the OEM and fill in customer milestone dates here; milestones and recommended tasks in the Project Gantt update automatically. Export from this view is the OEM milestone report.",
+      hintExec:"No customer milestones yet: pick an OEM under Customer Milestones, or add tasks / load the ASTEMO template here.",
+      clrAsk:"Clear the whole project (milestones, tasks, calendar)?", impOk:"Project imported", impBad:"Not a valid project file", expOk:"Project exported"},
+  de:{title:"Projekt-Gantt Automobilzulieferer", tabExec:"Projekt-Gantt", tabPlan:"Kundenmeilensteine", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
+      hintPlan:"Hier OEM wählen und Kundenmeilensteine eintragen; Meilensteine und empfohlene Aufgaben im Projekt-Gantt folgen automatisch. Der Export dieser Ansicht ist der Meilensteinbericht für den OEM.",
+      hintExec:"Noch keine Kundenmeilensteine: OEM unter Kundenmeilensteine wählen oder hier Aufgaben anlegen / ASTEMO-Vorlage laden.",
+      clrAsk:"Gesamtes Projekt leeren (Meilensteine, Aufgaben, Kalender)?", impOk:"Projekt importiert", impBad:"Keine gültige Projektdatei", expOk:"Projekt exportiert"}
+};
+/* 预览模式（沙箱里无 localStorage）：由构建脚本注入 INLINE 应用和内存存储 */
+var INLINE = window.__INLINE_APPS__ || null;
+var mem = {};
+function lsOk(){ try{ var k = "__t"; localStorage.setItem(k, "1"); localStorage.removeItem(k); return true; }catch(e){ return false; } }
+var PREVIEW = !!INLINE || !lsOk();
+function getK(k){ if(PREVIEW) return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function setK(k, v){ if(PREVIEW){ if(v === null) delete mem[k]; else mem[k] = v; return; } try{ if(v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} }
+
+var lang = getK("gantt-shell-lang") || "zh";
+var view = "exec";
+var fExec = document.getElementById("fExec"), fPlan = document.getElementById("fPlan");
+function $(id){ return document.getElementById(id); }
+function tr(k){ return (T[lang] || T.zh)[k] || T.zh[k] || k; }
+function toast(m){ var t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 1800); }
+function hasNodes(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return !!(p && p.oem && Object.keys(p.dates || {}).some(function(k){ return p.dates[k]; })); }catch(e){ return false; } }
+
+function post(f, msg){ try{ f.contentWindow.postMessage(msg, "*"); }catch(e){} }
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(function(el){ el.textContent = tr(el.getAttribute("data-t")); });
+  document.querySelectorAll(".lang button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-lang") === lang); });
+  document.title = tr("title");
+  updateHint();
+}
+function updateHint(){
+  var h = $("hint"), txt = "";
+  if(view === "plan") txt = tr("hintPlan");
+  else if(!hasNodes()) txt = tr("hintExec");
+  h.textContent = txt; h.classList.toggle("show", !!txt);
+}
+function show(v){
+  view = v;
+  fExec.classList.toggle("off", v !== "exec");
+  fPlan.classList.toggle("off", v !== "plan");
+  document.querySelectorAll("#top .tabs:not(.lang) button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-view") === v); });
+  updateHint();
+  post(v === "exec" ? fExec : fPlan, { t:"resize" });
+}
+
+/* ---- 加载两个视图 ---- */
+var SHIM = window.__INLINE_SHIM__ || "";
+function srcdocFor(app){
+  var html = INLINE[app];
+  var pre = "<script>window.__PREVIEW_STORE=" + JSON.stringify(mem).replace(/</g, "\\u003c") + ";<\/script>" + SHIM;
+  var i = html.indexOf("<head>");
+  return i >= 0 ? html.slice(0, i + 6) + pre + html.slice(i + 6) : pre + html;
+}
+function loadFrames(){
+  if(INLINE){ fExec.srcdoc = srcdocFor("exec"); fPlan.srcdoc = srcdocFor("plan"); }
+  else { var q = "?lang=" + lang + "&v=" + Date.now(); fExec.src = "exec.html" + q; fPlan.src = "plan.html" + q; }
+}
+[fExec, fPlan].forEach(function(f){ f.addEventListener("load", function(){ post(f, { t:"lang", v:lang }); updateHint(); }); });
+
+/* 预览模式：一个视图写数据 → 转发给另一个视图（触发它的 storage 事件），保持两边一致 */
+window.addEventListener("message", function(e){
+  var d = e.data || {};
+  if(d.t !== "ls") return;
+  if(getK(d.k) === d.v) return;
+  setK(d.k, d.v);
+  var other = e.source === fExec.contentWindow ? fPlan : fExec;
+  post(other, { t:"ls-in", k:d.k, v:d.v });
+  updateHint();
+});
+if(!PREVIEW) window.addEventListener("storage", function(){ updateHint(); });
+
+/* ---- 顶栏 ---- */
+document.querySelectorAll("#top .tabs:not(.lang) button").forEach(function(b){ b.addEventListener("click", function(){ show(b.getAttribute("data-view")); }); });
+document.querySelectorAll(".lang button").forEach(function(b){
+  b.addEventListener("click", function(){
+    lang = b.getAttribute("data-lang"); setK("gantt-shell-lang", lang); applyLang();
+    post(fExec, { t:"lang", v:lang }); post(fPlan, { t:"lang", v:lang });
+  });
+});
+function projName(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return ((p && p.projectName) || "").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 40); }catch(e){ return ""; } }
+$("btnExp").addEventListener("click", function(){
+  var data = { app:"gantt-project", version:3, savedAt:new Date().toISOString() };
+  KEYS.forEach(function(k){ var v = getK(k); data[k] = v ? JSON.parse(v) : null; });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type:"application/json" }));
+  a.download = (projName() || "gantt-project") + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  toast(tr("expOk"));
+});
+$("btnImp").addEventListener("click", function(){ $("fileImp").click(); });
+$("fileImp").addEventListener("change", function(){
+  var f = this.files && this.files[0]; this.value = "";
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    var d = null; try{ d = JSON.parse(r.result); }catch(e){}
+    if(!d){ toast(tr("impBad")); return; }
+    if(d.app === "gantt-project"){ KEYS.forEach(function(k){ setK(k, d[k] ? JSON.stringify(d[k]) : null); }); }
+    else if(d.app === "gantt-exec" && d.state){ /* 旧执行页 JSON */ setK("gantt-exec-v1", JSON.stringify(d.state)); }
+    else if(d.oem !== undefined && d.dates){ /* 旧里程碑计划 JSON */ setK("gantt-tool-v1", JSON.stringify(d)); }
+    else { toast(tr("impBad")); return; }
+    loadFrames(); toast(tr("impOk"));
+    setTimeout(function(){ show(hasNodes() ? "exec" : "plan"); }, 300);
+  };
+  r.readAsText(f);
+});
+$("btnClr").addEventListener("click", function(){
+  if(!confirm(tr("clrAsk"))) return;
+  KEYS.forEach(function(k){ setK(k, null); });
+  loadFrames(); show("plan");
+});
+
+window.__shell = { mem:mem, srcdocFor:srcdocFor, show:show }; /* 调试/测试用 */
+applyLang();
+loadFrames();
+show(hasNodes() ? "exec" : "plan");
+})();
+</script>
+</body>
+</html>
