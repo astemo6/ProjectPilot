@@ -73,6 +73,24 @@ button,input,select,textarea{font-family:inherit!important;letter-spacing:inheri
 #hint{background:rgba(0,122,255,.08);color:#0058b9;border-bottom:1px solid rgba(0,122,255,.15)}
 #toast{background:rgba(29,29,31,.88);border-radius:10px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 @media (max-width:700px){.tabs button,.tb{height:40px;min-height:40px;min-width:40px}.oemwrap select{height:40px}}
+
+/* v3.9 顶栏一行布局 */
+#top{overflow:visible;position:relative;z-index:30}
+.tsep{width:1px;height:18px;background:rgba(0,0,0,.12);margin:0 2px}
+#top .dd{position:relative;display:inline-flex}
+#top .ddm{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:200px;background:rgba(255,255,255,.95);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);border:.5px solid rgba(0,0,0,.14);border-radius:10px;padding:5px;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:50;flex-direction:column;gap:1px}
+#top .ddm.ddr{left:auto;right:0}
+#top .dd.open .ddm{display:flex}
+#top .ddm>button{all:unset;box-sizing:border-box;display:flex;align-items:center;height:26px;padding:0 10px;border-radius:5px;font-size:13px;color:#1d1d1f;cursor:pointer;white-space:nowrap;font-family:inherit}
+#top .ddm>button:hover{background:#007aff;color:#fff}
+#top .ddm>button.danger{color:#d70015}#top .ddm>button.danger:hover{background:#d70015;color:#fff}
+#top .ddm hr{border:none;border-top:1px solid rgba(0,0,0,.08);margin:4px 6px}
+#top .ddlab{font-size:11px;color:#86868b;padding:2px 10px 4px}
+#top .ddm .tabs.lang{margin:0 6px 2px;display:flex}#top .ddm .tabs.lang button{flex:1}
+#btnExpDd{gap:4px}
+@media (max-width:700px){.tsep{display:none}}
+#btnMore{width:32px;padding:0;font-size:16px;letter-spacing:0}
+#stage{height:calc(100% - 48px)}
 </style>
 </head>
 <body>
@@ -89,10 +107,25 @@ button,input,select,textarea{font-family:inherit!important;letter-spacing:inheri
   </div>
   <span class="sp"></span>
   <a class="tb" id="lnkV4" href="v4/" data-t="toV4">开发任务 v4 ↗</a>
-  <div class="tabs lang"><button class="tb" data-lang="zh">中文</button><button class="tb" data-lang="en">EN</button><button class="tb" data-lang="de">DE</button></div>
-  <button class="tb" id="btnExp" data-t="exp">导出项目</button>
-  <button class="tb" id="btnImp" data-t="imp">导入项目</button>
-  <button class="tb" id="btnClr" data-t="clr">清空</button>
+  <span class="tsep"></span>
+  <button class="tb" id="btnPv" data-t="pv">预览</button>
+  <div class="dd" id="ddExp"><button class="tb" id="btnExpDd"><span data-t="expDd">导出</span> ▾</button>
+    <div class="ddm">
+      <button data-px="btnPDF" data-t="expPdf">导出 PDF</button>
+      <button data-px="btnJPG" data-t="expJpg">导出 JPG</button>
+      <hr>
+      <button id="btnExp" data-t="expProj">导出项目文件（JSON）</button>
+    </div></div>
+  <button class="tb" id="btnImp" data-t="imp">导入</button>
+  <div class="dd" id="ddMore"><button class="tb" id="btnMore" title="更多">⋯</button>
+    <div class="ddm ddr">
+      <div class="ddlab" data-t="lng">语言</div>
+      <div class="tabs lang"><button class="tb" data-lang="zh">中文</button><button class="tb" data-lang="en">EN</button><button class="tb" data-lang="de">DE</button></div>
+      <hr>
+      <button data-px="btnSample" data-t="sample">载入示例日期</button>
+      <hr>
+      <button id="btnClr" class="danger" data-t="clr">清空项目…</button>
+    </div></div>
   <input type="file" id="fileImp" accept=".json,application/json" style="display:none">
 </div>
 <div id="hint"></div>
@@ -139,6 +172,22 @@ function toast(m){ var t = $("toast"); t.textContent = m; t.classList.add("show"
 function hasNodes(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return !!(p && p.oem && Object.keys(p.dates || {}).some(function(k){ return p.dates[k]; })); }catch(e){ return false; } }
 
 function post(f, msg){ try{ f.contentWindow.postMessage(msg, "*"); }catch(e){} }
+
+/* v3.9：顶栏合并为一行——预览 / 导出 ▾ / 导入 / ⋯（语言、示例、清空） */
+Object.assign(T.zh, {pv:"预览", expDd:"导出", expPdf:"导出 PDF", expJpg:"导出 JPG", expProj:"导出项目文件（JSON）", imp:"导入", lng:"语言", sample:"载入示例日期", clr:"清空项目…"});
+Object.assign(T.en, {pv:"Preview", expDd:"Export", expPdf:"Export PDF", expJpg:"Export JPG", expProj:"Export project file (JSON)", imp:"Import", lng:"Language", sample:"Load sample dates", clr:"Clear project…"});
+Object.assign(T.de, {pv:"Vorschau", expDd:"Export", expPdf:"PDF exportieren", expJpg:"JPG exportieren", expProj:"Projektdatei exportieren (JSON)", imp:"Import", lng:"Sprache", sample:"Beispieldaten laden", clr:"Projekt leeren…"});
+function pxClick(id){ var d = pdoc(), b = d && d.getElementById(id); if(b) b.click(); }
+function closeDd(){ document.querySelectorAll("#top .dd.open").forEach(function(x){ x.classList.remove("open"); }); }
+document.querySelectorAll("#top .dd > .tb").forEach(function(b){
+  b.addEventListener("click", function(e){ e.stopPropagation(); var dd = b.parentNode, was = dd.classList.contains("open"); closeDd(); if(!was) dd.classList.add("open"); });
+});
+document.querySelectorAll("#top .ddm").forEach(function(m){ m.addEventListener("click", function(e){ if(e.target.closest("button")) setTimeout(closeDd, 0); else e.stopPropagation(); }); });
+document.addEventListener("click", closeDd);
+window.addEventListener("blur", closeDd); /* 点进下方 iframe 时收起菜单 */
+document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeDd(); });
+document.querySelectorAll("#top [data-px]").forEach(function(b){ b.addEventListener("click", function(){ pxClick(b.getAttribute("data-px")); }); });
+document.getElementById("btnPv").addEventListener("click", function(){ pxClick("btnPreview"); });
 function applyLang(){
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-t]").forEach(function(el){ el.textContent = tr(el.getAttribute("data-t")); });
@@ -181,7 +230,7 @@ var pn = document.getElementById("projName");
 function pdoc(){ try { return fPlan.contentDocument; } catch(e){ return null; } }
 function mergePlanHeader(){
   var d = pdoc(); if(!d || !d.head) return;
-  if(!d.getElementById("v3merge")){ var st = d.createElement("style"); st.id = "v3merge"; st.textContent = ".toprow{display:none!important}"; d.head.appendChild(st); }
+  if(!d.getElementById("v3merge")){ var st = d.createElement("style"); st.id = "v3merge"; st.textContent = ".toprow,.subbar{display:none!important}"; d.head.appendChild(st); }
   var src = d.getElementById("projectName"); if(src && document.activeElement !== pn) pn.value = src.value || "";
 }
 pn.addEventListener("input", function(){ var d = pdoc(), src = d && d.getElementById("projectName"); if(src){ src.value = pn.value; src.dispatchEvent(new Event("input", { bubbles:true })); src.dispatchEvent(new Event("change", { bubbles:true })); } });
