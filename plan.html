@@ -177,6 +177,61 @@ input.flash{outline:2px solid #2563eb;outline-offset:1px}
 <style id="embedCss">
 html.embed aside > section:first-child, html.embed .langbtns, html.embed #btnExec, html.embed #btnJSON, html.embed #btnImport, html.embed #btnClearCache{display:none!important}
 </style>
+<style id="macStyle">
+/* ===== v3.8：macOS 风格 + 控件字体统一（与 v4.11 同一套） ===== */
+:root{--accent:#007aff;--mac-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Helvetica Neue","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+  --tx1:#1d1d1f;--tx2:#424245;--tx3:#86868b;--line:rgba(0,0,0,.12);--line2:rgba(0,0,0,.07);--m-bar:rgba(246,246,248,.86);--m-ctl:#fff;--m-ctl-h:#f6f6f6;--m-ctl-a:#e9e9eb;--m-bd:rgba(0,0,0,.14);--m-sh:0 .5px 1.5px rgba(0,0,0,.1);--m-seg:rgba(0,0,0,.06);--m-hd:#f2f2f4}
+body{font-family:var(--mac-font)!important;color:var(--tx1);background:#f5f5f7;-webkit-font-smoothing:antialiased;letter-spacing:.01em}
+button,input,select,textarea,optgroup{font-family:inherit!important;letter-spacing:inherit}
+header{background:var(--m-bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);color:var(--tx1);border-bottom:1px solid var(--line)}
+.brand{font-size:14px;font-weight:600;color:var(--tx1)}
+#projectName{background:var(--m-seg);border:1px solid transparent;color:var(--tx1);border-radius:7px;height:28px;padding:0 10px}
+#projectName::placeholder{color:var(--tx3)}#projectName:focus{outline:none;background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,122,255,.25)}
+/* 统一按钮：白底细边，字号 12px / 字重 500 / 行高 1.2 */
+button,button.ghost,.iconbtn,.subbar button,.logo-up .mini{background:var(--m-ctl);color:var(--tx1);border:.5px solid var(--m-bd);box-shadow:var(--m-sh);border-radius:6px;font-size:12px;font-weight:500;line-height:1.2;height:28px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:4px;vertical-align:middle}
+button:hover,button.ghost:hover,.iconbtn:hover,.subbar button:hover{background:var(--m-ctl-h);border-color:var(--m-bd);color:var(--tx1)}
+button:active{background:var(--m-ctl-a)}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(0,122,255,.3)}
+.iconbtn{width:28px;padding:0}
+.logo-up .mini{cursor:pointer;height:24px;padding:0 10px}
+h3 .mini,button.mini{height:22px;padding:0 9px;font-size:11px;font-weight:500;box-shadow:none;background:var(--m-seg);border-color:transparent;color:var(--tx2)}
+h3 .mini:hover,button.mini:hover{background:rgba(0,0,0,.1);color:var(--tx1)}
+h3{display:flex;align-items:center;flex-wrap:wrap;gap:6px}h3 .mini{margin-left:0}
+#btnAddTask,#btnAddLane,.cggo{background:var(--accent);color:#fff;border-color:transparent;font-weight:500}
+#btnAddTask:hover,#btnAddLane:hover,.cggo:hover{background:#0068d9;color:#fff}
+.cmadd{border:1px dashed rgba(0,0,0,.25);box-shadow:none;background:transparent}.cmadd:hover{border-color:var(--accent);color:var(--accent);background:transparent}
+.del{background:#fff;color:#d70015;border-color:var(--m-bd)}.del:hover{background:#fff1f0;color:#d70015}
+.cmx{height:22px;width:22px;padding:0;box-shadow:none}
+/* 语言：分段控件 */
+.langbtns{gap:0;background:var(--m-seg);border-radius:8px;padding:2px}
+.langbtns button{background:transparent;border:none;box-shadow:none;color:var(--tx2);height:24px;padding:0 9px;font-size:12px;font-weight:500}
+.langbtns button.on{background:#fff;color:var(--tx1);box-shadow:0 1px 2px rgba(0,0,0,.18)}
+/* 工具条 / 侧栏 / 卡片 */
+.subbar{background:#fff;border-bottom:1px solid var(--line);padding:8px 16px}
+aside{background:#fbfbfd;border-right:1px solid var(--line)}
+aside h3{font-size:13px;font-weight:600;color:var(--tx1)}
+aside select,aside input.date,aside input[type=text],.offs input{border:.5px solid var(--m-bd);border-radius:6px;background:#fff;color:var(--tx1)}
+aside select:focus,aside input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,122,255,.25)}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
+.node-row,.rec-row{border-bottom:1px solid var(--line2)}
+.seq{background:rgba(0,122,255,.1);color:var(--accent)}
+.hint,.rmeta{color:var(--tx3)}
+.chart-wrap,.noderef{border:.5px solid var(--line);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.reftable th{background:var(--m-hd)}.reftable th,.reftable td{border-color:var(--line2)}
+/* 预览面板 */
+#pvModal{background:rgba(0,0,0,.3);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.pv-box{border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.28),0 0 0 .5px rgba(0,0,0,.12)}
+.pv-x{width:24px;height:24px;border-radius:50%;background:var(--m-seg);border:none;box-shadow:none;font-size:15px;padding:0}
+/* 手机端两个页签：分段控件 */
+.mobile-tabs{background:#fff;padding:8px 12px;border-bottom:1px solid var(--line)}
+.mobile-tabs button{flex:1;background:transparent;border:none;box-shadow:none;height:32px;font-size:13px;color:var(--tx2);border-radius:7px}
+.mobile-tabs{gap:0!important}
+.mobile-tabs button.active,.mobile-tabs button.active:hover{background:#fff;color:var(--tx1);box-shadow:0 1px 3px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06)}
+.mobile-tabs button{background:var(--m-seg);border-radius:0;height:34px;border:2px solid transparent;background-clip:padding-box}
+.mobile-tabs button:first-child{border-radius:9px 0 0 9px}.mobile-tabs button:last-child{border-radius:0 9px 9px 0}
+.mobile-tabs button.active,.mobile-tabs button.active:hover{border-radius:8px;box-shadow:0 0 0 2px #ebebed,0 1px 3px 2px rgba(0,0,0,.15)}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);border-radius:10px;border:3px solid transparent;background-clip:content-box}::-webkit-scrollbar-track{background:transparent}
+</style>
 <script>if(window.self !== window.top) document.documentElement.className += " embed";</script>
 </head>
 <body class="tab-form">
@@ -1168,11 +1223,18 @@ function renderChart(){
   function X(d){ return GUT + diffDays(min, d) * pxDay; }
 
   var showPH = state.showPhase !== false;
-  var AXIS_H = 44, PH_Y = 44, PH_H = showPH ? 48 : 0, MS_Y = PH_Y + PH_H, MS_H = 64;
+  /* v3.8：里程碑标签自适应倾角——节点越密倾角越大，所需水平间距越小；里程碑行高度随最长标签自动增高，避免标签互相压住或伸进阶段行 */
+  var _msx = ms.map(function(m){ return X(m.d); }).sort(function(a, b){ return a - b; }), _minGap = 1e9;
+  for(var _i = 1; _i < _msx.length; _i++) _minGap = Math.min(_minGap, _msx[_i] - _msx[_i-1]);
+  var MS_ANG = _minGap >= 26 ? 25 : (_minGap >= 16 ? 45 : 62);
+  var MS_NEED = Math.ceil(12 / Math.sin(MS_ANG * Math.PI / 180));
+  var _msMaxW = 0; ms.forEach(function(m){ _msMaxW = Math.max(_msMaxW, textW(abbr(m.name))); });
+  var _labH = _msMaxW * Math.sin(MS_ANG * Math.PI / 180);
+  var AXIS_H = 44, PH_Y = 44, PH_H = showPH ? 48 : 0, MS_Y = PH_Y + PH_H, MS_H = Math.round(Math.max(72, Math.min(170, _labH + 58)));
   var CM_Y = MS_Y + MS_H, CM_H = 58;
   var TK_Y = CM_Y + cmLanes.length * CM_H, TK_H = 36;
   var H = TK_Y + laneTasks.length * TK_H + 10;
-  var msCY = MS_Y + MS_H/2;
+  var msCY = MS_Y + MS_H - 36;
   var sys = phaseSys();
 
   // 阶段锚点（提前计算：保证最后一个阶段条有足够的标签显示空间）
@@ -1275,23 +1337,27 @@ function renderChart(){
     if(m.d && (!prevD || m.d >= prevD)) prevD = m.d;
   });
   // 里程碑菱形 + 标签（统一高度，紧贴节点上方；标签重叠时自动错开）
-  var msLabelItems = ms.map(function(m){
-    var w = textW(abbr(m.name));
-    var cx = X(m.d);
-    return {x:cx-9-w/2, w:w};
+  /* v3.8：标签旋转 -25°。平行斜线水平相距 ≥26px 不重叠；更密时放到上一层（上移 14px，平行线间距足够），仍不够才往右挪 */
+  var msLabelDx = [], msLabelLane = [], msDateRow = [], _lastL = [-1e9, -1e9], _lastD = [-1e9, -1e9];
+  ms.map(function(m, i){ return i; }).sort(function(a, b){ return X(ms[a].d) - X(ms[b].d); }).forEach(function(i){
+    var cx = X(ms[i].d), base = cx + 2, lane = 0;
+    var lx = Math.max(base, _lastL[lane] + MS_NEED);
+    msLabelDx[i] = lx - base; msLabelLane[i] = lane; _lastL[lane] = lx;
+    var row = (cx - _lastD[0] >= 34) ? 0 : ((cx - _lastD[1] >= 34) ? 1 : 0);
+    msDateRow[i] = row; _lastD[row] = cx;
   });
-  var msLabelDx = deoverlapX(msLabelItems);
   ms.forEach(function(m, idx){
     var cx = X(m.d), r = 7;
     var fill = m.bad ? '#7f1d1d' : '#dc2626';
     var stroke = m.bad ? '#450a0a' : '#991b1b';
     var label = m.alias ? m.name + '（' + m.alias + '）' : m.name;
-    var lx = (cx - 9) + (msLabelDx[idx]||0), ly = msCY - 16;
+    var lx = (cx + 2) + (msLabelDx[idx]||0), ly = msCY - 12;
     s += '<g data-mnode="' + esc(m.name) + '"><title>' + esc(label + '\n' + fmtD(m.d)) + '</title>'
       + '<rect x="' + (cx-r).toFixed(1) + '" y="' + (msCY-r).toFixed(1) + '" width="' + (r*2) + '" height="' + (r*2)
       + '" transform="rotate(45 ' + cx.toFixed(1) + ' ' + msCY + ')" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"/>'
-      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-25 ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="end" class="mlabel">' + esc(abbr(m.name)) + '</text>'
-      + '<text x="' + cx.toFixed(1) + '" y="' + (msCY+24) + '" text-anchor="middle" fill="#1f2937" font-size="10">' + (m.d.getMonth()+1) + '/' + m.d.getDate() + '</text>'
+      + ((msLabelLane[idx] || msLabelDx[idx] > 4) ? '<line x1="' + cx.toFixed(1) + '" y1="' + (msCY-9) + '" x2="' + (lx+2).toFixed(1) + '" y2="' + (ly+2) + '" stroke="#6b7280" stroke-width="0.8"/>' : '')
+      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-' + MS_ANG + ' ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="start" class="mlabel">' + esc(abbr(m.name)) + '</text>'
+      + '<text x="' + cx.toFixed(1) + '" y="' + (msCY+21+(msDateRow[idx]?11:0)) + '" text-anchor="middle" fill="#1f2937" font-size="10">' + (m.d.getMonth()+1) + '/' + m.d.getDate() + '</text>'
       + '</g>';
   });
   // 自定义节点排：基线 + 菱形 + 日期（上方）+ 名称（下方）；标签重叠时自动错开
@@ -1400,12 +1466,12 @@ var CHART_CSS = '.axis{fill:#9ca3af;font-size:11px}.mlabel{font-size:11px;fill:#
 function fileBase(){
   var nm = (state.projectName || '').trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
   if(!nm) nm = tr('brand').replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
-  return nm + '_' + fmtD(new Date()).replace(/-/g, '');
+  return nm + '_' + fmtD(new Date());
 }
 /* JSON 导出沿用旧文件名格式：{project}-gantt-YYYYMMDD */
 function fileBaseJSON(){
   var nm = (state.projectName || '').trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
-  return (nm ? nm + '-' : '') + 'gantt-' + fmtD(new Date()).replace(/-/g, '');
+  return fileBase();
 }
 function downloadURL(url, filename){
   var a = document.createElement('a');
