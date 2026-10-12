@@ -530,6 +530,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 /* 细滚动条 */
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);border-radius:10px;border:3px solid transparent;background-clip:content-box}::-webkit-scrollbar-thumb:hover{background-color:rgba(0,0,0,.35)}::-webkit-scrollbar-track{background:transparent}
 html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,255,.22)}
+
+/* 移动 ▾：去掉原生箭头，文字居中，与按钮一致 */
+#msp2Bar select.m2-mv{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:none;width:auto;min-width:64px;padding:0 10px!important;text-align:center;text-align-last:center;line-height:normal;cursor:pointer}
+#msp2Bar select.m2-mv option{text-align:left}
 </style>
 <script>if(window.self !== window.top) document.documentElement.className += " embed";</script>
 </head>
