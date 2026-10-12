@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ProjectPilot</title>
+<title>汽车零部件项目甘特图</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#eef1f5;color:#1f2937}
@@ -96,7 +96,7 @@ button,input,select,textarea{font-family:inherit!important;letter-spacing:inheri
 <body>
 <div id="top">
   <button class="tb" id="btnSide" title="收起/展开左侧">◀</button>
-  <h1 data-t="title">ProjectPilot</h1>
+  <h1 data-t="title">汽车零部件开发计划</h1>
   <label class="oemwrap" id="oemWrap"><span data-t="stepOem">客户</span><select id="oemSel" aria-label="OEM"><option value="">…</option></select></label>
   <input id="projName" type="text" placeholder="项目名称（例如：XX车型项目）">
   <span class="arrow">→</span>
@@ -106,7 +106,7 @@ button,input,select,textarea{font-family:inherit!important;letter-spacing:inheri
     <button data-view="exec" data-t="tabExec">③ 开发任务</button>
   </div>
   <span class="sp"></span>
-  <a class="tb" id="lnkV4" href="v4/" data-t="toV4">开发任务 v4 ↗</a>
+  <a class="tb" id="lnkV4" href="v4/" data-t="toV4">ProjectPilot ↗</a>
   <span class="tsep"></span>
   <button class="tb" id="btnPv" data-t="pv">预览</button>
   <div class="dd" id="ddExp"><button class="tb" id="btnExpDd"><span data-t="expDd">导出</span> ▾</button>
@@ -140,15 +140,15 @@ button,input,select,textarea{font-family:inherit!important;letter-spacing:inheri
    两个视图实时联动：改客户节点 → 项目甘特图里的里程碑和推荐任务自动更新；在项目甘特图里拖动客户里程碑 → 节点日期自动回写。 */
 var KEYS = ["gantt-tool-v1", "gantt-exec-v1", "gantt-workcal-v1"];
 var T = {
-  zh:{title:"ProjectPilot", toV4:"开发任务 v4 ↗", pnPh:"项目名称（例如：XX车型项目）", stepOem:"客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
+  zh:{title:"汽车零部件开发计划", toV4:"ProjectPilot ↗", pnPh:"项目名称（例如：XX车型项目）", stepOem:"客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
       hintPlan:"在这里选择客户（主机厂）并填写客户节点日期；本页导出即给主机厂的节点报告。",
       hintExec:"还没有客户节点日期：先到「② 客户节点」填日期，或者直接在这里加任务、载入模板。",
       clrAsk:"清空整个项目（客户节点、任务、工作日历）？", impOk:"项目已导入", impBad:"不是有效的项目文件", expOk:"项目已导出"},
-  en:{title:"ProjectPilot", toV4:"Dev tasks v4 ↗", pnPh:"Project name (e.g. XX model project)", stepOem:"Customer", tabExec:"③ Development Tasks", tabPlan:"② Customer Milestones", hintOem:"Step 1: pick the customer (OEM) at top left, then enter customer milestone dates, then plan development tasks.", oemAsk:"Switching customer clears the milestone dates entered (your own tasks are kept). Continue?", exp:"Export project", imp:"Import project", clr:"Clear",
+  en:{title:"Automotive Parts Devt. Plan", toV4:"ProjectPilot ↗", pnPh:"Project name (e.g. XX model project)", stepOem:"Customer", tabExec:"③ Development Tasks", tabPlan:"② Customer Milestones", hintOem:"Step 1: pick the customer (OEM) at top left, then enter customer milestone dates, then plan development tasks.", oemAsk:"Switching customer clears the milestone dates entered (your own tasks are kept). Continue?", exp:"Export project", imp:"Import project", clr:"Clear",
       hintPlan:"Pick the customer (OEM) and enter customer milestone dates; this page exports the milestone report for the OEM.",
       hintExec:"No customer milestone dates yet: fill them in under ② Customer Milestones, or add tasks / load a template here.",
       clrAsk:"Clear the whole project (milestones, tasks, calendar)?", impOk:"Project imported", impBad:"Not a valid project file", expOk:"Project exported"},
-  de:{title:"ProjectPilot", toV4:"Entwicklung v4 ↗", pnPh:"Projektname (z. B. Projekt Modell XX)", stepOem:"Kunde", tabExec:"③ Entwicklungsaufgaben", tabPlan:"② Kundenmeilensteine", hintOem:"Schritt 1: oben links den Kunden (OEM) wählen, dann Kundenmeilensteine eintragen, dann Entwicklungsaufgaben planen.", oemAsk:"Kundenwechsel löscht die eingetragenen Meilensteindaten (eigene Aufgaben bleiben). Fortfahren?", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
+  de:{title:"Entwicklungsplan Autoteile", toV4:"ProjectPilot ↗", pnPh:"Projektname (z. B. Projekt Modell XX)", stepOem:"Kunde", tabExec:"③ Entwicklungsaufgaben", tabPlan:"② Kundenmeilensteine", hintOem:"Schritt 1: oben links den Kunden (OEM) wählen, dann Kundenmeilensteine eintragen, dann Entwicklungsaufgaben planen.", oemAsk:"Kundenwechsel löscht die eingetragenen Meilensteindaten (eigene Aufgaben bleiben). Fortfahren?", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
       hintPlan:"Kunden (OEM) wählen und Meilensteintermine eintragen; dieser Export ist der Meilensteinbericht für den OEM.",
       hintExec:"Noch keine Meilensteindaten: unter ② Kundenmeilensteine eintragen oder hier Aufgaben anlegen / Vorlage laden.",
       clrAsk:"Gesamtes Projekt leeren (Meilensteine, Aufgaben, Kalender)?", impOk:"Projekt importiert", impBad:"Keine gültige Projektdatei", expOk:"Projekt exportiert"}
