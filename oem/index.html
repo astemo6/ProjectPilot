@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汽车零部件项目甘特图</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#eef1f5;color:#1f2937}
+#top{height:48px;background:#1e3a52;color:#fff;display:flex;align-items:center;gap:8px;padding:0 12px;overflow-x:auto;white-space:nowrap}
+#top h1{font-size:15px;font-weight:600;margin-right:6px}
+.tabs{display:flex;gap:4px}
+.tabs button,.tb{border:1px solid #4b6a85;background:#2b4d6a;color:#fff;border-radius:6px;padding:0 14px;height:32px;min-height:32px;font-size:13px;cursor:pointer}
+.tabs button.on{background:#fff;color:#1e3a52;border-color:#fff;font-weight:600}
+.tb:hover,.tabs button:hover{background:#3a6283}
+.tabs button.on:hover{background:#fff}
+.sp{flex:1}
+.oemwrap{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.oemwrap select{height:32px;box-sizing:border-box;border-radius:6px;border:1px solid #5b7a94;background:#2b4d6a;color:#fff;font-size:13px;padding:0 8px;max-width:220px}
+.oemwrap select option{background:#fff;color:#1f2937}
+#top button,#top input,#top select,#top a.tb{box-sizing:border-box}
+.oemwrap.need select{outline:3px solid #fbbf24;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:rgba(251,191,36,.25)}}
+.arrow{opacity:.55;font-size:13px}
+.tabs{align-items:center}
+.lang button{padding:0 9px}
+.lang button.on,.tabs.lang button.on:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+#hint{display:none;background:#fff7e6;color:#92400e;font-size:12px;padding:5px 14px;border-bottom:1px solid #fde3b0}
+#hint.show{display:block}
+#stage{position:relative;height:calc(100% - 48px)}
+#hint.show + #stage{height:calc(100% - 48px - 27px)}
+#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+#stage iframe.off{left:-20000px;visibility:hidden}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+#toast.show{opacity:.92}
+@media (max-width:700px){
+  #top{height:auto;min-height:52px;flex-wrap:wrap;padding:6px 8px;white-space:normal}
+  #top h1{display:none}
+  .tabs button,.tb{height:44px;min-height:44px;min-width:44px}
+  .oemwrap select{height:44px}
+  .arrow{display:none}
+  #stage{height:calc(100% - 108px)}
+  #hint.show + #stage{height:calc(100% - 135px)}
+}
+/* 2026-10-11：根目录只保留 OEM 客户节点页，开发任务页移除（开发任务改用 v4） */
+#top .arrow,#top .tabs:not(.lang){display:none!important}
+#fExec{display:none!important}
+#projName{background:#2b4d6a;border:1px solid #5b7a94;color:#fff;border-radius:6px;padding:0 10px;height:32px;width:220px;font-size:13px}
+#projName::placeholder{color:#a9bccd}
+#btnSide{width:32px;padding:0}
+a.tb{display:inline-flex;align-items:center;text-decoration:none}
+</style>
+<style id="macStyle">
+/* ===== v3.8：macOS 风格顶栏 + 控件字体统一 ===== */
+html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Helvetica Neue","Microsoft YaHei","Noto Sans CJK SC",sans-serif!important;background:#f5f5f7;color:#1d1d1f;-webkit-font-smoothing:antialiased;letter-spacing:.01em}
+button,input,select,textarea{font-family:inherit!important;letter-spacing:inherit}
+#top{background:rgba(246,246,248,.86);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);color:#1d1d1f;border-bottom:1px solid rgba(0,0,0,.12)}
+#top h1{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.oemwrap{font-size:12px;font-weight:500;color:#424245}
+.tabs button,.tb,#top a.tb{background:#fff;color:#1d1d1f;border:.5px solid rgba(0,0,0,.14);box-shadow:0 .5px 1.5px rgba(0,0,0,.1);border-radius:7px;height:28px;min-height:28px;font-size:12px;font-weight:500;line-height:1.2;padding:0 12px;display:inline-flex;align-items:center;justify-content:center}
+.tb:hover,.tabs button:hover,#top a.tb:hover{background:#f6f6f6}
+.tb:active{background:#e9e9eb}
+#btnSide{width:28px;padding:0}
+.oemwrap select,#projName{height:28px;background:rgba(0,0,0,.06);border:1px solid transparent;color:#1d1d1f;border-radius:7px;font-size:13px}
+.oemwrap select{background:#fff;border:.5px solid rgba(0,0,0,.14);box-shadow:0 .5px 1.5px rgba(0,0,0,.1);font-weight:500}
+#projName::placeholder{color:#86868b}
+#projName:focus,.oemwrap select:focus{outline:none;background:#fff;border-color:#007aff;box-shadow:0 0 0 3px rgba(0,122,255,.25)}
+.oemwrap.need select{outline:none;animation:macPulse 1.4s ease-in-out infinite}
+@keyframes macPulse{0%,100%{box-shadow:0 0 0 3px rgba(0,122,255,.45)}50%{box-shadow:0 0 0 3px rgba(0,122,255,.1)}}
+.tabs.lang{gap:0;background:rgba(0,0,0,.06);border-radius:8px;padding:2px}
+.tabs.lang button{background:transparent;border:none;box-shadow:none;color:#424245;height:24px;min-height:24px;padding:0 9px}
+.tabs.lang button.on,.tabs.lang button.on:hover{background:#fff;color:#1d1d1f;border:none;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+#hint{background:rgba(0,122,255,.08);color:#0058b9;border-bottom:1px solid rgba(0,122,255,.15)}
+#toast{background:rgba(29,29,31,.88);border-radius:10px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+@media (max-width:700px){.tabs button,.tb{height:40px;min-height:40px;min-width:40px}.oemwrap select{height:40px}}
+
+/* v3.9 顶栏一行布局 */
+#top{overflow:visible;position:relative;z-index:30}
+.tsep{width:1px;height:18px;background:rgba(0,0,0,.12);margin:0 2px}
+#top .dd{position:relative;display:inline-flex}
+#top .ddm{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:200px;background:rgba(255,255,255,.95);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);border:.5px solid rgba(0,0,0,.14);border-radius:10px;padding:5px;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:50;flex-direction:column;gap:1px}
+#top .ddm.ddr{left:auto;right:0}
+#top .dd.open .ddm{display:flex}
+#top .ddm>button{all:unset;box-sizing:border-box;display:flex;align-items:center;height:26px;padding:0 10px;border-radius:5px;font-size:13px;color:#1d1d1f;cursor:pointer;white-space:nowrap;font-family:inherit}
+#top .ddm>button:hover{background:#007aff;color:#fff}
+#top .ddm>button.danger{color:#d70015}#top .ddm>button.danger:hover{background:#d70015;color:#fff}
+#top .ddm hr{border:none;border-top:1px solid rgba(0,0,0,.08);margin:4px 6px}
+#top .ddlab{font-size:11px;color:#86868b;padding:2px 10px 4px}
+#top .ddm .tabs.lang{margin:0 6px 2px;display:flex}#top .ddm .tabs.lang button{flex:1}
+#btnExpDd{gap:4px}
+@media (max-width:700px){.tsep{display:none}}
+#btnMore{width:32px;padding:0;font-size:16px;letter-spacing:0}
+#stage{height:calc(100% - 48px)}
+</style>
+</head>
+<body>
+<div id="top">
+  <button class="tb" id="btnSide" title="收起/展开左侧">◀</button>
+  <h1 data-t="title">汽车零部件开发计划</h1>
+  <label class="oemwrap" id="oemWrap"><span data-t="stepOem">客户</span><select id="oemSel" aria-label="OEM"><option value="">…</option></select></label>
+  <input id="projName" type="text" placeholder="项目名称（例如：XX车型项目）">
+  <span class="arrow">→</span>
+  <div class="tabs">
+    <button data-view="plan" data-t="tabPlan">② 客户节点</button>
+    <span class="arrow">→</span>
+    <button data-view="exec" data-t="tabExec">③ 开发任务</button>
+  </div>
+  <span class="sp"></span>
+  <a class="tb" id="lnkV4" href="../" data-t="toV4">ProjectPilot ↗</a>
+  <span class="tsep"></span>
+  <button class="tb" id="btnPv" data-t="pv">预览</button>
+  <div class="dd" id="ddExp"><button class="tb" id="btnExpDd"><span data-t="expDd">导出</span> ▾</button>
+    <div class="ddm">
+      <button data-px="btnPDF" data-t="expPdf">导出 PDF</button>
+      <button data-px="btnJPG" data-t="expJpg">导出 JPG</button>
+      <hr>
+      <button id="btnExp" data-t="expProj">导出项目文件（JSON）</button>
+    </div></div>
+  <button class="tb" id="btnImp" data-t="imp">导入</button>
+  <div class="dd" id="ddMore"><button class="tb" id="btnMore" title="更多">⋯</button>
+    <div class="ddm ddr">
+      <div class="ddlab" data-t="lng">语言</div>
+      <div class="tabs lang"><button class="tb" data-lang="zh">中文</button><button class="tb" data-lang="en">EN</button><button class="tb" data-lang="de">DE</button></div>
+      <hr>
+      <button data-px="btnSample" data-t="sample">载入示例日期</button>
+      <hr>
+      <button id="btnClr" class="danger" data-t="clr">清空项目…</button>
+    </div></div>
+  <input type="file" id="fileImp" accept=".json,application/json" style="display:none">
+</div>
+<div id="hint"></div>
+<div id="stage">
+  <iframe id="fExec" title="项目甘特图"></iframe>
+  <iframe id="fPlan" title="客户节点"></iframe>
+</div>
+<div id="toast"></div>
+<script>
+(function(){
+/* 一个项目 = 三份本地数据：客户节点(gantt-tool-v1)、执行任务(gantt-exec-v1)、工作日历(gantt-workcal-v1)。
+   两个视图实时联动：改客户节点 → 项目甘特图里的里程碑和推荐任务自动更新；在项目甘特图里拖动客户里程碑 → 节点日期自动回写。 */
+var KEYS = ["gantt-tool-v1", "gantt-exec-v1", "gantt-workcal-v1"];
+var T = {
+  zh:{title:"汽车零部件开发计划", toV4:"ProjectPilot ↗", pnPh:"项目名称（例如：XX车型项目）", stepOem:"客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
+      hintPlan:"在这里选择客户（主机厂）并填写客户节点日期；本页导出即给主机厂的节点报告。",
+      hintExec:"还没有客户节点日期：先到「② 客户节点」填日期，或者直接在这里加任务、载入模板。",
+      clrAsk:"清空整个项目（客户节点、任务、工作日历）？", impOk:"项目已导入", impBad:"不是有效的项目文件", expOk:"项目已导出"},
+  en:{title:"Automotive Parts Devt. Plan", toV4:"ProjectPilot ↗", pnPh:"Project name (e.g. XX model project)", stepOem:"Customer", tabExec:"③ Development Tasks", tabPlan:"② Customer Milestones", hintOem:"Step 1: pick the customer (OEM) at top left, then enter customer milestone dates, then plan development tasks.", oemAsk:"Switching customer clears the milestone dates entered (your own tasks are kept). Continue?", exp:"Export project", imp:"Import project", clr:"Clear",
+      hintPlan:"Pick the customer (OEM) and enter customer milestone dates; this page exports the milestone report for the OEM.",
+      hintExec:"No customer milestone dates yet: fill them in under ② Customer Milestones, or add tasks / load a template here.",
+      clrAsk:"Clear the whole project (milestones, tasks, calendar)?", impOk:"Project imported", impBad:"Not a valid project file", expOk:"Project exported"},
+  de:{title:"Entwicklungsplan Autoteile", toV4:"ProjectPilot ↗", pnPh:"Projektname (z. B. Projekt Modell XX)", stepOem:"Kunde", tabExec:"③ Entwicklungsaufgaben", tabPlan:"② Kundenmeilensteine", hintOem:"Schritt 1: oben links den Kunden (OEM) wählen, dann Kundenmeilensteine eintragen, dann Entwicklungsaufgaben planen.", oemAsk:"Kundenwechsel löscht die eingetragenen Meilensteindaten (eigene Aufgaben bleiben). Fortfahren?", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
+      hintPlan:"Kunden (OEM) wählen und Meilensteintermine eintragen; dieser Export ist der Meilensteinbericht für den OEM.",
+      hintExec:"Noch keine Meilensteindaten: unter ② Kundenmeilensteine eintragen oder hier Aufgaben anlegen / Vorlage laden.",
+      clrAsk:"Gesamtes Projekt leeren (Meilensteine, Aufgaben, Kalender)?", impOk:"Projekt importiert", impBad:"Keine gültige Projektdatei", expOk:"Projekt exportiert"}
+};
+/* 预览模式（沙箱里无 localStorage）：由构建脚本注入 INLINE 应用和内存存储 */
+var INLINE = window.__INLINE_APPS__ || null;
+var mem = {};
+function lsOk(){ try{ var k = "__t"; localStorage.setItem(k, "1"); localStorage.removeItem(k); return true; }catch(e){ return false; } }
+var PREVIEW = !!INLINE || !lsOk();
+function getK(k){ if(PREVIEW) return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function setK(k, v){ if(PREVIEW){ if(v === null) delete mem[k]; else mem[k] = v; return; } try{ if(v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} }
+
+var lang = getK("gantt-shell-lang") || "zh";
+var view = "plan", curOem = "", oemList = null;
+function curOemFromStore(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return (p && p.oem) || ""; }catch(e){ return ""; } }
+curOem = curOemFromStore();
+var fExec = document.getElementById("fExec"), fPlan = document.getElementById("fPlan");
+function $(id){ return document.getElementById(id); }
+function tr(k){ return (T[lang] || T.zh)[k] || T.zh[k] || k; }
+function toast(m){ var t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("show"); }, 1800); }
+function hasNodes(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return !!(p && p.oem && Object.keys(p.dates || {}).some(function(k){ return p.dates[k]; })); }catch(e){ return false; } }
+
+function post(f, msg){ try{ f.contentWindow.postMessage(msg, "*"); }catch(e){} }
+
+/* v3.9：顶栏合并为一行——预览 / 导出 ▾ / 导入 / ⋯（语言、示例、清空） */
+Object.assign(T.zh, {pv:"预览", expDd:"导出", expPdf:"导出 PDF", expJpg:"导出 JPG", expProj:"导出项目文件（JSON）", imp:"导入", lng:"语言", sample:"载入示例日期", clr:"清空项目…"});
+Object.assign(T.en, {pv:"Preview", expDd:"Export", expPdf:"Export PDF", expJpg:"Export JPG", expProj:"Export project file (JSON)", imp:"Import", lng:"Language", sample:"Load sample dates", clr:"Clear project…"});
+Object.assign(T.de, {pv:"Vorschau", expDd:"Export", expPdf:"PDF exportieren", expJpg:"JPG exportieren", expProj:"Projektdatei exportieren (JSON)", imp:"Import", lng:"Sprache", sample:"Beispieldaten laden", clr:"Projekt leeren…"});
+function pxClick(id){ var d = pdoc(), b = d && d.getElementById(id); if(b) b.click(); }
+function closeDd(){ document.querySelectorAll("#top .dd.open").forEach(function(x){ x.classList.remove("open"); }); }
+document.querySelectorAll("#top .dd > .tb").forEach(function(b){
+  b.addEventListener("click", function(e){ e.stopPropagation(); var dd = b.parentNode, was = dd.classList.contains("open"); closeDd(); if(!was) dd.classList.add("open"); });
+});
+document.querySelectorAll("#top .ddm").forEach(function(m){ m.addEventListener("click", function(e){ if(e.target.closest("button")) setTimeout(closeDd, 0); else e.stopPropagation(); }); });
+document.addEventListener("click", closeDd);
+window.addEventListener("blur", closeDd); /* 点进下方 iframe 时收起菜单 */
+document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeDd(); });
+document.querySelectorAll("#top [data-px]").forEach(function(b){ b.addEventListener("click", function(){ pxClick(b.getAttribute("data-px")); }); });
+document.getElementById("btnPv").addEventListener("click", function(){ pxClick("btnPreview"); });
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(function(el){ el.textContent = tr(el.getAttribute("data-t")); });
+  var _pn = document.getElementById("projName"); if(_pn) _pn.placeholder = tr("pnPh");
+  document.querySelectorAll(".lang button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-lang") === lang); });
+  document.title = tr("title");
+  updateHint();
+}
+function updateHint(){
+  var h = $("hint"), txt = "";
+  if(!curOem) txt = tr("hintOem");
+  else if(view === "plan") txt = ""; /* 2026-10-11：用户要求去掉本页提示条 */
+  else if(!hasNodes()) txt = tr("hintExec");
+  $("oemWrap").classList.toggle("need", !curOem);
+  h.textContent = txt; h.classList.toggle("show", !!txt);
+}
+function show(v){
+  v = "plan"; view = v;
+  fExec.classList.toggle("off", v !== "exec");
+  fPlan.classList.toggle("off", v !== "plan");
+  document.querySelectorAll("#top .tabs:not(.lang) button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-view") === v); });
+  updateHint();
+  post(v === "exec" ? fExec : fPlan, { t:"resize" });
+}
+
+/* ---- 加载两个视图 ---- */
+var SHIM = window.__INLINE_SHIM__ || "";
+function srcdocFor(app){
+  var html = INLINE[app];
+  var pre = "<script>window.__PREVIEW_STORE=" + JSON.stringify(mem).replace(/</g, "\\u003c") + ";<\/script>" + SHIM;
+  var i = html.indexOf("<head>");
+  return i >= 0 ? html.slice(0, i + 6) + pre + html.slice(i + 6) : pre + html;
+}
+function loadFrames(){
+  if(INLINE){ fPlan.srcdoc = srcdocFor("plan"); }
+  else { var q = "?lang=" + lang + "&v=" + Date.now(); fPlan.src = "plan.html" + q; }
+}
+/* 客户节点页自身的标题行（◀ / 标题 / 项目名称 / 语言）合并到本页顶栏 */
+var pn = document.getElementById("projName");
+function pdoc(){ try { return fPlan.contentDocument; } catch(e){ return null; } }
+function mergePlanHeader(){
+  var d = pdoc(); if(!d || !d.head) return;
+  if(!d.getElementById("v3merge")){ var st = d.createElement("style"); st.id = "v3merge"; st.textContent = ".toprow,.subbar{display:none!important}"; d.head.appendChild(st); }
+  var src = d.getElementById("projectName"); if(src && document.activeElement !== pn) pn.value = src.value || "";
+}
+pn.addEventListener("input", function(){ var d = pdoc(), src = d && d.getElementById("projectName"); if(src){ src.value = pn.value; src.dispatchEvent(new Event("input", { bubbles:true })); src.dispatchEvent(new Event("change", { bubbles:true })); } });
+pn.addEventListener("keydown", function(e){ if(e.key === "Enter") pn.blur(); });
+/* v3.8：焦点在外层时按 Esc 也能关闭页内预览/弹窗 */
+document.addEventListener("keydown", function(e){ if(e.key !== "Escape") return; try{ var w = $("fPlan").contentWindow; w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key:"Escape", bubbles:true })); }catch(err){} });
+document.getElementById("btnSide").addEventListener("click", function(){ var d = pdoc(), b = d && d.getElementById("btnSidebar"); if(b){ b.click(); this.textContent = this.textContent === "◀" ? "▶" : "◀"; } });
+fPlan.addEventListener("load", function(){ mergePlanHeader(); setTimeout(mergePlanHeader, 300); });
+[fExec, fPlan].forEach(function(f){ f.addEventListener("load", function(){ post(f, { t:"lang", v:lang }); if(f === fPlan) post(f, { t:"hello" }); updateHint(); }); });
+
+/* 预览模式：一个视图写数据 → 转发给另一个视图（触发它的 storage 事件），保持两边一致 */
+function renderOems(){
+  var sel = $("oemSel");
+  if(oemList) sel.innerHTML = oemList.map(function(o){ return '<option value="' + String(o.v).replace(/"/g, "&quot;") + '">' + String(o.l).replace(/</g, "&lt;") + "</option>"; }).join("");
+  sel.value = curOem;
+}
+window.addEventListener("message", function(e){
+  var d = e.data || {};
+  if(d.t === "oems"){ oemList = d.list || []; curOem = d.cur || ""; renderOems(); updateHint(); return; }
+  if(d.t !== "ls") return;
+  if(getK(d.k) === d.v) return;
+  setK(d.k, d.v);
+  var other = e.source === fExec.contentWindow ? fPlan : fExec;
+  post(other, { t:"ls-in", k:d.k, v:d.v });
+  updateHint();
+});
+if(!PREVIEW) window.addEventListener("storage", function(){ curOem = curOemFromStore(); renderOems(); updateHint(); });
+
+/* ---- 顶栏 ---- */
+document.querySelectorAll("#top .tabs:not(.lang) button").forEach(function(b){ b.addEventListener("click", function(){ show(b.getAttribute("data-view")); }); });
+$("oemSel").addEventListener("change", function(){
+  var v = this.value;
+  if(curOem && v !== curOem && hasNodes() && !confirm(tr("oemAsk"))){ this.value = curOem; return; }
+  curOem = v; updateHint();
+  post(fPlan, { t:"oem", v:v });
+  show("plan");
+});
+document.querySelectorAll(".lang button").forEach(function(b){
+  b.addEventListener("click", function(){
+    lang = b.getAttribute("data-lang"); setK("gantt-shell-lang", lang); applyLang();
+    post(fExec, { t:"lang", v:lang }); post(fPlan, { t:"lang", v:lang });
+  });
+});
+function projName(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return ((p && p.projectName) || "").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 40); }catch(e){ return ""; } }
+$("btnExp").addEventListener("click", function(){
+  var data = { app:"gantt-project", version:3, savedAt:new Date().toISOString() };
+  KEYS.forEach(function(k){ var v = getK(k); data[k] = v ? JSON.parse(v) : null; });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type:"application/json" }));
+  var _d = new Date(), _p = function(n){ return (n < 10 ? "0" : "") + n; };
+  a.download = (projName() || ((pdoc() && pdoc().querySelector(".brand")) || {}).textContent || "gantt-project").trim() + "_" + _d.getFullYear() + "-" + _p(_d.getMonth()+1) + "-" + _p(_d.getDate()) + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  toast(tr("expOk"));
+});
+$("btnImp").addEventListener("click", function(){ $("fileImp").click(); });
+$("fileImp").addEventListener("change", function(){
+  var f = this.files && this.files[0]; this.value = "";
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    var d = null; try{ d = JSON.parse(r.result); }catch(e){}
+    if(!d){ toast(tr("impBad")); return; }
+    if(d.app === "gantt-project"){ KEYS.forEach(function(k){ setK(k, d[k] ? JSON.stringify(d[k]) : null); }); }
+    else if(d.app === "gantt-exec" && d.state){ /* 旧执行页 JSON */ setK("gantt-exec-v1", JSON.stringify(d.state)); }
+    else if(d.oem !== undefined && d.dates){ /* 旧里程碑计划 JSON */ setK("gantt-tool-v1", JSON.stringify(d)); }
+    else { toast(tr("impBad")); return; }
+    curOem = curOemFromStore(); renderOems();
+    loadFrames(); toast(tr("impOk"));
+    setTimeout(function(){ show(hasNodes() ? "exec" : "plan"); }, 300);
+  };
+  r.readAsText(f);
+});
+$("btnClr").addEventListener("click", function(){
+  if(!confirm(tr("clrAsk"))) return;
+  KEYS.forEach(function(k){ setK(k, null); });
+  curOem = ""; renderOems();
+  loadFrames(); show("plan");
+});
+
+window.__shell = { mem:mem, srcdocFor:srcdocFor, show:show }; /* 调试/测试用 */
+applyLang();
+loadFrames();
+show(hasNodes() ? "exec" : "plan");
+})();
+</script>
+</body>
+</html>
