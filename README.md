@@ -1,26 +1,30 @@
-# 汽车零部件开发计划（v3）
+# ProjectPilot
 
-选择主机厂、填写客户节点日期，自动生成给主机厂的节点甘特图。
+项目计划排程工具（任务、资源、进度跟踪），对标 MS Project / GanttProject。单页应用，数据保存在本机浏览器。
 
 - 在线地址：https://astemo6.github.io/ProjectPilot/
-- 完整排程工具：顶栏「ProjectPilot ↗」进入 v4
+- 界面语言：中文 / English / Deutsch；浅色 / 深色 / 跟随系统
 
 ## 主要功能
 
-- 16 家主机厂的客户节点模板及节点说明
-- 阶段色带（APQP 等）、推荐任务、供应商节点、自定义任务
-- 日期倒置标红；节点密集时标签自动错开
-- 预览，导出 PDF / JPG（可加 Logo、制作者、日期）
-- 项目文件导出 / 导入（JSON）
-- 中文 / English / Deutsch；中国节假日与调休
+- **任务**：分组、里程碑、手动/自动排程、FS/SS/FF/SF 依赖与延隔、约束、期限、停用任务、周期性任务、备注与超链接
+- **资源与成本**：资源工作表、分配、工时、成本、资源调配
+- **跟踪**：基线 0–10、完成百分比、挣值、关键路径、延迟/可宽延显示
+- **视图**：甘特图、日历、网络图、日程表、任务窗体；分组、筛选、突出显示、大纲数字
+- **工作日历**：中国法定节假日与调休，自定义日历
+- **客户里程碑**：选主机厂，勾选节点并填日期，插入为固定里程碑
+- **导入**：MS Project XML、MPP（经转换服务）、GanttProject .gan / CSV、JSON
+- **导出**：PDF / JPG（MS Project 打印样式）、XML、GanttProject .gan、CSV、Excel、JSON
+- **操作**：Ribbon 功能区、快速访问工具栏、右键菜单、撤销/重做、快捷键（F1 查看）
 
 ## 最近更新
 
-- v3.10：v4 入口改名为「ProjectPilot ↗」
-- v3.9：顶栏合并为一行（预览 / 导出 ▾ / 导入 / ⋯）
-- v3.8：macOS 风格界面；修复里程碑标签重叠、Esc 关预览、导出文件名统一
+- 2026-10-12：根地址直接打开 ProjectPilot；OEM-Gantt移到 /oem/
+- 2026-10-12：工具定名 ProjectPilot；macOS 风格界面，按钮字体与尺寸统一
+- 2026-10-12：所有对话框可按 Esc 关闭
+- 2026-10-11：GanttProject 导入/导出；备注与超链接；右键菜单
 
-## 文件
+## 说明
 
-- `index.html` 外壳与顶栏，`plan.html` 客户节点页，`workcal.js` 工作日历
-- 数据保存在本机浏览器（`gantt-tool-v1`）
+- OEM-Gantt（客户节点图）：https://astemo6.github.io/ProjectPilot/oem/
+- 数据保存在本机浏览器，与OEM-Gantt互不影响
