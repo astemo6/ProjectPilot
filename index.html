@@ -534,6 +534,9 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 /* 移动 ▾：去掉原生箭头，文字居中，与按钮一致 */
 #msp2Bar select.m2-mv{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:none;width:auto;min-width:64px;padding:0 10px!important;text-align:center;text-align-last:center;line-height:normal;cursor:pointer}
 #msp2Bar select.m2-mv option{text-align:left}
+
+/* 对话框内下拉框不因长选项撑宽对话框 */
+.modal select{max-width:100%}
 </style>
 <script>if(window.self !== window.top) document.documentElement.className += " embed";</script>
 </head>
@@ -5099,14 +5102,14 @@ function v4ExpPlan(){
   function openDlg(){
     var S = state.textStyle || {}, bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "txtStyleBg";
     function row(k){ var s = S[k] || {};
-      return '<div class="ts-row" data-k="' + k + '" style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 34px 40px;gap:6px;align-items:center;margin-bottom:8px">'
-        + '<span style="font-size:13px">' + L(k) + '</span><select class="ts-f">' + fontOpts(s.f || "") + '</select><select class="ts-s">' + sizeOpts(s.s || "") + '</select>'
+      return '<div class="ts-row" data-k="' + k + '" style="display:grid;grid-template-columns:88px minmax(0,1fr) 64px 34px 34px 34px 40px;gap:6px;align-items:center;margin-bottom:8px">'
+        + '<span style="font-size:13px">' + L(k) + '</span><select class="ts-f" style="width:100%;min-width:0">' + fontOpts(s.f || "") + '</select><select class="ts-s" style="width:100%;min-width:0">' + sizeOpts(s.s || "") + '</select>'
         + '<label title="' + L("bold") + '" style="display:flex;align-items:center;gap:2px;font-weight:700"><input type="checkbox" class="ts-b" style="width:auto"' + (s.b ? " checked" : "") + '>B</label>'
         + '<label title="' + L("ital") + '" style="display:flex;align-items:center;gap:2px;font-style:italic;font-family:serif"><input type="checkbox" class="ts-i" style="width:auto"' + (s.i ? " checked" : "") + '>I</label>'
         + '<label title="' + L("strike") + '" style="display:flex;align-items:center;gap:2px;text-decoration:line-through"><input type="checkbox" class="ts-k" style="width:auto"' + (s.k ? " checked" : "") + '>S</label>'
         + '<input type="color" class="ts-c" value="' + (s.c || "#1f2937") + '" data-set="' + (s.c ? 1 : 0) + '" style="width:40px;height:28px;padding:0;border:1px solid var(--line);border-radius:4px"></div>'; }
-    bg.innerHTML = '<div class="modal" style="width:520px"><div class="modal-h"><span>' + L("t") + '</span><button class="ts-x">×</button></div><div class="modal-b">'
-      + '<div style="display:grid;grid-template-columns:96px 1fr 64px 34px 34px 34px 40px;gap:6px;font-size:11px;color:#6b7280;margin-bottom:6px"><span></span><span>' + L("font") + '</span><span>' + L("size") + '</span><span>B</span><span>I</span><span>S</span><span>A</span></div>'
+    bg.innerHTML = '<div class="modal" style="width:560px;overflow-x:hidden"><div class="modal-h"><span>' + L("t") + '</span><button class="ts-x">×</button></div><div class="modal-b">'
+      + '<div style="display:grid;grid-template-columns:88px minmax(0,1fr) 64px 34px 34px 34px 40px;gap:6px;font-size:11px;color:#6b7280;margin-bottom:6px"><span></span><span>' + L("font") + '</span><span>' + L("size") + '</span><span>B</span><span>I</span><span>S</span><span>A</span></div>'
       + ["task","ms","sum"].map(row).join("")
       + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:6px 0"><input type="checkbox" class="ts-clr" style="width:auto">' + L("clr") + '</label>'
       + '<div style="font-size:11px;color:#6b7280;margin:8px 0 12px">' + L("hint") + '</div>'
