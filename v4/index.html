@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>项目开发甘特图 v4</title>
+<title>ProjectPilot</title>
 <style>
 :root{
   --steel:#1e3a52; --steel2:#2b4d6a; --steel3:#3a6283; --accent:#2563eb;
@@ -535,7 +535,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1 data-i18n="appTitle">项目开发甘特图</h1><span class="sub" id="appVer" title="版本 / Version">v4.11</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version">v4.12</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="https://astemo6.github.io/gantt-tool-v3/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM 开发计划 ↗</a>
@@ -710,7 +710,7 @@ function applyLang(){ if(typeof syncCalModeSel === "function" && document.getEle
   document.querySelectorAll("[data-i18n]").forEach(function(el){ el.textContent = tr(el.dataset.i18n); });
   document.querySelectorAll("[data-i18n-ph]").forEach(function(el){ el.placeholder = tr(el.dataset.i18nPh); });
   document.querySelectorAll(".langbtns button").forEach(function(b){ b.classList.toggle("on", b.dataset.lang === lang); });
-  document.title = tr("appTitle");
+  document.title = "ProjectPilot"; /* v4.12：工具名固定，不随语言切换 */
   if(typeof calMode !== "undefined" && calMode === "text") setCalMode("text");
 }
 function toast(m){ var t = document.getElementById("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(function(){ t.style.display = "none"; }, 2200); }
