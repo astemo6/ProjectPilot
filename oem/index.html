@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OEM-Gantt</title>
+<script>(function(){try{var p=localStorage.getItem("gantt-theme-v4")||"system";document.documentElement.dataset.theme=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"}catch(e){}})()</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#eef1f5;color:#1f2937}
@@ -91,6 +92,34 @@ button,input,select,textarea{font-family:inherit!important;letter-spacing:inheri
 @media (max-width:700px){.tsep{display:none}}
 #btnMore{width:32px;padding:0;font-size:16px;letter-spacing:0}
 #stage{height:calc(100% - 48px)}
+
+/* 主题 / 语言分段控件（与 ProjectPilot 一致，放在顶栏最右） */
+#top .seg,#top .tabs.lang{display:inline-flex;gap:0;background:rgba(0,0,0,.06);border-radius:8px;padding:2px;height:28px;align-items:center;flex-shrink:0}
+#top .seg button,#top .tabs.lang button{background:transparent;border:none;box-shadow:none;color:#424245;height:24px;min-height:24px;padding:0 9px;border-radius:6px;font-size:12px}
+#top .seg button.on,#top .tabs.lang button.on,#top .tabs.lang button.on:hover{background:#fff;color:#1d1d1f;box-shadow:0 1px 2px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06)}
+#top .seg button:hover,#top .tabs.lang button:hover{background:rgba(0,0,0,.05)}
+/* ===== 暗色 ===== */
+html[data-theme=dark]{color-scheme:dark}
+html[data-theme=dark],html[data-theme=dark] body{background:#1c1c1e;color:#f5f5f7}
+html[data-theme=dark] #top{background:rgba(40,40,42,.86);color:#f5f5f7;border-bottom-color:rgba(255,255,255,.12)}
+html[data-theme=dark] .tb,html[data-theme=dark] #top a.tb,html[data-theme=dark] .tabs button{background:#3a3a3c;color:#f5f5f7;border-color:rgba(255,255,255,.1);box-shadow:0 .5px 1px rgba(0,0,0,.4)}
+html[data-theme=dark] .tb:hover,html[data-theme=dark] #top a.tb:hover{background:#444446}
+html[data-theme=dark] .oemwrap{color:#d1d1d6}
+html[data-theme=dark] .oemwrap select{background:#3a3a3c;color:#f5f5f7;border-color:rgba(255,255,255,.1)}
+html[data-theme=dark] .oemwrap select option{background:#2c2c2e;color:#f5f5f7}
+html[data-theme=dark] #projName{background:rgba(255,255,255,.08);color:#f5f5f7}
+html[data-theme=dark] #projName::placeholder{color:#98989d}
+html[data-theme=dark] #projName:focus,html[data-theme=dark] .oemwrap select:focus{background:#2c2c2e;border-color:#0a84ff}
+html[data-theme=dark] .tsep{background:rgba(255,255,255,.14)}
+html[data-theme=dark] #top .ddm{background:rgba(44,44,46,.96);border-color:rgba(255,255,255,.12)}
+html[data-theme=dark] #top .ddm>button{color:#f5f5f7}
+html[data-theme=dark] #top .ddm>button:hover{background:#0a84ff;color:#fff}
+html[data-theme=dark] #top .ddm hr{border-top-color:rgba(255,255,255,.1)}
+html[data-theme=dark] #top .seg,html[data-theme=dark] #top .tabs.lang{background:rgba(255,255,255,.08)}
+html[data-theme=dark] #top .seg button,html[data-theme=dark] #top .tabs.lang button{background:transparent;color:#d1d1d6;box-shadow:none}
+html[data-theme=dark] #top .seg button.on,html[data-theme=dark] #top .tabs.lang button.on{background:#636366;color:#fff}
+html[data-theme=dark] #stage iframe{background:#1c1c1e}
+html[data-theme=dark] #hint{background:rgba(10,132,255,.14);color:#64b5ff;border-bottom-color:rgba(10,132,255,.25)}
 </style>
 </head>
 <body>
@@ -119,13 +148,13 @@ button,input,select,textarea{font-family:inherit!important;letter-spacing:inheri
   <button class="tb" id="btnImp" data-t="imp">导入</button>
   <div class="dd" id="ddMore"><button class="tb" id="btnMore" title="更多">⋯</button>
     <div class="ddm ddr">
-      <div class="ddlab" data-t="lng">语言</div>
-      <div class="tabs lang"><button class="tb" data-lang="zh">中文</button><button class="tb" data-lang="en">EN</button><button class="tb" data-lang="de">DE</button></div>
-      <hr>
       <button data-px="btnSample" data-t="sample">载入示例日期</button>
       <hr>
       <button id="btnClr" class="danger" data-t="clr">清空项目…</button>
     </div></div>
+  <span class="tsep"></span>
+  <div class="seg" id="themeBtns"><button type="button" class="tb" data-th="light" title="浅色">☀</button><button type="button" class="tb" data-th="dark" title="暗色">🌙</button><button type="button" class="tb" data-th="system" title="跟随系统">🖥</button></div>
+  <div class="tabs lang"><button class="tb" data-lang="zh">中文</button><button class="tb" data-lang="en">EN</button><button class="tb" data-lang="de">DE</button></div>
   <input type="file" id="fileImp" accept=".json,application/json" style="display:none">
 </div>
 <div id="hint"></div>
@@ -314,6 +343,27 @@ window.__shell = { mem:mem, srcdocFor:srcdocFor, show:show }; /* 调试/测试�
 applyLang();
 loadFrames();
 show(hasNodes() ? "exec" : "plan");
+})();
+</script>
+<script>
+/* 主题：浅色 / 暗色 / 跟随系统，与 ProjectPilot 共用偏好 gantt-theme-v4 */
+(function(){
+  var KEY = "gantt-theme-v4", mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null, f = document.getElementById("fPlan");
+  var TT = { zh:["浅色","暗色","跟随系统"], en:["Light","Dark","System"], de:["Hell","Dunkel","System"] };
+  function pref(){ var v = ""; try{ v = localStorage.getItem(KEY) || ""; }catch(e){} return /^(light|dark|system)$/.test(v) ? v : "system"; }
+  function eff(){ var p = pref(); return p === "system" ? (mq && mq.matches ? "dark" : "light") : p; }
+  function apply(){
+    var d = eff(); document.documentElement.dataset.theme = d;
+    var lg = document.documentElement.lang || "zh", tt = TT[lg] || TT.zh;
+    document.querySelectorAll("#themeBtns button").forEach(function(b, i){ b.classList.toggle("on", b.dataset.th === pref()); b.title = tt[i]; });
+    try{ var pd = f && f.contentDocument; if(pd && pd.documentElement){ pd.documentElement.dataset.theme = d; } }catch(e){}
+  }
+  document.querySelectorAll("#themeBtns button").forEach(function(b){ b.addEventListener("click", function(){ try{ localStorage.setItem(KEY, b.dataset.th); }catch(e){} apply(); }); });
+  if(mq){ var h = function(){ if(pref() === "system") apply(); }; if(mq.addEventListener) mq.addEventListener("change", h); else if(mq.addListener) mq.addListener(h); }
+  window.addEventListener("storage", function(e){ if(e.key === KEY) apply(); });
+  if(f) f.addEventListener("load", apply);
+  document.querySelectorAll(".lang button").forEach(function(b){ b.addEventListener("click", function(){ setTimeout(apply, 0); }); });
+  apply();
 })();
 </script>
 </body>
