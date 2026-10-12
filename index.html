@@ -50,6 +50,30 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe
 #btnSide{width:32px;padding:0}
 a.tb{display:inline-flex;align-items:center;text-decoration:none}
 </style>
+<style id="macStyle">
+/* ===== v3.8：macOS 风格顶栏 + 控件字体统一 ===== */
+html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Helvetica Neue","Microsoft YaHei","Noto Sans CJK SC",sans-serif!important;background:#f5f5f7;color:#1d1d1f;-webkit-font-smoothing:antialiased;letter-spacing:.01em}
+button,input,select,textarea{font-family:inherit!important;letter-spacing:inherit}
+#top{background:rgba(246,246,248,.86);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);color:#1d1d1f;border-bottom:1px solid rgba(0,0,0,.12)}
+#top h1{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.oemwrap{font-size:12px;font-weight:500;color:#424245}
+.tabs button,.tb,#top a.tb{background:#fff;color:#1d1d1f;border:.5px solid rgba(0,0,0,.14);box-shadow:0 .5px 1.5px rgba(0,0,0,.1);border-radius:7px;height:28px;min-height:28px;font-size:12px;font-weight:500;line-height:1.2;padding:0 12px;display:inline-flex;align-items:center;justify-content:center}
+.tb:hover,.tabs button:hover,#top a.tb:hover{background:#f6f6f6}
+.tb:active{background:#e9e9eb}
+#btnSide{width:28px;padding:0}
+.oemwrap select,#projName{height:28px;background:rgba(0,0,0,.06);border:1px solid transparent;color:#1d1d1f;border-radius:7px;font-size:13px}
+.oemwrap select{background:#fff;border:.5px solid rgba(0,0,0,.14);box-shadow:0 .5px 1.5px rgba(0,0,0,.1);font-weight:500}
+#projName::placeholder{color:#86868b}
+#projName:focus,.oemwrap select:focus{outline:none;background:#fff;border-color:#007aff;box-shadow:0 0 0 3px rgba(0,122,255,.25)}
+.oemwrap.need select{outline:none;animation:macPulse 1.4s ease-in-out infinite}
+@keyframes macPulse{0%,100%{box-shadow:0 0 0 3px rgba(0,122,255,.45)}50%{box-shadow:0 0 0 3px rgba(0,122,255,.1)}}
+.tabs.lang{gap:0;background:rgba(0,0,0,.06);border-radius:8px;padding:2px}
+.tabs.lang button{background:transparent;border:none;box-shadow:none;color:#424245;height:24px;min-height:24px;padding:0 9px}
+.tabs.lang button.on,.tabs.lang button.on:hover{background:#fff;color:#1d1d1f;border:none;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+#hint{background:rgba(0,122,255,.08);color:#0058b9;border-bottom:1px solid rgba(0,122,255,.15)}
+#toast{background:rgba(29,29,31,.88);border-radius:10px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+@media (max-width:700px){.tabs button,.tb{height:40px;min-height:40px;min-width:40px}.oemwrap select{height:40px}}
+</style>
 </head>
 <body>
 <div id="top">
@@ -162,6 +186,8 @@ function mergePlanHeader(){
 }
 pn.addEventListener("input", function(){ var d = pdoc(), src = d && d.getElementById("projectName"); if(src){ src.value = pn.value; src.dispatchEvent(new Event("input", { bubbles:true })); src.dispatchEvent(new Event("change", { bubbles:true })); } });
 pn.addEventListener("keydown", function(e){ if(e.key === "Enter") pn.blur(); });
+/* v3.8：焦点在外层时按 Esc 也能关闭页内预览/弹窗 */
+document.addEventListener("keydown", function(e){ if(e.key !== "Escape") return; try{ var w = $("fPlan").contentWindow; w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key:"Escape", bubbles:true })); }catch(err){} });
 document.getElementById("btnSide").addEventListener("click", function(){ var d = pdoc(), b = d && d.getElementById("btnSidebar"); if(b){ b.click(); this.textContent = this.textContent === "◀" ? "▶" : "◀"; } });
 fPlan.addEventListener("load", function(){ mergePlanHeader(); setTimeout(mergePlanHeader, 300); });
 [fExec, fPlan].forEach(function(f){ f.addEventListener("load", function(){ post(f, { t:"lang", v:lang }); if(f === fPlan) post(f, { t:"hello" }); updateHint(); }); });
@@ -205,7 +231,8 @@ $("btnExp").addEventListener("click", function(){
   KEYS.forEach(function(k){ var v = getK(k); data[k] = v ? JSON.parse(v) : null; });
   var a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type:"application/json" }));
-  a.download = (projName() || "gantt-project") + ".json";
+  var _d = new Date(), _p = function(n){ return (n < 10 ? "0" : "") + n; };
+  a.download = (projName() || ($("top").querySelector("h1") || {}).textContent || "gantt-project").trim() + "_" + _d.getFullYear() + "-" + _p(_d.getMonth()+1) + "-" + _p(_d.getDate()) + ".json";
   document.body.appendChild(a); a.click(); a.remove();
   toast(tr("expOk"));
 });
