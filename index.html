@@ -1106,20 +1106,36 @@ function load(){
   try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; if(!state.colDefV4){ state.colVis = {}; state.colDefV4 = true; } COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
   seedSample();
 }
-function seedSample(){
-  state.tasks = [
-    {id:"g1",name:"项目启动",type:"group",group:"",start:"",dur:0,end:"",deps:[],owner:"",output:"",progress:0,remarks:"",color:"",source:"sample",subs:[]},
-    mkTask({name:"需求分析",group:"g1",start:"2026-10-12",dur:5,owner:"张三",progress:100,source:"sample"}),
-    mkTask({name:"原型设计",group:"g1",start:"2026-10-19",dur:4,owner:"李四",progress:60,source:"sample"}),
-    mkTask({name:"UI设计",group:"g1",start:"2026-10-23",dur:6,progress:20,source:"sample"}),
-    mkTask({name:"后端开发",group:"g1",start:"2026-10-23",dur:15,owner:"王五",progress:10,source:"sample"}),
-    mkTask({name:"上线发布",type:"milestone",group:"g1",start:"2026-11-30",dur:0,source:"sample"})
+/* 默认模板：PMBOK 五大过程组（启动 / 规划 / 执行 / 监控 / 收尾），任务按依赖自动排程 */
+var PG_TX = {
+  zh:{ g:["1 启动","2 规划","3 执行","4 监控","5 收尾"], t:{ charter:"制定项目章程", stake:"识别干系人", kick:"项目立项", req:"收集需求", scope:"定义范围", wbs:"创建 WBS", sch:"制定进度计划", cost:"制定预算", risk:"风险与质量规划", plan:"项目计划批准", work:"指导与管理项目工作", proc:"实施采购", team:"建设与管理团队", test:"测试与验证", done:"可交付成果完成", mon:"监控项目工作", ccb:"实施整体变更控制", val:"确认范围", acc:"项目验收", ll:"总结经验教训", arch:"文档归档", close:"项目关闭" } },
+  en:{ g:["1 Initiating","2 Planning","3 Executing","4 Monitoring & Controlling","5 Closing"], t:{ charter:"Develop project charter", stake:"Identify stakeholders", kick:"Project approved", req:"Collect requirements", scope:"Define scope", wbs:"Create WBS", sch:"Develop schedule", cost:"Determine budget", risk:"Plan risk & quality", plan:"Project plan approved", work:"Direct and manage project work", proc:"Conduct procurements", team:"Develop and manage team", test:"Test and verify", done:"Deliverables complete", mon:"Monitor and control project work", ccb:"Perform integrated change control", val:"Validate scope", acc:"Project acceptance", ll:"Lessons learned", arch:"Archive documents", close:"Project closed" } },
+  de:{ g:["1 Initiierung","2 Planung","3 Ausführung","4 Überwachung und Steuerung","5 Abschluss"], t:{ charter:"Projektauftrag entwickeln", stake:"Stakeholder identifizieren", kick:"Projekt freigegeben", req:"Anforderungen sammeln", scope:"Umfang definieren", wbs:"PSP erstellen", sch:"Terminplan entwickeln", cost:"Budget festlegen", risk:"Risiko- und Qualitätsplanung", plan:"Projektplan genehmigt", work:"Projektarbeit lenken und managen", proc:"Beschaffungen durchführen", team:"Team entwickeln und managen", test:"Testen und verifizieren", done:"Liefergegenstände fertig", mon:"Projektarbeit überwachen und steuern", ccb:"Integrierte Änderungssteuerung", val:"Umfang validieren", acc:"Projektabnahme", ll:"Lessons Learned", arch:"Dokumente archivieren", close:"Projekt abgeschlossen" } }
+};
+function pgTemplate(start){
+  var X = PG_TX[lang] || PG_TX.zh, T = X.t, out = [], K = {};
+  var st = start || fmtD(new Date()); try{ var d0 = parseD(st); for(var i = 0; i < 30 && !isWorkday(d0); i++) d0 = addDays(d0, 1); st = fmtD(d0); }catch(e){}
+  function D(k, ty){ return { id:K[k].id, type:ty || "FS", lag:0 }; }
+  var spec = [
+    [0, [["charter",3],["stake",2,["charter"]],["kick",0,["stake"]]]],
+    [1, [["req",5,["kick"]],["scope",3,["req"]],["wbs",3,["scope"]],["sch",3,["wbs"]],["cost",2,["wbs"]],["risk",3,["wbs"]],["plan",0,["sch","cost","risk"]]]],
+    [2, [["work",15,["plan"]],["proc",10,[["work","SS"]]],["team",15,[["work","SS"]]],["test",8,["work"]],["done",0,["test","proc"]]]],
+    [3, [["mon",23,[["work","SS"]]],["ccb",23,[["work","SS"]]],["val",3,["test"]]]],
+    [4, [["acc",3,["val","done"]],["ll",2,["acc"]],["arch",2,[["ll","SS"]]],["close",0,["ll","arch"]]]]
   ];
-  state.tasks[2].deps = [{id:state.tasks[1].id, type:"FS", lag:0}];
-  state.tasks[3].deps = [{id:state.tasks[2].id, type:"FS", lag:0}];
-  state.tasks[4].deps = [{id:state.tasks[2].id, type:"FS", lag:0}];
-  state.tasks[5].deps = [{id:state.tasks[3].id, type:"FS", lag:0}, {id:state.tasks[4].id, type:"FS", lag:0}];
-  state.seq = 100;
+  spec.forEach(function(g){
+    var grp = mkTask({ name:X.g[g[0]], type:"group" }); grp.start = ""; out.push(grp);
+    g[1].forEach(function(r){
+      var t = mkTask({ name:T[r[0]], type:r[1] ? "task" : "milestone", group:grp.id, start:st, dur:r[1] });
+      t.deps = (r[2] || []).map(function(x){ return Array.isArray(x) ? D(x[0], x[1]) : D(x); });
+      K[r[0]] = t; out.push(t);
+    });
+  });
+  return out;
+}
+function seedSample(){
+  state.seq = 1;
+  state.tasks = pgTemplate();
 }
 /* ============ 排期引擎 ============ */
 function taskEnd(t){ // 按工期算结束日（含开始日）
@@ -5146,9 +5162,9 @@ function v4ExpPlan(){
 /* ===== v4：新建项目计划（清空当前项目数据，保留颜色/文本样式/列/视图等显示设置；默认先下载当前项目备份） ===== */
 (function(){
   var TX = {
-    zh:{ btn:"＋ 新建项目", t:"新建项目计划", name:"项目名称", start:"项目开始日期", bak:"先下载当前项目备份（.json，可用「导入」恢复）", tpl:"放入一个示例阶段（可删除）", warn:"当前计划的任务、资源、基线将被清空，颜色、字体等显示设置保留。", ok:"新建", no:"取消", done:"已新建项目", ph:"新项目", grp:"阶段 1", task:"新任务" },
-    en:{ btn:"＋ New project", t:"New project plan", name:"Project name", start:"Project start", bak:"Download a backup of the current project first (.json, restore via Import)", tpl:"Add a starter phase (can delete)", warn:"Tasks, resources and baselines of the current plan will be cleared; colors, fonts and other display settings are kept.", ok:"Create", no:"Cancel", done:"New project created", ph:"New project", grp:"Phase 1", task:"New task" },
-    de:{ btn:"＋ Neues Projekt", t:"Neuer Projektplan", name:"Projektname", start:"Projektbeginn", bak:"Zuerst Sicherung des aktuellen Projekts herunterladen (.json)", tpl:"Startphase anlegen (löschbar)", warn:"Vorgänge, Ressourcen und Basispläne werden gelöscht; Farben, Schriften und Anzeige bleiben.", ok:"Anlegen", no:"Abbrechen", done:"Neues Projekt angelegt", ph:"Neues Projekt", grp:"Phase 1", task:"Neuer Vorgang" }
+    zh:{ btn:"＋ 新建项目", t:"新建项目计划", name:"项目名称", start:"项目开始日期", bak:"先下载当前项目备份（.json，可用「导入」恢复）", tpl:"按五大过程组生成模板（启动 / 规划 / 执行 / 监控 / 收尾）", warn:"当前计划的任务、资源、基线将被清空，颜色、字体等显示设置保留。", ok:"新建", no:"取消", done:"已新建项目", ph:"新项目", grp:"阶段 1", task:"新任务" },
+    en:{ btn:"＋ New project", t:"New project plan", name:"Project name", start:"Project start", bak:"Download a backup of the current project first (.json, restore via Import)", tpl:"Use the 5 process groups template (Initiating / Planning / Executing / Monitoring / Closing)", warn:"Tasks, resources and baselines of the current plan will be cleared; colors, fonts and other display settings are kept.", ok:"Create", no:"Cancel", done:"New project created", ph:"New project", grp:"Phase 1", task:"New task" },
+    de:{ btn:"＋ Neues Projekt", t:"Neuer Projektplan", name:"Projektname", start:"Projektbeginn", bak:"Zuerst Sicherung des aktuellen Projekts herunterladen (.json)", tpl:"Vorlage mit 5 Prozessgruppen (Initiierung / Planung / Ausführung / Überwachung / Abschluss)", warn:"Vorgänge, Ressourcen und Basispläne werden gelöscht; Farben, Schriften und Anzeige bleiben.", ok:"Anlegen", no:"Abbrechen", done:"Neues Projekt angelegt", ph:"Neues Projekt", grp:"Phase 1", task:"Neuer Vorgang" }
   };
   function L(k){ return (TX[lang] || TX.zh)[k]; }
   function nextWork(d){ var x = parseD(d); for(var i = 0; i < 30 && !isWorkday(x); i++) x = addDays(x, 1); return fmtD(x); }
@@ -5176,8 +5192,7 @@ function v4ExpPlan(){
       state.info = { title:name, author:keepInfo.author || "", logo:keepInfo.logo };
       if(!state.info.logo) delete state.info.logo;
       if(q(".np-tpl").checked){
-        var g = mkTask({ name:L("grp"), type:"group" }); state.tasks.push(g);
-        state.tasks.push(mkTask({ name:L("task"), group:g.id, start:st, dur:5 }));
+        state.tasks = pgTemplate(st);
       }
       selId = null; state.view = "fit";
       save(); render(); close(); toast(L("done"));
