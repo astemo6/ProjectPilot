@@ -252,6 +252,9 @@ function srcdocFor(app){
 }
 function loadFrames(){
   if(INLINE){ fPlan.srcdoc = srcdocFor("plan"); }
+  else if(window.__OFFLINE_PLAN__){ /* 离线单文件版：file:// 下用 srcdoc 同源加载，保留真实 localStorage */
+    var h = window.__OFFLINE_PLAN__, pre = "<script>window.__OFFLINE_URL=" + JSON.stringify("https://offline.local/plan.html?lang=" + lang) + ";<\/script>", i = h.indexOf("<head>");
+    fPlan.srcdoc = i >= 0 ? h.slice(0, i + 6) + pre + h.slice(i + 6) : pre + h; }
   else { var q = "?lang=" + lang + "&v=" + Date.now(); fPlan.src = "plan.html" + q; }
 }
 /* 客户节点页自身的标题行（◀ / 标题 / 项目名称 / 语言）合并到本页顶栏 */
