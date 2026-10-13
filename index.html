@@ -1031,13 +1031,13 @@ function tsFont(t, sz, defBold, fixedSize){ var e = tsEff(t), b = e.b == null ? 
 function tsCol(t, def){ return tsEff(t).c || def; }
 function tColor(t){ return t.color || CC()[t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task"]; }
 var COLORS = ["#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#dc2626","#4f46e5","#0d9488"];
-var state = { tasks:[], seq:1, view:"fit", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{}, colDefV4:true };
+var state = { tasks:[], seq:1, view:"fit", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{}, colDefV4:true, colModeOff:true };
 /* 列模型：ID 与任务名称为冻结固定列（常显不可隐藏），其余列可显隐、可拖拽调宽 */
 var COLS = [
   {key:'id',    cls:'c-id',    defW:36, fixed:true},
   {key:'name',  cls:'c-name',  defW:0,  fixed:true, i18n:'cName'},
   {key:'wbs',   cls:'c-wbs',   defW:56, i18n:'cWbs', hide:true},
-  {key:'mode',  cls:'c-mode',  defW:100, i18n:'cMode'},
+  {key:'mode',  cls:'c-mode',  defW:100, i18n:'cMode', hide:true},
   {key:'owner', cls:'c-owner', defW:110, i18n:'cOwner', hide:true},
   {key:'dur',   cls:'c-dur',   defW:52, i18n:'cDur', hide:true},
   {key:'work',  cls:'c-work',  defW:60, i18n:'cWork', hide:true},
@@ -1103,7 +1103,7 @@ function undo(){ histApply(HIST.u, HIST.r); }
 function redo(){ histApply(HIST.r, HIST.u); }
 function save(){ histRecord(); try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} WORKCAL.save(cal); }
 function load(){
-  try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; if(!state.colDefV4){ state.colVis = {}; state.colDefV4 = true; } COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
+  try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; if(!state.colDefV4){ state.colVis = {}; state.colDefV4 = true; } if(!state.colModeOff){ state.colVis.mode = false; state.colModeOff = true; } COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
   seedSample();
 }
 /* 默认模板：PMBOK 五大过程组（启动 / 规划 / 执行 / 监控 / 收尾），任务按依赖自动排程 */
@@ -1123,6 +1123,9 @@ function pgTemplate(start){
     [3, [["mon",23,[["work","SS"]]],["ccb",23,[["work","SS"]]],["val",3,["test"]]]],
     [4, [["acc",3,["val","done"]],["ll",2,["acc"]],["arch",2,[["ll","SS"]]],["close",0,["ll","arch"]]]]
   ];
+  /* 最上方：客户里程碑占位（日期留空，名称 xxx；在「客户里程碑」对话框选主机厂后自动替换） */
+  var og = mkTask({ name:tr("oemMsGrp"), type:"group" }); og.start = ""; og.source = "oemgrp:"; out.push(og);
+  for(var oi = 1; oi <= 5; oi++){ var om = mkTask({ name:"xxx", type:"milestone", group:og.id, start:"", dur:0 }); om.start = ""; om.source = "oem:|xxx" + oi; out.push(om); }
   spec.forEach(function(g){
     var grp = mkTask({ name:X.g[g[0]], type:"group" }); grp.start = ""; out.push(grp);
     g[1].forEach(function(r){
