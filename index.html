@@ -4758,9 +4758,67 @@ var OEM_SHORT_DUP = (function(){ var dup = {}; Object.keys(OEM_NODES).forEach(fu
 function oemShort(s){ if(OEM_SHORT_DUP[s]) return String(s).replace(/\s*[（(]\s*/g, " ").replace(/\s*[）)]\s*/g, " ").replace(/\s+/g, " ").trim(); return oemShort0(s); }
 function oemMsKey(oem, name){ return "oem:" + oem + "|" + name; }
 function oemMsTasks(oem){ return state.tasks.filter(function(t){ return t.type === "milestone" && String(t.source || "").indexOf("oem:" + oem + "|") === 0; }); }
-function openOemMs(oem){
+/* 不选主机厂 = 自己输入客户里程碑（名称 + 日期，可留空），不强制套用任何主机厂模板 */
+var OEMC_TX = {
+  zh:{ hint:"未选择主机厂：可自己填写客户里程碑名称和日期（日期可留空）。", name:"里程碑名称", date:"日期", add:"＋ 添加里程碑", del:"删除", ok:"确定", done:"已更新客户里程碑：{0} 个" },
+  en:{ hint:"No OEM selected: enter your own customer milestones (date optional).", name:"Milestone", date:"Date", add:"+ Add milestone", del:"Delete", ok:"OK", done:"Customer milestones updated: {0}" },
+  de:{ hint:"Kein OEM gewählt: eigene Kundenmeilensteine eingeben (Datum optional).", name:"Meilenstein", date:"Datum", add:"+ Meilenstein hinzufügen", del:"Löschen", ok:"OK", done:"Kundenmeilensteine aktualisiert: {0}" }
+};
+function oemCustomMs(bg, close){
+  var X = OEMC_TX[lang] || OEMC_TX.zh;
+  var cur = oemMsTasks("");
+  var mb = bg.querySelector(".modal-b"), hint = mb.querySelector(".hint");
+  var box = document.createElement("div");
+  box.innerHTML = '<div style="font-size:12px;color:var(--tx3);margin:6px 0">' + esc(X.hint) + '</div>'
+    + '<div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:6px"><table class="rs" style="width:100%"><thead><tr><th>' + esc(X.name) + '</th><th style="width:150px">' + esc(X.date) + '</th><th style="width:40px"></th></tr></thead><tbody class="omcB"></tbody></table></div>'
+    + '<button type="button" class="omcAdd" style="margin-top:8px">' + esc(X.add) + '</button>';
+  if(hint) hint.style.display = "none";
+  mb.appendChild(box);
+  var tb = box.querySelector(".omcB");
+  function row(nm, d, id){
+    var tr2 = document.createElement("tr"); if(id) tr2.dataset.id = id;
+    tr2.innerHTML = '<td><input type="text" class="omcN" style="width:100%" placeholder="xxx"></td><td><input type="date" class="omcD" style="width:100%"></td><td style="text-align:center"><button type="button" class="omcX" title="' + esc(X.del) + '" style="padding:0 6px">×</button></td>';
+    tr2.querySelector(".omcN").value = nm || ""; tr2.querySelector(".omcD").value = d || "";
+    tr2.querySelector(".omcX").onclick = function(){ tr2.remove(); };
+    tb.appendChild(tr2); return tr2;
+  }
+  cur.forEach(function(t){ row(t.name, t.start, t.id); });
+  if(!cur.length) for(var i = 0; i < 3; i++) row("", "");
+  box.querySelector(".omcAdd").onclick = function(){ row("", "").querySelector(".omcN").focus(); };
+  var f = bg.querySelector(".modal-f"), ok = document.createElement("button");
+  ok.className = "primary"; ok.style.cssText = "background:var(--accent);color:#fff"; ok.textContent = X.ok; f.appendChild(ok);
+  ok.onclick = function(){
+    var rows = [].slice.call(tb.querySelectorAll("tr")).map(function(r){ return { id:r.dataset.id || "", n:r.querySelector(".omcN").value.trim(), d:r.querySelector(".omcD").value }; }).filter(function(r){ return r.n || r.d; });
+    /* 去掉主机厂模板插入的里程碑及分组（只保留一套客户里程碑） */
+    var dropO = {}, dropG = {};
+    state.tasks.forEach(function(t){ var s2 = String(t.source || "");
+      if(s2.indexOf("oem:") === 0 && s2.indexOf("oem:|") !== 0) dropO[t.id] = 1;
+      if(t.type === "group" && s2.indexOf("oemgrp:") === 0 && s2 !== "oemgrp:") dropG[t.id] = 1; });
+    var keepIds = {}; rows.forEach(function(r){ if(r.id) keepIds[r.id] = 1; });
+    oemMsTasks("").forEach(function(t){ if(!keepIds[t.id]) dropO[t.id] = 1; });
+    state.tasks.forEach(function(t){ if(dropG[t.group] && !dropO[t.id]) t.group = ""; });
+    state.tasks = state.tasks.filter(function(t){ return !dropO[t.id] && !dropG[t.id]; });
+    state.tasks.forEach(function(t){ t.deps = normDeps(t.deps).filter(function(d){ return !dropO[d.id] && !dropG[d.id]; }); });
+    var grp = null; state.tasks.forEach(function(t){ if(t.type === "group" && t.source === "oemgrp:") grp = t; });
+    if(!grp && rows.length){ grp = mkTask({ name:tr("oemMsGrp"), type:"group", group:"" }); grp.start = ""; grp.source = "oemgrp:"; state.tasks.unshift(grp); }
+    var at = grp ? state.tasks.indexOf(grp) + 1 : 0, n = 0;
+    rows.forEach(function(r){
+      var dd = parseD(r.d) ? fmtD(snapWorkday(parseD(r.d))) : "";
+      var t = r.id ? byId(r.id) : null;
+      if(!t){ t = mkTask({ name:r.n || "xxx", type:"milestone", group:grp.id, start:dd, dur:0 }); t.source = "oem:|c" + Date.now().toString(36) + (n++); state.tasks.splice(at, 0, t); }
+      else { var i0 = state.tasks.indexOf(t); state.tasks.splice(i0, 1); at = Math.min(at, state.tasks.length); state.tasks.splice(at, 0, t); }
+      t.name = r.n || "xxx"; t.group = grp.id; t.start = dd;
+      if(dd){ t.cons = "MSO"; t.consDate = dd; } else { delete t.cons; delete t.consDate; }
+      at = state.tasks.indexOf(t) + 1;
+    });
+    if(grp && !state.tasks.some(function(t){ return t.group === grp.id; })) state.tasks = state.tasks.filter(function(t){ return t !== grp; });
+    state.planOem = ""; if(typeof syncOemSelect === "function") syncOemSelect();
+    close(); save(); render(); toast(X.done.replace("{0}", rows.length));
+  };
+}
+function openOemMs(oem, explicit){
   var old = document.getElementById("oemMsBg"); if(old) old.remove();
-  oem = oem || state.planOem || "";
+  oem = explicit ? (oem || "") : (oem || state.planOem || "");
   if(!OEM_NODES[oem]) oem = "";
   var bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "oemMsBg";
   var have = {}; if(oem) oemMsTasks(oem).forEach(function(t){ have[t.source] = t; });
@@ -4780,8 +4838,8 @@ function openOemMs(oem){
   bg.innerHTML = h; document.body.appendChild(bg);
   function close(){ bg.remove(); }
   bg.querySelector("#omX").onclick = close; bg.querySelector("#omCancel").onclick = close;
-  bg.querySelector("#omOem").onchange = function(){ openOemMs(this.value); };
-  if(!oem) return;
+  bg.querySelector("#omOem").onchange = function(){ openOemMs(this.value, true); };
+  if(!oem){ oemCustomMs(bg, close); return; }
   bg.querySelector("#omAll").onclick = function(){ bg.querySelectorAll(".omCk").forEach(function(c){ c.checked = true; }); };
   bg.querySelector("#omNone").onclick = function(){ bg.querySelectorAll(".omCk").forEach(function(c){ c.checked = false; }); };
   function fillDates(){
@@ -5859,9 +5917,9 @@ function v4ExpPlan(){
                 ["gSched", [mspBar && mspBar.querySelector(".ms-pct"), mspBar && mspBar.querySelector(".ms-link"), mspBar && mspBar.querySelector(".ms-unlink"), "#btnOutdent", "#btnIndent"]],
                 ["gTask", ["#modeBtns", msp2]], ["gFont", ["#fmtBar"]]]],
       ["fmt", [["gTxt", ["#btnTxtStyle"]], ["gBar", ["#btnColors"]], ["gCols", ["#btnCols"]], ["gShow", ["#ddShow"]]]],
+      ["proj", [["gProj", ["#ddSched"]], ["gBase", ["#ddBase"]]]],
       ["res", [["gResView", [proxy("res"), proxy("use"), proxy("tuse"), proxy("hist")]]]],
       ["rep", [["gRepView", [proxy("rep"), proxy("evm"), proxy("wbs"), proxy("net")]], ["gOut", ["#btnPreview"]]]],
-      ["proj", [["gProj", ["#ddSched"]], ["gBase", ["#ddBase"]]]],
       ["view", [["gViews", ["#paneBtns"]], ["gZoom", [zoomBox]], ["gData", ["#fltTxt", "#ddFlt"]]]]
     ];
     var used = [], tabs = document.createElement("div"), body = document.createElement("div"), stash = document.createElement("div");
@@ -6328,6 +6386,41 @@ document.addEventListener("keydown", function(e){
   if(!bgs.length) return; var top = bgs[bgs.length - 1], x = top.querySelector(".modal-h button");
   if(x) x.click(); else if(top.parentNode && !top.id) top.remove();
 });
+/* ===== 打开页面时选择：继续上次项目 / 新建项目（每次浏览器会话问一次；切换语言等刷新不再问） ===== */
+(function(){
+  var TX = {
+    zh:{ t:"打开项目", last:"上次的项目", n:"{0} 项任务", untitled:"（未命名项目）", cont:"继续上次项目", nw:"新建项目…", imp:"导入文件…" },
+    en:{ t:"Open project", last:"Last project", n:"{0} tasks", untitled:"(untitled project)", cont:"Continue last project", nw:"New project…", imp:"Import file…" },
+    de:{ t:"Projekt öffnen", last:"Letztes Projekt", n:"{0} Vorgänge", untitled:"(unbenanntes Projekt)", cont:"Letztes Projekt fortsetzen", nw:"Neues Projekt…", imp:"Datei importieren…" }
+  };
+  function L(k){ return (TX[lang] || TX.zh)[k]; }
+  var SK = "pp-start-asked", had = false, asked = false;
+  try{ had = !!localStorage.getItem(LS_KEY); asked = !!sessionStorage.getItem(SK); sessionStorage.setItem(SK, "1"); }catch(e){}
+  function show(){
+    if(!had || asked || document.getElementById("startBg")) return;
+    var n = (state.tasks || []).filter(function(t){ return t.type !== "group"; }).length; if(!n) return;
+    var nm = (state.info && state.info.title) || L("untitled");
+    var bg = document.createElement("div"); bg.className = "modal-bg show"; bg.id = "startBg";
+    bg.innerHTML = '<div class="modal" style="width:400px"><div class="modal-h"><span>' + L("t") + '</span><button class="st-x">×</button></div><div class="modal-b">'
+      + '<div style="font-size:12px;color:var(--tx3);margin-bottom:4px">' + L("last") + '</div>'
+      + '<div style="font-size:15px;font-weight:600;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(nm) + '</div>'
+      + '<div style="font-size:12px;color:var(--tx3)">' + L("n").replace("{0}", n) + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">'
+      + '<button class="st-c" style="background:var(--accent);color:#fff;border-color:transparent;height:32px">' + L("cont") + '</button>'
+      + '<button class="st-n" style="height:32px">' + L("nw") + '</button>'
+      + '<button class="st-i" style="height:32px">' + L("imp") + '</button></div></div></div>';
+    document.body.appendChild(bg);
+    var q = function(x){ return bg.querySelector(x); };
+    function close(){ bg.remove(); }
+    q(".st-x").onclick = close; q(".st-c").onclick = close;
+    q(".st-n").onclick = function(){ close(); if(window.__v4NewProj) window.__v4NewProj(); };
+    q(".st-i").onclick = function(){ close(); try{ if(window.__v4Ribbon && window.__v4Ribbon.show) window.__v4Ribbon.show("file"); }catch(e){} setTimeout(function(){ var b = document.querySelector("#ddImp .dd-b"); if(b) b.click(); }, 50); };
+    bg.addEventListener("keydown", function(e){ if(e.key === "Escape" || e.key === "Enter"){ e.stopPropagation(); close(); } });
+    setTimeout(function(){ q(".st-c").focus(); }, 0);
+  }
+  window.addEventListener("load", function(){ setTimeout(show, 200); });
+  window.__ppStart = show;
+})();
 /* ===== 一键清除：撤销按钮前，清空任务/资源/基线/项目名称（可用撤销恢复任务数据） ===== */
 (function(){
   var TX = { zh:{ b:"⌫ 清除", t:"一键清除所有信息（任务、资源、基线、项目名称）", q:"确定清除当前项目的所有信息？\n任务、资源、基线和项目名称将被清空；可点「撤销」恢复任务数据。", done:"已清除" },
