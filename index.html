@@ -4051,7 +4051,7 @@ var MSPDI_DEP_R = { "0":"FF", "1":"FS", "2":"SF", "3":"SS" };
 function planProjectName(){
   var plan = null;
   plan = v4ExpPlan();
-  var nm = (plan && plan.projectName || '').trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
+  var nm = (plan && plan.projectName || '').trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 150);
   return nm || '项目计划';
 }
 function xmlTag(name, val){ return "<" + name + ">" + esc(val) + "</" + name + ">"; }
