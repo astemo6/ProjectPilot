@@ -6301,6 +6301,10 @@ function v4ExpPlan(){
   function syncName(){ var el = document.getElementById("projName"); if(el && document.activeElement !== el) el.value = (state.info && state.info.title) || ""; }
   function migOemNames(){ var mig = 0;
     (state.tasks || []).forEach(function(t){ var s = String(t.source || ""); if(t.type === "group" && s.indexOf("oemgrp:") === 0 && t.name !== tr("oemMsGrp")){ t.name = tr("oemMsGrp"); mig++; } /* 分组名只显示「客户里程碑」，随语言切换 */ if(s.indexOf("oem:") === 0){ var full = s.slice(s.indexOf("|") + 1); if((t.name === full || t.name === oemShort0(full)) && oemShort(full) !== t.name){ t.name = oemShort(full); mig++; } } });
+    /* 默认模板（APQP）中未改名的阶段和任务随语言切换 */
+    if(typeof PG_TX === "object"){ var cur = PG_TX[lang] || PG_TX.zh, M = migOemNames._m;
+      if(!M){ M = migOemNames._m = {}; Object.keys(PG_TX).forEach(function(L){ var X = PG_TX[L]; X.g.forEach(function(n, i){ M[n] = ["g", i]; }); Object.keys(X.t).forEach(function(k){ M[X.t[k]] = ["t", k]; }); }); }
+      (state.tasks || []).forEach(function(t){ var m = M[t.name]; if(!m || String(t.source || "").indexOf("oem") === 0) return; if((m[0] === "g") !== (t.type === "group")) return; var n = m[0] === "g" ? cur.g[m[1]] : cur.t[m[1]]; if(n && n !== t.name){ t.name = n; mig++; } }); }
     if(mig) save(); }
   var _r = render; render = function(){ migOemNames(); _r.apply(this, arguments); syncName(); };
   function setup(){
