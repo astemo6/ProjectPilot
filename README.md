@@ -18,12 +18,13 @@
 - **工作日历**：中国法定节假日与调休，自定义日历
 - **客户里程碑**：选主机厂，勾选节点并填日期，插入为固定里程碑
 - **默认模板**：客户里程碑占位 + PMBOK 五大过程组（启动 / 规划 / 执行 / 监控 / 收尾）
-- **导入**：MS Project XML、MPP（经转换服务）、GanttProject .gan / CSV、JSON
+- **导入**：MS Project XML、MPP（Project 2007–2024 的 .mpp 在浏览器内离线解析；更早版本经转换服务）、GanttProject .gan / CSV、JSON
 - **导出**：PDF / JPG（MS Project 打印样式）、XML、GanttProject .gan、CSV、Excel、JSON
 - **操作**：Ribbon 功能区、快速访问工具栏、右键菜单、撤销/重做、快捷键（F1 查看）
 
 ### 最近更新
 
+- 2026-10-14：.mpp 可离线直接导入（浏览器内解析，无需联网）
 - 2026-10-13：打开页面时可选「继续上次项目 / 新建项目 / 导入文件」；「项目」页签移到「格式」之后；客户里程碑可不选主机厂、自己填写名称和日期；README 增加英文、德文说明
 - 2026-10-13：默认模板最上方加入「客户里程碑」占位（名称 xxx、日期留空，选主机厂后自动替换）；任务模式列默认隐藏
 - 2026-10-12：默认模板改为 PMBOK 五大过程组（22 项任务与里程碑，已连好依赖）
@@ -45,7 +46,7 @@ A project scheduling tool (tasks, resources, progress tracking) modelled on MS P
 - **Calendars**: Chinese public holidays and make-up workdays, custom calendars
 - **Customer milestones**: pick an OEM, tick its milestones and enter dates; inserted as fixed milestones
 - **Default template**: customer-milestone placeholders + PMBOK 5 process groups (Initiating / Planning / Executing / Monitoring / Closing)
-- **Import**: MS Project XML, MPP (via conversion service), GanttProject .gan / CSV, JSON
+- **Import**: MS Project XML, MPP (Project 2007–2024 .mpp files are parsed offline in the browser; older versions via conversion service), GanttProject .gan / CSV, JSON
 - **Export**: PDF / JPG (MS Project print style), XML, GanttProject .gan, CSV, Excel, JSON
 - **Usability**: ribbon, Quick Access Toolbar, context menu, undo/redo, keyboard shortcuts (press F1)
 
@@ -64,7 +65,7 @@ Ein Projektplanungswerkzeug (Vorgänge, Ressourcen, Fortschrittsverfolgung) nach
 - **Kalender**: chinesische Feiertage und Ersatzarbeitstage, eigene Kalender
 - **Kundenmeilensteine**: OEM wählen, Meilensteine ankreuzen und Termine eintragen; werden als feste Meilensteine eingefügt
 - **Standardvorlage**: Platzhalter für Kundenmeilensteine + PMBOK-5-Prozessgruppen (Initiierung / Planung / Ausführung / Überwachung / Abschluss)
-- **Import**: MS Project XML, MPP (über Konvertierungsdienst), GanttProject .gan / CSV, JSON
+- **Import**: MS Project XML, MPP (.mpp aus Project 2007–2024 wird offline im Browser gelesen; ältere Versionen über Konvertierungsdienst), GanttProject .gan / CSV, JSON
 - **Export**: PDF / JPG (MS-Project-Druckstil), XML, GanttProject .gan, CSV, Excel, JSON
 - **Bedienung**: Menüband, Symbolleiste für den Schnellzugriff, Kontextmenü, Rückgängig/Wiederholen, Tastenkürzel (F1)
 
