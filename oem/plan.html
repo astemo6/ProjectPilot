@@ -54,6 +54,7 @@ aside select,aside input.date,aside input[type=text]{font-size:13px;padding:6px 
 .offs input{width:46px;font-size:12px;padding:3px 4px;border:1px solid #d1d5db;border-radius:6px}
 .hint{font-size:12px;color:#9ca3af;margin:6px 0}
 main{flex:1;overflow:auto;padding:12px 16px;min-width:0}
+.sz-ctl{margin-left:auto;display:inline-flex;gap:10px;align-items:center}.sz-ctl label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.sz-ctl input{width:62px;font-size:12px;padding:2px 4px}
 .legend{font-size:12px;color:#6b7280;margin-bottom:8px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
 .dot{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:baseline}
 .chart-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow-x:auto;min-height:320px;position:relative}
@@ -371,6 +372,7 @@ html[data-theme=dark] #chart rect[fill="#dbeafe"]{fill:#1e3350}html[data-theme=d
       <span><span class="dot" style="background:#4ade80;transform:rotate(45deg)"></span><span data-i18n="legendCustomMs">供应商节点</span></span>
       <span><span class="dot" style="background:#ef4444;width:2px;height:12px"></span><span data-i18n="today">今天</span></span>
       <span style="color:#7f1d1d" data-i18n="warnInvert">深红色节点 = 日期倒置</span>
+      <span class="sz-ctl"><label><span data-i18n="szGut">左列宽</span> <input type="number" id="szGut" min="60" max="800" step="10"></label><label><span data-i18n="szMs">里程碑行高</span> <input type="number" id="szMs" min="40" max="400" step="5"></label><button class="mini ghost" id="szAuto" data-i18n="szAuto">自动</button></span>
     </div>
     <div class="chart-wrap">
       <div id="chart"></div>
@@ -464,7 +466,7 @@ zh: {
   toastNeedGenStart:'请先选择开始日期',
   btnSelAll:'全选', btnDeselAll:'取消全选', cmDateNamePh:'名称（如 T0）',
   startDate:'开始日期', endDate:'结束日期',
-  legendMs:'里程碑', legendPhase:'阶段区间', legendRec:'推荐任务', legendCustom:'自定义任务', legendTasks:'任务',
+  legendMs:'里程碑', szGut:'左列宽', szMs:'里程碑行高', szAuto:'自动', rzGutTip:'拖动调整左列宽度', rzMsTip:'拖动调整里程碑行高度', legendPhase:'阶段区间', legendRec:'推荐任务', legendCustom:'自定义任务', legendTasks:'任务',
   today:'今天', warnInvert:'深红色节点 = 日期倒置',
   emptyHint:'请先选择主机厂，并在左侧填写各客户节点的日期，甘特图将自动生成。<br>也可以点「载入示例日期」先看效果。',
   hintNoPhase:'该主机厂暂无可锚定的阶段', hintNoTasks:'暂无自定义任务，可在下方添加', hintNoNodes:'请先选择主机厂',
@@ -497,7 +499,7 @@ en: {
   toastNeedGenStart:'Please pick a start date first',
   btnSelAll:'Select All', btnDeselAll:'Deselect All', cmDateNamePh:'Name (e.g. T0)',
   startDate:'Start Date', endDate:'End Date',
-  legendMs:'Milestone', legendPhase:'Phase', legendRec:'Recommended', legendCustom:'Custom', legendTasks:'Tasks',
+  legendMs:'Milestone', szGut:'Label width', szMs:'Milestone row', szAuto:'Auto', rzGutTip:'Drag to resize label column', rzMsTip:'Drag to resize milestone row', legendPhase:'Phase', legendRec:'Recommended', legendCustom:'Custom', legendTasks:'Tasks',
   today:'Today', warnInvert:'Dark red milestone = inverted dates',
   emptyHint:'Please select an OEM and fill in the milestone dates on the left; the Gantt chart generates automatically.<br>You can also click "Load sample dates" for a preview.',
   hintNoPhase:'No mappable phases for this OEM', hintNoTasks:'No custom tasks yet — add below', hintNoNodes:'Please select an OEM first',
@@ -530,7 +532,7 @@ de: {
   toastNeedGenStart:'Bitte zuerst ein Startdatum wählen',
   btnSelAll:'Alle wählen', btnDeselAll:'Alle abwählen', cmDateNamePh:'Name (z. B. T0)',
   startDate:'Startdatum', endDate:'Enddatum',
-  legendMs:'Meilenstein', legendPhase:'Phase', legendRec:'Empfohlen', legendCustom:'Eigene', legendTasks:'Aufgaben',
+  legendMs:'Meilenstein', szGut:'Spaltenbreite', szMs:'Meilensteinzeile', szAuto:'Auto', rzGutTip:'Ziehen, um die Spaltenbreite zu ändern', rzMsTip:'Ziehen, um die Zeilenhöhe zu ändern', legendPhase:'Phase', legendRec:'Empfohlen', legendCustom:'Eigene', legendTasks:'Aufgaben',
   today:'Heute', warnInvert:'Dunkelroter Meilenstein = verdrehte Daten',
   emptyHint:'Bitte einen OEM wählen und links die Meilensteintermine eintragen; das Gantt-Diagramm wird automatisch erzeugt.<br>Auch „Beispieldaten laden" zeigt eine Vorschau.',
   hintNoPhase:'Für diesen OEM keine zuordenbaren Phasen', hintNoTasks:'Noch keine eigenen Aufgaben – unten hinzufügen', hintNoNodes:'Bitte zuerst einen OEM wählen',
@@ -615,13 +617,14 @@ function buildOemOptions(){
   sel.value = state.oem || '';
 }
 
-var state = { oem:'', projectName:'', dates:{}, tasks:[], excluded:{}, recTasks:{}, customMs:[], showPhase:true, logoLeft:'', logoRight:'' };
+var state = { oem:'', projectName:'', dates:{}, tasks:[], excluded:{}, recTasks:{}, customMs:[], showPhase:true, gutW:0, msRowH:0, logoLeft:'', logoRight:'' };
 var LS_KEY = 'gantt-tool-v1';
 function save(){
   try{
     var data = { oem:state.oem, projectName:state.projectName, dates:state.dates,
       excluded:state.excluded, recTasks:state.recTasks, tasks:state.tasks,
       customMs:state.customMs, showPhase:state.showPhase !== false,
+      gutW:state.gutW || 0, msRowH:state.msRowH || 0,
       logoLeft:state.logoLeft || '', logoRight:state.logoRight || '',
       creatorName:$('creatorName') ? $('creatorName').value : '',
       ckShowCreator:$('ckShowCreator') ? $('ckShowCreator').checked : false,
@@ -658,6 +661,7 @@ function load(){
     if(Array.isArray(d.tasks)) state.tasks = d.tasks;
     if(Array.isArray(d.customMs)) state.customMs = d.customMs;
     if(typeof d.showPhase === 'boolean') state.showPhase = d.showPhase;
+    state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0;
     if(typeof d.logoLeft === 'string') state.logoLeft = d.logoLeft;
     if(typeof d.logoRight === 'string') state.logoRight = d.logoRight;
     if(typeof d.execSyncAt === 'number') state.execSyncAt = d.execSyncAt;
@@ -1260,6 +1264,8 @@ function renderChart(){
   cmLanes.forEach(function(l){ _gutMax = Math.max(_gutMax, _tw(l.name, '11.5px sans-serif')); });
   laneTasks.forEach(function(t){ _gutMax = Math.max(_gutMax, _tw(t.name, '11.5px sans-serif')); });
   var GUT = Math.min(340, Math.max(wrapW < 560 ? 108 : 150, Math.ceil(_gutMax) + 28));
+  window._autoGut = GUT;
+  if(state.gutW > 0) GUT = Math.round(Math.max(60, Math.min(800, state.gutW)));
   var pxDay = Math.max((wrapW - GUT - 24) / totalDays, 0.6);
   var W = Math.ceil(GUT + 24 + totalDays * pxDay);
   function X(d){ return GUT + diffDays(min, d) * pxDay; }
@@ -1273,6 +1279,8 @@ function renderChart(){
   var _msMaxW = 0; ms.forEach(function(m){ _msMaxW = Math.max(_msMaxW, textW(abbr(m.name))); });
   var _labH = _msMaxW * Math.sin(MS_ANG * Math.PI / 180);
   var AXIS_H = 44, PH_Y = 44, PH_H = showPH ? 48 : 0, MS_Y = PH_Y + PH_H, MS_H = Math.round(Math.max(72, Math.min(170, _labH + 58)));
+  window._autoMsH = MS_H;
+  if(state.msRowH > 0){ MS_H = Math.round(Math.max(40, Math.min(400, state.msRowH))); MS_Y = PH_Y + PH_H; }
   var CM_Y = MS_Y + MS_H, CM_H = 58;
   var TK_Y = CM_Y + cmLanes.length * CM_H, TK_H = 36;
   var H = TK_Y + laneTasks.length * TK_H + 10;
@@ -1468,7 +1476,12 @@ function renderChart(){
       + '<text x="' + tx.toFixed(1) + '" y="15" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="600">' + esc(tr('today')) + '</text>';
   }
 
+  /* 手动调整：左列宽（竖线）与里程碑行高（横线）拖动手柄；导出时移除 */
+  s += '<rect class="rz-h rz-ms" data-noexp="1" x="0" y="' + (MS_Y + MS_H - 4) + '" width="' + W + '" height="8" fill="transparent" style="cursor:row-resize"><title>' + esc(tr('rzMsTip')) + '</title></rect>';
+  s += '<rect class="rz-h rz-gut" data-noexp="1" x="' + (GUT - 4) + '" y="0" width="8" height="' + H + '" fill="transparent" style="cursor:col-resize"><title>' + esc(tr('rzGutTip')) + '</title></rect>';
+  window._curGut = GUT; window._curMsH = MS_H;
   chart.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" data-cm-y="' + CM_Y + '" data-cm-h="' + CM_H + '" data-cm-n="' + cmLanes.length + '">' + s + '</svg>';
+  if(window.syncSizeInputs) syncSizeInputs();
 }
 
 /* ---------- 右侧：客户节点说明表（甘特图下方） ---------- */
@@ -1532,6 +1545,7 @@ function chartSVGString(){
   if(!svg) return null;
   var clone = svg.cloneNode(true);
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  Array.prototype.forEach.call(clone.querySelectorAll('[data-noexp]'), function(n){ n.remove(); });
   var st = document.createElementNS('http://www.w3.org/2000/svg', 'style');
   st.textContent = CHART_CSS;
   clone.insertBefore(st, clone.firstChild);
@@ -1734,6 +1748,7 @@ function exportJSON(){
   var data = { app:'gantt-tool', v:1, oem:state.oem, projectName:state.projectName,
     dates:state.dates, excluded:state.excluded, recTasks:state.recTasks,
     tasks:state.tasks, customMs:state.customMs, showPhase:state.showPhase !== false,
+    gutW:state.gutW || 0, msRowH:state.msRowH || 0,
     logoLeft:state.logoLeft || '', logoRight:state.logoRight || '',
     creatorName:$('creatorName') ? $('creatorName').value : '',
     ckShowCreator:$('ckShowCreator') ? $('ckShowCreator').checked : false,
@@ -1755,6 +1770,8 @@ function importJSON(file){
       state.tasks = Array.isArray(d.tasks) ? d.tasks : [];
       state.customMs = Array.isArray(d.customMs) ? d.customMs : [];
       state.showPhase = d.showPhase !== false;
+      state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0;
+      if(window.syncSizeInputs) syncSizeInputs();
       state.logoLeft = (typeof d.logoLeft === 'string') ? d.logoLeft : '';
       state.logoRight = (typeof d.logoRight === 'string') ? d.logoRight : '';
       if(typeof d.creatorName === 'string') $('creatorName').value = d.creatorName;
@@ -1890,6 +1907,32 @@ function init(){
     state.showPhase = this.checked;
     save(); renderChart();
   });
+  /* 左列宽 / 里程碑行高：输入数值或在图上拖动；留空或「自动」= 自适应 */
+  window.syncSizeInputs = function(){
+    var g = $('szGut'), m = $('szMs'); if(!g) return;
+    g.value = state.gutW > 0 ? Math.round(state.gutW) : ''; m.value = state.msRowH > 0 ? Math.round(state.msRowH) : '';
+    g.placeholder = window._autoGut ? String(window._autoGut) : ''; m.placeholder = window._autoMsH ? String(window._autoMsH) : '';
+  };
+  function szApply(){ save(); renderChart(); syncSizeInputs(); }
+  $('szGut').addEventListener('change', function(){ var v = parseFloat(this.value); state.gutW = v > 0 ? Math.max(60, Math.min(800, v)) : 0; szApply(); });
+  $('szMs').addEventListener('change', function(){ var v = parseFloat(this.value); state.msRowH = v > 0 ? Math.max(40, Math.min(400, v)) : 0; szApply(); });
+  $('szAuto').addEventListener('click', function(){ state.gutW = 0; state.msRowH = 0; szApply(); });
+  $('chart').addEventListener('mousedown', function(e){
+    var t = e.target; if(!t.classList || !t.classList.contains('rz-h')) return;
+    e.preventDefault(); e.stopPropagation();
+    var isGut = t.classList.contains('rz-gut'), x0 = e.clientX, y0 = e.clientY;
+    var v0 = isGut ? (window._curGut || 150) : (window._curMsH || 80), raf = 0;
+    document.body.style.cursor = isGut ? 'col-resize' : 'row-resize'; document.body.style.userSelect = 'none';
+    function mv(ev){
+      var v = v0 + (isGut ? ev.clientX - x0 : ev.clientY - y0);
+      if(isGut) state.gutW = Math.max(60, Math.min(800, v)); else state.msRowH = Math.max(40, Math.min(400, v));
+      if(!raf) raf = requestAnimationFrame(function(){ raf = 0; renderChart(); syncSizeInputs(); });
+    }
+    function up(){ document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
+      document.body.style.cursor = ''; document.body.style.userSelect = ''; save(); renderChart(); syncSizeInputs(); }
+    document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+  }, true);
+  syncSizeInputs();
 
   sel.addEventListener('change', function(){
     state.oem = sel.value;
