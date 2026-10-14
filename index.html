@@ -702,6 +702,1271 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<script id="mppLocal">
+/* ==== MPPLocal: offline .mpp reader (port of MPXJ, LGPL-2.1) — generated from mppjs/, do not edit by hand ==== */
+/*!
+ * MPPLocal — offline Microsoft Project (.mpp) reader for the browser.
+ *
+ * This is a JavaScript port of parts of MPXJ (https://github.com/joniles/mpxj,
+ * Copyright Jon Iles and contributors), in particular org.mpxj.mpp.MPP14Reader,
+ * MPP12Reader, FieldMap/FieldMap14/FieldMap12, FixedMeta, FixedData, Var2Data,
+ * VarMeta12, Props14/Props12, ConstraintFactory, MPPUtility, ProjectPropertiesReader,
+ * AbstractCalendarFactory/AbstractCalendarAndExceptionFactory, ResourceAssignmentFactory,
+ * the field tables of MPPTaskField/MPPResourceField/MPPAssignmentField and the
+ * MSPDI output conventions of MSPDIWriter/DatatypeConverter.
+ *
+ * MPXJ is licensed under the GNU Lesser General Public License v2.1 (LGPL-2.1);
+ * this derived file is distributed under the same licence:
+ * https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+ *
+ * Includes a small self-written OLE2 Compound File (CFB) reader. No network access.
+ *
+ * API: MPPLocal.parse(arrayBuffer) -> MSPDI XML string (throws Error with .code on
+ *      unsupported input: "NOT_CFB", "ENCRYPTED", "UNSUPPORTED_VERSION", "CORRUPT").
+ */
+(function(root){
+"use strict";
+
+function MPPError(code, msg){ var e = new Error(msg); e.code = code; e.name = "MPPLocalError"; return e; }
+
+/* ===================== byte helpers (ByteArrayHelper / MPPUtility) ===================== */
+function b(d, o){ var v = d[o]; return v === undefined ? 0 : v; }
+function getByte(d, o){ return b(d, o); }
+function getShort(d, o){ return b(d, o) | (b(d, o + 1) << 8); }
+function getInt(d, o){ return (b(d, o) | (b(d, o + 1) << 8) | (b(d, o + 2) << 16) | (b(d, o + 3) << 24)); }
+function getLongKey(d, o){ return [getInt(d, o + 4), getInt(d, o) >>> 0]; } /* signed 64-bit as [hi(signed), lo(unsigned)] */
+function cmpLong(a, c){ return a[0] !== c[0] ? (a[0] < c[0] ? -1 : 1) : (a[1] !== c[1] ? (a[1] < c[1] ? -1 : 1) : 0); }
+var _f64 = new DataView(new ArrayBuffer(8));
+function getDouble(d, o){ for(var i = 0; i < 8; i++) _f64.setUint8(i, b(d, o + i)); var r = _f64.getFloat64(0, true); return isNaN(r) ? 0 : r; }
+function sub(d, o, n){ var r = new Uint8Array(Math.max(0, n)); r.set(d.subarray(o, o + n)); return r; }
+var EPOCH_MS = Date.UTC(1983, 11, 31); /* MicrosoftProjectConstants.EPOCH_DATE */
+/* LocalDateTime is represented as seconds since 1983-12-31T00:00 (number) */
+function getTimestamp(d, o){
+  var days = getShort(d, o + 2);
+  if(days <= 1 || days === 65535) return null;
+  var time = getShort(d, o); if(time === 65535) time = 0;
+  var s = days * 86400 + time * 6;
+  if(days < 100 && (s % 60) !== 0) return null;
+  return s;
+}
+function getDate(d, o){ var days = getShort(d, o); return days === 65535 ? null : days; } /* days since epoch */
+function getTime(d, o){ var sec = Math.floor(getShort(d, o) / 10) * 60; if(sec > 86399) sec = sec % 86400; return sec; } /* seconds of day */
+function getDurationMs(d, o){ return Math.floor(getShort(d, o) * 60000 / 10); }
+function utf16(d, o, len){ var s = ""; for(var i = 0; i + 1 < len; i += 2){ s += String.fromCharCode(d[o + i] | (d[o + i + 1] << 8)); } return s; }
+function getUnicodeString(d, o, maxLen){
+  if(!d || o >= d.length) return "";
+  var len = d.length - o;
+  for(var i = o; i < d.length - 1; i += 2){ if(d[i] === 0 && d[i + 1] === 0){ len = i - o; break; } }
+  if(maxLen > 0 && len > maxLen) len = maxLen;
+  return len === 0 ? "" : utf16(d, o, len - (len % 2)) + (len % 2 ? "\ufffd" : "");
+}
+function getString(d, o){ var s = ""; for(var i = o; i < d.length; i++){ if(d[i] === 0) break; s += String.fromCharCode(d[i] > 127 ? (d[i] - 256) & 0xFFFF : d[i]); } return s; }
+function hex2(n){ return (n < 16 ? "0" : "") + n.toString(16).toUpperCase(); }
+function getGUID(d, o){
+  if(!d || d.length <= o + 15) return null;
+  var z = true; for(var i = 0; i < 16; i++) if(d[o + i]){ z = false; break; } if(z) return null;
+  var h = function(arr){ return arr.map(function(k){ return hex2(d[o + k]); }).join(""); };
+  return h([3,2,1,0]) + "-" + h([5,4]) + "-" + h([7,6]) + "-" + h([8,9]) + "-" + h([10,11,12,13,14,15]);
+}
+function getPercentage(d, o){ var v = getShort(d, o); return (v >= 0 && v <= 100) ? v : null; }
+
+/* ===================== OLE2 compound file reader ===================== */
+function CFB(buf){
+  var u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  var SIG = [0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1];
+  if(u8.length < 512) throw MPPError("NOT_CFB", "Not an OLE2 compound file");
+  for(var i = 0; i < 8; i++) if(u8[i] !== SIG[i]) throw MPPError("NOT_CFB", "Not an OLE2 compound file");
+  var major = getShort(u8, 26), ss = 1 << getShort(u8, 30), mss = 1 << getShort(u8, 32);
+  if(ss !== 512 && ss !== 4096) throw MPPError("CORRUPT", "Bad sector size");
+  var nFat = getInt(u8, 44) >>> 0, dirStart = getInt(u8, 48), cutoff = getInt(u8, 56) >>> 0,
+      miniFatStart = getInt(u8, 60), difStart = getInt(u8, 68), nDif = getInt(u8, 72) >>> 0;
+  var nSec = Math.ceil(u8.length / ss) - 1;
+  var fatSecs = [];
+  for(i = 0; i < 109; i++){ var v = getInt(u8, 76 + i * 4); if(v >= 0) fatSecs.push(v); }
+  var s = difStart, guard = 0;
+  while(s >= 0 && s < nSec && guard++ < nDif + 2){
+    var off = (s + 1) * ss;
+    for(i = 0; i < ss / 4 - 1; i++){ v = getInt(u8, off + i * 4); if(v >= 0) fatSecs.push(v); }
+    s = getInt(u8, off + ss - 4);
+  }
+  if(nFat && fatSecs.length > nFat) fatSecs.length = nFat;
+  var per = ss / 4, FAT = new Int32Array(fatSecs.length * per);
+  fatSecs.forEach(function(fs, k){ var o = (fs + 1) * ss; for(var j = 0; j < per; j++) FAT[k * per + j] = getInt(u8, o + j * 4); });
+  function chain(start, fat, limit){ var out = [], x = start, g = 0; while(x >= 0 && x < fat.length && g++ < limit){ out.push(x); x = fat[x]; } return out; }
+  function readBig(start, size){
+    var c = chain(start, FAT, FAT.length + 1), n = size == null ? c.length * ss : size, r = new Uint8Array(Math.min(n, c.length * ss));
+    for(var k = 0; k < c.length && k * ss < r.length; k++){ var o = (c[k] + 1) * ss; r.set(u8.subarray(o, Math.min(o + ss, o + r.length - k * ss)), k * ss); }
+    return r;
+  }
+  var dir = readBig(dirStart, null), ents = [];
+  for(var e = 0; e + 128 <= dir.length; e += 128){
+    var nl = getShort(dir, e + 64);
+    var lo = getInt(dir, e + 120) >>> 0, hi = getInt(dir, e + 124) >>> 0;
+    ents.push({ name: utf16(dir, e, Math.max(0, Math.min(64, nl) - 2)), type: dir[e + 66], left: getInt(dir, e + 68), right: getInt(dir, e + 72), child: getInt(dir, e + 76), start: getInt(dir, e + 116), size: major >= 4 ? lo + hi * 4294967296 : lo, kids: null });
+  }
+  if(!ents.length || ents[0].type !== 5) throw MPPError("CORRUPT", "No root entry");
+  var rootE = ents[0], ministream = null, MINIFAT = null;
+  function miniInit(){
+    if(ministream) return;
+    ministream = readBig(rootE.start, rootE.size);
+    var mf = readBig(miniFatStart, null); MINIFAT = new Int32Array(mf.length >> 2);
+    for(var k = 0; k < MINIFAT.length; k++) MINIFAT[k] = getInt(mf, k * 4);
+  }
+  function kids(ent){
+    if(ent.kids) return ent.kids;
+    var m = {}, st = [ent.child], g = 0;
+    while(st.length && g++ < ents.length * 2){ var k = st.pop(); if(k < 0 || k >= ents.length) continue; var c = ents[k]; if(c.type){ m[c.name] = c; } st.push(c.left); st.push(c.right); }
+    return (ent.kids = m);
+  }
+  function read(ent){
+    if(ent.data) return ent.data;
+    if(ent.size < cutoff){
+      miniInit();
+      var c = chain(ent.start, MINIFAT, MINIFAT.length + 1), r = new Uint8Array(Math.min(ent.size, c.length * mss));
+      for(var k = 0; k < c.length && k * mss < r.length; k++){ var o = c[k] * mss; r.set(ministream.subarray(o, Math.min(o + mss, o + r.length - k * mss)), k * mss); }
+      ent.data = r;
+    } else ent.data = readBig(ent.start, ent.size);
+    return ent.data;
+  }
+  function wrap(ent){
+    return {
+      name: ent.name,
+      isDir: ent.type === 1 || ent.type === 5,
+      has: function(n){ return !!kids(ent)[n]; },
+      dir: function(n){ var c = kids(ent)[n]; if(!c || (c.type !== 1)) throw MPPError("CORRUPT", "Missing storage " + n); return wrap(c); },
+      optDir: function(n){ var c = kids(ent)[n]; return c && c.type === 1 ? wrap(c) : null; },
+      stream: function(n){ var c = kids(ent)[n]; if(!c || c.type !== 2) throw MPPError("CORRUPT", "Missing stream " + n); return read(c); },
+      optStream: function(n){ var c = kids(ent)[n]; return c && c.type === 2 ? read(c) : null; },
+      names: function(){ return Object.keys(kids(ent)); }
+    };
+  }
+  return wrap(rootE);
+}
+
+/* simple input stream over a byte array */
+function IS(d, xor){
+  if(xor){ var c = new Uint8Array(d.length); for(var i = 0; i < d.length; i++) c[i] = d[i] ^ xor; d = c; }
+  return { d: d, p: 0,
+    avail: function(){ return Math.max(0, this.d.length - this.p); },
+    read: function(n){ if(n < 0 || this.p + n > this.d.length) throw MPPError("CORRUPT", "Unexpected end of stream"); var r = this.d.subarray(this.p, this.p + n); this.p += n; return r; },
+    int: function(){ return getInt(this.read(4), 0); },
+    short: function(){ return getShort(this.read(2), 0); },
+    skip: function(n){ this.p += n; }
+  };
+}
+
+/* ===================== Props / FixedMeta / FixedData / VarMeta / Var2Data ===================== */
+function Props(is, v14){
+  var map = {}, header = is.read(16), headerCount = getShort(header, 12), found = 0, avail = is.avail();
+  while(found < headerCount){
+    if(v14 && avail < 12) break;
+    if(is.avail() < 12) break;
+    var a1 = is.int(), a2 = is.int(); is.int(); avail -= 12;
+    if(avail < a1 || a1 < 1) break;
+    var data = sub(is.d, is.p, a1); is.p += a1; avail -= a1;
+    map[a2] = data; ++found;
+    if(data.length % 2 !== 0) is.skip(1);
+  }
+  return {
+    bytes: function(k){ return map[k] || null; },
+    byte: function(k){ var x = map[k]; return x ? (x[0] << 24 >> 24) : 0; },
+    short: function(k){ var x = map[k]; return x ? getShort(x, 0) : 0; },
+    int: function(k){ var x = map[k]; return x ? getInt(x, 0) : 0; },
+    double: function(k){ var x = map[k]; return x ? getDouble(x, 0) : 0; },
+    time: function(k){ var x = map[k]; return x ? getTime(x, 0) : null; },
+    timestamp: function(k){ var x = map[k]; return x ? getTimestamp(x, 0) : null; },
+    bool: function(k){ var x = map[k]; return x ? getShort(x, 0) !== 0 : false; },
+    ustr: function(k){ var x = map[k]; return x ? getUnicodeString(x, 0) : null; }
+  };
+}
+var PK = { ASSIGNMENT_FIELD_MAP:131095, ASSIGNMENT_FIELD_MAP2:50331671, AUTO_FILTER:893386767, CRITICAL_SLACK_LIMIT:37748756,
+  CURRENCY_CODE:37753787, CURRENCY_DIGITS:37748754, CURRENCY_SYMBOL:37748752, DAYS_PER_MONTH:37753743, DEFAULT_CALENDAR_HOURS:37753736,
+  DEFAULT_CALENDAR_NAME:37748750, DEFAULT_TASK_TYPE:37748785, DURATION_UNITS:37748757, EDITABLE_ACTUAL_COSTS:37748802, ENCRYPTION_CODE:893386759,
+  END_TIME:37748769, ENTERPRISE_CUSTOM_FIELD_MAP:37753797, GUID:37748777, HONOR_CONSTRAINTS:37748794, MINUTES_PER_DAY:37748765,
+  MINUTES_PER_WEEK:37748766, NEW_TASKS_ARE_MANUAL:37753800, PASSWORD_FLAG:893386752, PROJECT_FINISH_DATE:37748739, PROJECT_START_DATE:37748738,
+  PROTECTION_PASSWORD_HASH:893386756, RELATION_FIELD_MAP:131094, RESOURCE_FIELD_MAP:131093, RESOURCE_FIELD_MAP2:50331669, SCHEDULE_FROM:37748740,
+  START_TIME:37748764, STATUS_DATE:37748805, TASK_FIELD_MAP:131092, TASK_FIELD_MAP2:50331668, WEEK_START_DAY:37748773, WORK_UNITS:37748758,
+  COMPANY:37748736, MANAGER:37748737, COMMENTS:37748741, TITLE:37748744, SUBJECT:37748745, AUTHOR:37748748, KEYWORDS:37748749, CATEGORY:37748809 };
+
+function FixedMeta(is, itemSizeProvider){
+  var fileSize = is.avail(), magic = is.int();
+  if((magic >>> 0) !== 0xFADFADBA) throw MPPError("CORRUPT", "Bad magic number");
+  is.int(); var itemCount = is.int(); is.int();
+  var itemSize = typeof itemSizeProvider === "number" ? itemSizeProvider : itemSizeProvider(fileSize, itemCount);
+  var adj = Math.floor((fileSize - 16) / itemSize), arr = new Array(Math.max(0, adj));
+  for(var i = 0; i < adj; i++) arr[i] = is.read(itemSize);
+  return { itemCount: itemCount, adjusted: adj, get: function(i){ return (i >= 0 && i < arr.length) ? arr[i] : null; } };
+}
+function multiSize(otherFixed, sizes){
+  return function(fileSize, itemCount){
+    var itemSize = sizes[0], available = fileSize - 16, distance = -2147483648, other = otherFixed.count;
+    for(var k = 0; k < sizes.length; k++){ var t = sizes[k];
+      if(available % t === 0){
+        if(available / t === other){ itemSize = t; break; }
+        var td = itemCount * t - available;
+        if(td <= 0 && td > distance){ itemSize = t; distance = td; }
+      }
+    }
+    return itemSize;
+  };
+}
+function FixedData(meta, is, maxExpected, minSize){
+  maxExpected = maxExpected || 0; minSize = minSize || 0;
+  var buffer = is.d.subarray(is.p), n = meta.adjusted, arr = new Array(n), offs = new Array(n);
+  for(var i = 0; i < n; i++){
+    var md = meta.get(i), itemOffset = getInt(md, 4);
+    if(itemOffset < 0 || itemOffset > buffer.length) continue;
+    var itemSize = (i + 1 === n) ? buffer.length - itemOffset : getInt(meta.get(i + 1), 4) - itemOffset;
+    if(itemSize === 0) itemSize = minSize;
+    var available = buffer.length - itemOffset;
+    if(itemSize < 0 || itemSize > available) itemSize = maxExpected === 0 ? available : Math.min(maxExpected, available);
+    if(maxExpected !== 0 && itemSize > maxExpected) itemSize = maxExpected;
+    if(itemSize > 0){ arr[i] = sub(buffer, itemOffset, Math.min(itemSize, buffer.length - itemOffset)); offs[i] = itemOffset; }
+  }
+  return fixedDataObj(arr, offs);
+}
+function FixedDataSized(meta, itemSize, is){ /* FixedData(FixedMeta, int itemSize, InputStream) */
+  var buffer = is.d.subarray(is.p), n = meta.adjusted, arr = new Array(n), offs = new Array(n);
+  for(var i = 0; i < n; i++){
+    var itemOffset = getInt(meta.get(i), 4);
+    if(itemOffset < 0 || itemOffset > buffer.length) continue;
+    var available = buffer.length - itemOffset;
+    if(itemSize < 0) itemSize = available; else if(itemSize > available) itemSize = available;
+    arr[i] = sub(buffer, itemOffset, itemSize); offs[i] = itemOffset;
+  }
+  return fixedDataObj(arr, offs);
+}
+function FixedDataBlocks(itemSize, is){ /* FixedData(int itemSize, InputStream) */
+  var n = Math.floor(is.avail() / itemSize), arr = new Array(n), offs = new Array(n), o = 0;
+  for(var i = 0; i < n; i++){ offs[i] = o; arr[i] = sub(is.d, is.p, itemSize); is.p += itemSize; o += itemSize; }
+  return fixedDataObj(arr, offs);
+}
+function fixedDataObj(arr, offs){
+  var idx = null;
+  return { count: arr.length,
+    get: function(i){ return (i >= 0 && i < arr.length && arr[i]) ? arr[i] : null; },
+    valid: function(i){ return i != null && i >= 0 && i < arr.length; },
+    indexFromOffset: function(o){ if(!idx){ idx = {}; for(var k = offs.length - 1; k >= 0; k--) if(offs[k] !== undefined) idx[offs[k]] = k; } var r = idx[o]; return r === undefined ? -1 : r; }
+  };
+}
+function VarMeta12(is){
+  var magic = is.int();
+  if(magic !== 0 && (magic >>> 0) !== 0xFADFADBA) throw MPPError("CORRUPT", "Bad magic number");
+  is.int(); var itemCount = is.int(); is.int(); is.int(); is.int();
+  var table = new Map(), offsets = [];
+  for(var i = 0; i < itemCount; i++){
+    if(is.avail() < 12) break;
+    var uid = is.int(), off = is.int(), type = is.short(); is.short();
+    var m = table.get(uid); if(!m){ m = new Map(); table.set(uid, m); }
+    m.set(type, off); offsets.push(off);
+  }
+  while(offsets.length < itemCount) offsets.push(0);
+  offsets.sort(function(a, c){ return a - c; });
+  return { table: table, offsets: offsets,
+    getOffset: function(id, type){ var m = table.get(id); return (m && type != null) ? m.get(type) : undefined; },
+    hasId: function(id){ return table.has(id); },
+    typeCount: function(id){ var m = table.get(id); return m ? m.size : 0; },
+    ids: function(){ return Array.from(table.keys()).sort(function(a, c){ return a - c; }); }
+  };
+}
+function Var2Data(meta, is){
+  var map = new Map(), d = is.d, total = d.length;
+  meta.offsets.forEach(function(off){
+    if(off >= total || off < 0 || map.has(off)) return;
+    var size = getInt(d, off);
+    if(size < 0 || size > total - off - 4) return;
+    map.set(off, sub(d, off + 4, size));
+  });
+  var self = {
+    meta: meta,
+    bytes: function(id, type){ var o = meta.getOffset(id, type); return o === undefined ? null : (map.get(o) || null); },
+    ustr: function(id, type){ var v = self.bytes(id, type); return v ? getUnicodeString(v, 0) : null; },
+    str: function(id, type){ var v = self.bytes(id, type); return v ? getString(v, 0) : null; },
+    short: function(id, type){ var v = self.bytes(id, type); return v && v.length >= 2 ? getShort(v, 0) : 0; },
+    byte: function(id, type){ var v = self.bytes(id, type); return v && v.length ? v[0] : 0; },
+    int: function(id, type){ var v = self.bytes(id, type); return v && v.length >= 4 ? getInt(v, 0) : 0; },
+    double: function(id, type){ var v = self.bytes(id, type); return v && v.length >= 8 ? getDouble(v, 0) : 0; },
+    timestamp: function(id, type){ var v = self.bytes(id, type); return v && v.length >= 4 ? getTimestamp(v, 0) : null; }
+  };
+  return self;
+}
+
+/* ===================== durations / time units ===================== */
+function durationUnits(type, def){
+  switch(type & 0x1F){
+    case 3: return "MINUTES"; case 4: return "ELAPSED_MINUTES"; case 5: return "HOURS"; case 6: return "ELAPSED_HOURS";
+    case 8: return "ELAPSED_DAYS"; case 9: return "WEEKS"; case 10: return "ELAPSED_WEEKS"; case 11: return "MONTHS";
+    case 12: return "ELAPSED_MONTHS"; case 19: return "PERCENT"; case 20: return "ELAPSED_PERCENT"; case 7: return "DAYS";
+    case 21: return def || "DAYS"; default: return "DAYS";
+  }
+}
+function Dur(v, u){ return { v: v, u: u }; }
+function rawDuration(value, u){
+  var x;
+  switch(u){
+    case "MINUTES": case "ELAPSED_MINUTES": x = value / 10; break;
+    case "HOURS": case "ELAPSED_HOURS": x = value / 600; break;
+    case "DAYS": x = value / 4800; break; case "ELAPSED_DAYS": x = value / 14400; break;
+    case "WEEKS": x = value / 24000; break; case "ELAPSED_WEEKS": x = value / 100800; break;
+    case "MONTHS": x = value / 96000; break; case "ELAPSED_MONTHS": x = value / 432000; break;
+    default: x = value;
+  }
+  return Dur(x, u);
+}
+function adjustedDuration(P, duration, u){
+  if(duration === -1) return null;
+  switch(u){
+    case "DAYS": { var upd = P.minutesPerDay * 10; return Dur(upd !== 0 ? duration / upd : 0, u); }
+    case "ELAPSED_DAYS": return Dur(duration / 14400, u);
+    case "WEEKS": { var upw = P.minutesPerWeek * 10; return Dur(upw !== 0 ? duration / upw : 0, u); }
+    case "ELAPSED_WEEKS": return Dur(duration / 100800, u);
+    case "MONTHS": { var upm = P.minutesPerDay * P.daysPerMonth * 10; return Dur(upm !== 0 ? duration / upm : 0, u); }
+    case "ELAPSED_MONTHS": return Dur(duration / 432000, u);
+    default: return rawDuration(duration, u);
+  }
+}
+function convertUnits(dur, from, to, P){
+  if(from === to) return dur;
+  var mpd = P.minutesPerDay, mpw = P.minutesPerWeek, dpm = P.daysPerMonth;
+  switch(from){
+    case "YEARS": dur *= mpw * 52; break; case "ELAPSED_YEARS": dur *= 60 * 24 * 7 * 52; break;
+    case "MONTHS": dur *= mpd * dpm; break; case "ELAPSED_MONTHS": dur *= 60 * 24 * 30; break;
+    case "WEEKS": dur *= mpw; break; case "ELAPSED_WEEKS": dur *= 60 * 24 * 7; break;
+    case "DAYS": dur *= mpd; break; case "ELAPSED_DAYS": dur *= 60 * 24; break;
+    case "HOURS": case "ELAPSED_HOURS": dur *= 60; break;
+  }
+  if(to !== "MINUTES" && to !== "ELAPSED_MINUTES"){
+    switch(to){
+      case "HOURS": case "ELAPSED_HOURS": dur /= 60; break;
+      case "DAYS": dur = mpd !== 0 ? dur / mpd : 0; break;
+      case "ELAPSED_DAYS": dur /= 60 * 24; break;
+      case "WEEKS": dur = mpw !== 0 ? dur / mpw : 0; break;
+      case "ELAPSED_WEEKS": dur /= 60 * 24 * 7; break;
+      case "MONTHS": dur = (mpd !== 0 && dpm !== 0) ? dur / (mpd * dpm) : 0; break;
+      case "ELAPSED_MONTHS": dur /= 60 * 24 * 30; break;
+      case "YEARS": dur = mpw !== 0 ? dur / (mpw * 52) : 0; break;
+      case "ELAPSED_YEARS": dur /= 60 * 24 * 7 * 52; break;
+    }
+  }
+  return dur;
+}
+var TIME_UNITS = ["MINUTES","HOURS","DAYS","WEEKS","MONTHS","PERCENT","YEARS","ELAPSED_MINUTES","ELAPSED_HOURS","ELAPSED_DAYS","ELAPSED_WEEKS","ELAPSED_MONTHS","ELAPSED_YEARS","ELAPSED_PERCENT"];
+function timeUnitInstance(i){ return (i < 0 || i >= TIME_UNITS.length) ? "DAYS" : TIME_UNITS[i]; }
+var CONSTRAINTS = ["AS_SOON_AS_POSSIBLE","AS_LATE_AS_POSSIBLE","MUST_START_ON","MUST_FINISH_ON","START_NO_EARLIER_THAN","START_NO_LATER_THAN","FINISH_NO_EARLIER_THAN","FINISH_NO_LATER_THAN"];
+/* generated by gen_tables.py from MPXJ sources (LGPL-2.1) */
+var MT={"T":"0,WORK;1,BASELINE_WORK;2,ACTUAL_WORK;3,WORK_VARIANCE;4,REMAINING_WORK;5,COST;6,BASELINE_COST;7,ACTUAL_COST;8,FIXED_COST;9,COST_VARIANCE;10,REMAINING_COST;11,BCWP;12,BCWS;13,SV;14,NAME;15,NOTES;16,WBS;17,CONSTRAINT_TYPE;18,CONSTRAINT_DATE;19,CRITICAL;20,LEVELING_DELAY;21,FREE_SLACK;22,TOTAL_SLACK;23,ID;24,MILESTONE;25,PRIORITY;26,SUBPROJECT_FILE;27,BASELINE_DURATION;28,ACTUAL_DURATION;29,DURATION;30,DURATION_VARIANCE;31,REMAINING_DURATION;32,PERCENT_COMPLETE;33,PERCENT_WORK_COMPLETE;34,FIXED_DURATION;35,START;36,FINISH;37,EARLY_START;38,EARLY_FINISH;39,LATE_START;40,LATE_FINISH;41,ACTUAL_START;42,ACTUAL_FINISH;43,BASELINE_START;44,BASELINE_FINISH;45,START_VARIANCE;46,FINISH_VARIANCE;47,PREDECESSORS;48,SUCCESSORS;49,RESOURCE_NAMES;50,RESOURCE_INITIALS;51,TEXT1;52,START1;53,FINISH1;54,TEXT2;55,START2;56,FINISH2;57,TEXT3;58,START3;59,FINISH3;60,TEXT4;61,START4;62,FINISH4;63,TEXT5;64,START5;65,FINISH5;66,TEXT6;67,TEXT7;68,TEXT8;69,TEXT9;70,TEXT10;71,MARKED;72,FLAG1;73,FLAG2;74,FLAG3;75,FLAG4;76,FLAG5;77,FLAG6;78,FLAG7;79,FLAG8;80,FLAG9;81,FLAG10;82,ROLLUP;83,CV;84,PROJECT;85,OUTLINE_LEVEL;86,UNIQUE_ID;87,NUMBER1;88,NUMBER2;89,NUMBER3;90,NUMBER4;91,NUMBER5;92,SUMMARY;93,CREATED;94,NOTES;95,UNIQUE_ID_PREDECESSORS;96,UNIQUE_ID_SUCCESSORS;97,OBJECTS;98,LINKED_FIELDS;99,RESUME;100,STOP;101,RESUME_NO_EARLIER_THAN;102,OUTLINE_NUMBER;103,DURATION1;104,DURATION2;105,DURATION3;106,COST1;107,COST2;108,COST3;109,HIDE_BAR;110,CONFIRMED;111,UPDATE_NEEDED;112,CONTACT;113,RESOURCE_GROUP;119,COMPLETE_THROUGH;120,ACWP;128,TYPE;129,RECURRING;132,EFFORT_DRIVEN;135,PARENT_TASK;152,DURATION_UNITS;160,PARENT_TASK_UNIQUE_ID;163,OVERTIME_WORK;164,ACTUAL_OVERTIME_WORK;165,REMAINING_OVERTIME_WORK;166,REGULAR_WORK;168,OVERTIME_COST;169,ACTUAL_OVERTIME_COST;170,REMAINING_OVERTIME_COST;178,LEVELING_DELAY_UNITS;179,BASELINE_DURATION_UNITS;181,ACTUAL_DURATION_UNITS;183,DURATION1_UNITS;184,DURATION2_UNITS;185,DURATION3_UNITS;200,FIXED_COST_ACCRUAL;202,RECURRING;203,RECURRING_DATA;205,INDICATORS;215,HYPERLINK_DATA;217,HYPERLINK;218,HYPERLINK_ADDRESS;219,HYPERLINK_SUBADDRESS;220,HYPERLINK_HREF;224,ASSIGNMENT;225,OVERALLOCATED;232,EXTERNAL_TASK;242,SUBPROJECT_TASK_UNIQUE_ID;246,SUBPROJECT_READ_ONLY;249,OUTLINE_LEVEL;250,RESPONSE_PENDING;251,TEAMSTATUS_PENDING;252,LEVELING_CAN_SPLIT;253,LEVEL_ASSIGNMENTS;255,SUBPROJECT_TASK_ID;256,WORK_CONTOUR;258,COST4;259,COST5;260,COST6;261,COST7;262,COST8;263,COST9;264,COST10;265,DATE1;266,DATE2;267,DATE3;268,DATE4;269,DATE5;270,DATE6;271,DATE7;272,DATE8;273,DATE9;274,DATE10;275,DURATION4;276,DURATION5;277,DURATION6;278,DURATION7;279,DURATION8;280,DURATION9;281,DURATION10;282,START6;283,FINISH6;284,START7;285,FINISH7;286,START8;287,FINISH8;288,START9;289,FINISH9;290,START10;291,FINISH10;292,FLAG11;293,FLAG12;294,FLAG13;295,FLAG14;296,FLAG15;297,FLAG16;298,FLAG17;299,FLAG18;300,FLAG19;301,FLAG20;302,NUMBER6;303,NUMBER7;304,NUMBER8;305,NUMBER9;306,NUMBER10;307,NUMBER11;308,NUMBER12;309,NUMBER13;310,NUMBER14;311,NUMBER15;312,NUMBER16;313,NUMBER17;314,NUMBER18;315,NUMBER19;316,NUMBER20;317,TEXT11;318,TEXT12;319,TEXT13;320,TEXT14;321,TEXT15;322,TEXT16;323,TEXT17;324,TEXT18;325,TEXT19;326,TEXT20;327,TEXT21;328,TEXT22;329,TEXT23;330,TEXT24;331,TEXT25;332,TEXT26;333,TEXT27;334,TEXT28;335,TEXT29;336,TEXT30;337,DURATION4_UNITS;338,DURATION5_UNITS;339,DURATION6_UNITS;340,DURATION7_UNITS;341,DURATION8_UNITS;342,DURATION9_UNITS;343,DURATION10_UNITS;349,RESOURCE_PHONETICS;360,INDEX;366,ASSIGNMENT_DELAY;367,ASSIGNMENT_UNITS;368,COST_RATE_TABLE;369,PRELEVELED_START;370,PRELEVELED_FINISH;372,SUMMARY_PROGRESS;387,SUMMARY_PROGRESS;396,ESTIMATED;399,IGNORE_RESOURCE_CALENDAR;401,CALENDAR_UNIQUE_ID;402,TASK_CALENDAR;403,DURATION1_ESTIMATED;404,DURATION2_ESTIMATED;405,DURATION3_ESTIMATED;406,DURATION4_ESTIMATED;407,DURATION5_ESTIMATED;408,DURATION6_ESTIMATED;409,DURATION7_ESTIMATED;410,DURATION8_ESTIMATED;411,DURATION9_ESTIMATED;412,DURATION10_ESTIMATED;413,BASELINE_DURATION_ESTIMATED;416,OUTLINE_CODE1;417,OUTLINE_CODE1_INDEX;418,OUTLINE_CODE2;419,OUTLINE_CODE2_INDEX;420,OUTLINE_CODE3;421,OUTLINE_CODE3_INDEX;422,OUTLINE_CODE4;423,OUTLINE_CODE4_INDEX;424,OUTLINE_CODE5;425,OUTLINE_CODE5_INDEX;426,OUTLINE_CODE6;427,OUTLINE_CODE6_INDEX;428,OUTLINE_CODE7;429,OUTLINE_CODE7_INDEX;430,OUTLINE_CODE8;431,OUTLINE_CODE8_INDEX;432,OUTLINE_CODE9;433,OUTLINE_CODE9_INDEX;434,OUTLINE_CODE10;435,OUTLINE_CODE10_INDEX;437,DEADLINE;438,START_SLACK;439,FINISH_SLACK;441,VAC;446,GROUP_BY_SUMMARY;449,WBS_PREDECESSORS;450,WBS_SUCCESSORS;451,RESOURCE_TYPE;452,HYPERLINK_SCREEN_TIP;458,SUBPROJECT_TASKS_UNIQUEID_OFFSET;480,BASELINE_FIXED_COST;481,ENTERPRISE_DATA;482,BASELINE1_START;483,BASELINE1_FINISH;484,BASELINE1_COST;485,BASELINE1_WORK;487,BASELINE1_DURATION;488,BASELINE1_DURATION_UNITS;489,BASELINE1_FIXED_COST;493,BASELINE2_START;494,BASELINE2_FINISH;495,BASELINE2_COST;496,BASELINE2_WORK;498,BASELINE2_DURATION;499,BASELINE2_DURATION_UNITS;500,BASELINE2_FIXED_COST;504,BASELINE3_START;505,BASELINE3_FINISH;506,BASELINE3_COST;507,BASELINE3_WORK;509,BASELINE3_DURATION;510,BASELINE3_DURATION_UNITS;511,BASELINE3_FIXED_COST;515,BASELINE4_START;516,BASELINE4_FINISH;517,BASELINE4_COST;518,BASELINE4_WORK;520,BASELINE4_DURATION;521,BASELINE4_DURATION_UNITS;522,BASELINE4_FIXED_COST;526,BASELINE5_START;527,BASELINE5_FINISH;528,BASELINE5_COST;529,BASELINE5_WORK;531,BASELINE5_DURATION;532,BASELINE5_DURATION_UNITS;533,BASELINE5_FIXED_COST;537,CPI;538,SPI;539,CVPERCENT;540,SVPERCENT;541,EAC;542,TCPI;543,STATUS;544,BASELINE6_START;545,BASELINE6_FINISH;546,BASELINE6_COST;547,BASELINE6_WORK;549,BASELINE6_DURATION;550,BASELINE6_DURATION_UNITS;551,BASELINE6_FIXED_COST;555,BASELINE7_START;556,BASELINE7_FINISH;557,BASELINE7_COST;558,BASELINE7_WORK;560,BASELINE7_DURATION;561,BASELINE7_DURATION_UNITS;562,BASELINE7_FIXED_COST;566,BASELINE8_START;567,BASELINE8_FINISH;568,BASELINE8_COST;569,BASELINE8_WORK;571,BASELINE8_DURATION;572,BASELINE8_DURATION_UNITS;573,BASELINE8_FIXED_COST;577,BASELINE9_START;578,BASELINE9_FINISH;579,BASELINE9_COST;580,BASELINE9_WORK;582,BASELINE9_DURATION;583,BASELINE9_DURATION_UNITS;584,BASELINE9_FIXED_COST;588,BASELINE10_START;589,BASELINE10_FINISH;590,BASELINE10_COST;591,BASELINE10_WORK;593,BASELINE10_DURATION;594,BASELINE10_DURATION_UNITS;595,BASELINE10_FIXED_COST;599,ENTERPRISE_COST1;600,ENTERPRISE_COST2;601,ENTERPRISE_COST3;602,ENTERPRISE_COST4;603,ENTERPRISE_COST5;604,ENTERPRISE_COST6;605,ENTERPRISE_COST7;606,ENTERPRISE_COST8;607,ENTERPRISE_COST9;608,ENTERPRISE_COST10;609,ENTERPRISE_DATE1;610,ENTERPRISE_DATE2;611,ENTERPRISE_DATE3;612,ENTERPRISE_DATE4;613,ENTERPRISE_DATE5;614,ENTERPRISE_DATE6;615,ENTERPRISE_DATE7;616,ENTERPRISE_DATE8;617,ENTERPRISE_DATE9;618,ENTERPRISE_DATE10;619,ENTERPRISE_DATE11;620,ENTERPRISE_DATE12;621,ENTERPRISE_DATE13;622,ENTERPRISE_DATE14;623,ENTERPRISE_DATE15;624,ENTERPRISE_DATE16;625,ENTERPRISE_DATE17;626,ENTERPRISE_DATE18;627,ENTERPRISE_DATE19;628,ENTERPRISE_DATE20;629,ENTERPRISE_DATE21;630,ENTERPRISE_DATE22;631,ENTERPRISE_DATE23;632,ENTERPRISE_DATE24;633,ENTERPRISE_DATE25;634,ENTERPRISE_DATE26;635,ENTERPRISE_DATE27;636,ENTERPRISE_DATE28;637,ENTERPRISE_DATE29;638,ENTERPRISE_DATE30;639,ENTERPRISE_DURATION1;640,ENTERPRISE_DURATION2;641,ENTERPRISE_DURATION3;642,ENTERPRISE_DURATION4;643,ENTERPRISE_DURATION5;644,ENTERPRISE_DURATION6;645,ENTERPRISE_DURATION7;646,ENTERPRISE_DURATION8;647,ENTERPRISE_DURATION9;648,ENTERPRISE_DURATION10;649,ENTERPRISE_DURATION1_UNITS;650,ENTERPRISE_DURATION2_UNITS;651,ENTERPRISE_DURATION3_UNITS;652,ENTERPRISE_DURATION4_UNITS;653,ENTERPRISE_DURATION5_UNITS;654,ENTERPRISE_DURATION6_UNITS;655,ENTERPRISE_DURATION7_UNITS;656,ENTERPRISE_DURATION8_UNITS;657,ENTERPRISE_DURATION9_UNITS;658,ENTERPRISE_DURATION10_UNITS;659,ENTERPRISE_FLAG1;660,ENTERPRISE_FLAG2;661,ENTERPRISE_FLAG3;662,ENTERPRISE_FLAG4;663,ENTERPRISE_FLAG5;664,ENTERPRISE_FLAG6;665,ENTERPRISE_FLAG7;666,ENTERPRISE_FLAG8;667,ENTERPRISE_FLAG9;668,ENTERPRISE_FLAG10;669,ENTERPRISE_FLAG11;670,ENTERPRISE_FLAG12;671,ENTERPRISE_FLAG13;672,ENTERPRISE_FLAG14;673,ENTERPRISE_FLAG15;674,ENTERPRISE_FLAG16;675,ENTERPRISE_FLAG17;676,ENTERPRISE_FLAG18;677,ENTERPRISE_FLAG19;678,ENTERPRISE_FLAG20;699,ENTERPRISE_NUMBER1;700,ENTERPRISE_NUMBER2;701,ENTERPRISE_NUMBER3;702,ENTERPRISE_NUMBER4;703,ENTERPRISE_NUMBER5;704,ENTERPRISE_NUMBER6;705,ENTERPRISE_NUMBER7;706,ENTERPRISE_NUMBER8;707,ENTERPRISE_NUMBER9;708,ENTERPRISE_NUMBER10;709,ENTERPRISE_NUMBER11;710,ENTERPRISE_NUMBER12;711,ENTERPRISE_NUMBER13;712,ENTERPRISE_NUMBER14;713,ENTERPRISE_NUMBER15;714,ENTERPRISE_NUMBER16;715,ENTERPRISE_NUMBER17;716,ENTERPRISE_NUMBER18;717,ENTERPRISE_NUMBER19;718,ENTERPRISE_NUMBER20;719,ENTERPRISE_NUMBER21;720,ENTERPRISE_NUMBER22;721,ENTERPRISE_NUMBER23;722,ENTERPRISE_NUMBER24;723,ENTERPRISE_NUMBER25;724,ENTERPRISE_NUMBER26;725,ENTERPRISE_NUMBER27;726,ENTERPRISE_NUMBER28;727,ENTERPRISE_NUMBER29;728,ENTERPRISE_NUMBER30;729,ENTERPRISE_NUMBER31;730,ENTERPRISE_NUMBER32;731,ENTERPRISE_NUMBER33;732,ENTERPRISE_NUMBER34;733,ENTERPRISE_NUMBER35;734,ENTERPRISE_NUMBER36;735,ENTERPRISE_NUMBER37;736,ENTERPRISE_NUMBER38;737,ENTERPRISE_NUMBER39;738,ENTERPRISE_NUMBER40;739,ENTERPRISE_OUTLINE_CODE1;741,ENTERPRISE_OUTLINE_CODE2;743,ENTERPRISE_OUTLINE_CODE3;745,ENTERPRISE_OUTLINE_CODE4;747,ENTERPRISE_OUTLINE_CODE5;749,ENTERPRISE_OUTLINE_CODE6;751,ENTERPRISE_OUTLINE_CODE7;753,ENTERPRISE_OUTLINE_CODE8;755,ENTERPRISE_OUTLINE_CODE9;757,ENTERPRISE_OUTLINE_CODE10;759,ENTERPRISE_OUTLINE_CODE11;761,ENTERPRISE_OUTLINE_CODE12;763,ENTERPRISE_OUTLINE_CODE13;765,ENTERPRISE_OUTLINE_CODE14;767,ENTERPRISE_OUTLINE_CODE15;769,ENTERPRISE_OUTLINE_CODE16;771,ENTERPRISE_OUTLINE_CODE17;773,ENTERPRISE_OUTLINE_CODE18;775,ENTERPRISE_OUTLINE_CODE19;777,ENTERPRISE_OUTLINE_CODE20;779,ENTERPRISE_OUTLINE_CODE21;781,ENTERPRISE_OUTLINE_CODE22;783,ENTERPRISE_OUTLINE_CODE23;785,ENTERPRISE_OUTLINE_CODE24;787,ENTERPRISE_OUTLINE_CODE25;789,ENTERPRISE_OUTLINE_CODE26;791,ENTERPRISE_OUTLINE_CODE27;793,ENTERPRISE_OUTLINE_CODE28;795,ENTERPRISE_OUTLINE_CODE29;797,ENTERPRISE_OUTLINE_CODE30;799,ENTERPRISE_TEXT1;800,ENTERPRISE_TEXT2;801,ENTERPRISE_TEXT3;802,ENTERPRISE_TEXT4;803,ENTERPRISE_TEXT5;804,ENTERPRISE_TEXT6;805,ENTERPRISE_TEXT7;806,ENTERPRISE_TEXT8;807,ENTERPRISE_TEXT9;808,ENTERPRISE_TEXT10;809,ENTERPRISE_TEXT11;810,ENTERPRISE_TEXT12;811,ENTERPRISE_TEXT13;812,ENTERPRISE_TEXT14;813,ENTERPRISE_TEXT15;814,ENTERPRISE_TEXT16;815,ENTERPRISE_TEXT17;816,ENTERPRISE_TEXT18;817,ENTERPRISE_TEXT19;818,ENTERPRISE_TEXT20;819,ENTERPRISE_TEXT21;820,ENTERPRISE_TEXT22;821,ENTERPRISE_TEXT23;822,ENTERPRISE_TEXT24;823,ENTERPRISE_TEXT25;824,ENTERPRISE_TEXT26;825,ENTERPRISE_TEXT27;826,ENTERPRISE_TEXT28;827,ENTERPRISE_TEXT29;828,ENTERPRISE_TEXT30;829,ENTERPRISE_TEXT31;830,ENTERPRISE_TEXT32;831,ENTERPRISE_TEXT33;832,ENTERPRISE_TEXT34;833,ENTERPRISE_TEXT35;834,ENTERPRISE_TEXT36;835,ENTERPRISE_TEXT37;836,ENTERPRISE_TEXT38;837,ENTERPRISE_TEXT39;838,ENTERPRISE_TEXT40;839,BASELINE1_DURATION_ESTIMATED;840,BASELINE2_DURATION_ESTIMATED;841,BASELINE3_DURATION_ESTIMATED;842,BASELINE4_DURATION_ESTIMATED;843,BASELINE5_DURATION_ESTIMATED;844,BASELINE6_DURATION_ESTIMATED;845,BASELINE7_DURATION_ESTIMATED;846,BASELINE8_DURATION_ESTIMATED;847,BASELINE9_DURATION_ESTIMATED;848,BASELINE10_DURATION_ESTIMATED;849,ENTERPRISE_PROJECT_COST1;850,ENTERPRISE_PROJECT_COST2;851,ENTERPRISE_PROJECT_COST3;852,ENTERPRISE_PROJECT_COST4;853,ENTERPRISE_PROJECT_COST5;854,ENTERPRISE_PROJECT_COST6;855,ENTERPRISE_PROJECT_COST7;856,ENTERPRISE_PROJECT_COST8;857,ENTERPRISE_PROJECT_COST9;858,ENTERPRISE_PROJECT_COST10;859,ENTERPRISE_PROJECT_DATE1;860,ENTERPRISE_PROJECT_DATE2;861,ENTERPRISE_PROJECT_DATE3;862,ENTERPRISE_PROJECT_DATE4;863,ENTERPRISE_PROJECT_DATE5;864,ENTERPRISE_PROJECT_DATE6;865,ENTERPRISE_PROJECT_DATE7;866,ENTERPRISE_PROJECT_DATE8;867,ENTERPRISE_PROJECT_DATE9;868,ENTERPRISE_PROJECT_DATE10;869,ENTERPRISE_PROJECT_DATE11;870,ENTERPRISE_PROJECT_DATE12;871,ENTERPRISE_PROJECT_DATE13;872,ENTERPRISE_PROJECT_DATE14;873,ENTERPRISE_PROJECT_DATE15;874,ENTERPRISE_PROJECT_DATE16;875,ENTERPRISE_PROJECT_DATE17;876,ENTERPRISE_PROJECT_DATE18;877,ENTERPRISE_PROJECT_DATE19;878,ENTERPRISE_PROJECT_DATE20;879,ENTERPRISE_PROJECT_DATE21;880,ENTERPRISE_PROJECT_DATE22;881,ENTERPRISE_PROJECT_DATE23;882,ENTERPRISE_PROJECT_DATE24;883,ENTERPRISE_PROJECT_DATE25;884,ENTERPRISE_PROJECT_DATE26;885,ENTERPRISE_PROJECT_DATE27;886,ENTERPRISE_PROJECT_DATE28;887,ENTERPRISE_PROJECT_DATE29;888,ENTERPRISE_PROJECT_DATE30;889,ENTERPRISE_PROJECT_DURATION1;890,ENTERPRISE_PROJECT_DURATION2;891,ENTERPRISE_PROJECT_DURATION3;892,ENTERPRISE_PROJECT_DURATION4;893,ENTERPRISE_PROJECT_DURATION5;894,ENTERPRISE_PROJECT_DURATION6;895,ENTERPRISE_PROJECT_DURATION7;896,ENTERPRISE_PROJECT_DURATION8;897,ENTERPRISE_PROJECT_DURATION9;898,ENTERPRISE_PROJECT_DURATION10;909,ENTERPRISE_PROJECT_OUTLINE_CODE1;910,ENTERPRISE_PROJECT_OUTLINE_CODE2;911,ENTERPRISE_PROJECT_OUTLINE_CODE3;912,ENTERPRISE_PROJECT_OUTLINE_CODE4;913,ENTERPRISE_PROJECT_OUTLINE_CODE5;914,ENTERPRISE_PROJECT_OUTLINE_CODE6;915,ENTERPRISE_PROJECT_OUTLINE_CODE7;916,ENTERPRISE_PROJECT_OUTLINE_CODE8;917,ENTERPRISE_PROJECT_OUTLINE_CODE9;918,ENTERPRISE_PROJECT_OUTLINE_CODE10;919,ENTERPRISE_PROJECT_OUTLINE_CODE11;920,ENTERPRISE_PROJECT_OUTLINE_CODE12;921,ENTERPRISE_PROJECT_OUTLINE_CODE13;922,ENTERPRISE_PROJECT_OUTLINE_CODE14;923,ENTERPRISE_PROJECT_OUTLINE_CODE15;924,ENTERPRISE_PROJECT_OUTLINE_CODE16;925,ENTERPRISE_PROJECT_OUTLINE_CODE17;926,ENTERPRISE_PROJECT_OUTLINE_CODE18;927,ENTERPRISE_PROJECT_OUTLINE_CODE19;928,ENTERPRISE_PROJECT_OUTLINE_CODE20;929,ENTERPRISE_PROJECT_OUTLINE_CODE21;930,ENTERPRISE_PROJECT_OUTLINE_CODE22;931,ENTERPRISE_PROJECT_OUTLINE_CODE23;932,ENTERPRISE_PROJECT_OUTLINE_CODE24;933,ENTERPRISE_PROJECT_OUTLINE_CODE25;934,ENTERPRISE_PROJECT_OUTLINE_CODE26;935,ENTERPRISE_PROJECT_OUTLINE_CODE27;936,ENTERPRISE_PROJECT_OUTLINE_CODE28;937,ENTERPRISE_PROJECT_OUTLINE_CODE29;938,ENTERPRISE_PROJECT_OUTLINE_CODE30;969,ENTERPRISE_PROJECT_FLAG1;970,ENTERPRISE_PROJECT_FLAG2;971,ENTERPRISE_PROJECT_FLAG3;972,ENTERPRISE_PROJECT_FLAG4;973,ENTERPRISE_PROJECT_FLAG5;974,ENTERPRISE_PROJECT_FLAG6;975,ENTERPRISE_PROJECT_FLAG7;976,ENTERPRISE_PROJECT_FLAG8;977,ENTERPRISE_PROJECT_FLAG9;978,ENTERPRISE_PROJECT_FLAG10;979,ENTERPRISE_PROJECT_FLAG11;980,ENTERPRISE_PROJECT_FLAG12;981,ENTERPRISE_PROJECT_FLAG13;982,ENTERPRISE_PROJECT_FLAG14;983,ENTERPRISE_PROJECT_FLAG15;984,ENTERPRISE_PROJECT_FLAG16;985,ENTERPRISE_PROJECT_FLAG17;986,ENTERPRISE_PROJECT_FLAG18;987,ENTERPRISE_PROJECT_FLAG19;988,ENTERPRISE_PROJECT_FLAG20;1009,ENTERPRISE_PROJECT_NUMBER1;1010,ENTERPRISE_PROJECT_NUMBER2;1011,ENTERPRISE_PROJECT_NUMBER3;1012,ENTERPRISE_PROJECT_NUMBER4;1013,ENTERPRISE_PROJECT_NUMBER5;1014,ENTERPRISE_PROJECT_NUMBER6;1015,ENTERPRISE_PROJECT_NUMBER7;1016,ENTERPRISE_PROJECT_NUMBER8;1017,ENTERPRISE_PROJECT_NUMBER9;1018,ENTERPRISE_PROJECT_NUMBER10;1019,ENTERPRISE_PROJECT_NUMBER11;1020,ENTERPRISE_PROJECT_NUMBER12;1021,ENTERPRISE_PROJECT_NUMBER13;1022,ENTERPRISE_PROJECT_NUMBER14;1023,ENTERPRISE_PROJECT_NUMBER15;1024,ENTERPRISE_PROJECT_NUMBER16;1025,ENTERPRISE_PROJECT_NUMBER17;1026,ENTERPRISE_PROJECT_NUMBER18;1027,ENTERPRISE_PROJECT_NUMBER19;1028,ENTERPRISE_PROJECT_NUMBER20;1029,ENTERPRISE_PROJECT_NUMBER21;1030,ENTERPRISE_PROJECT_NUMBER22;1031,ENTERPRISE_PROJECT_NUMBER23;1032,ENTERPRISE_PROJECT_NUMBER24;1033,ENTERPRISE_PROJECT_NUMBER25;1034,ENTERPRISE_PROJECT_NUMBER26;1035,ENTERPRISE_PROJECT_NUMBER27;1036,ENTERPRISE_PROJECT_NUMBER28;1037,ENTERPRISE_PROJECT_NUMBER29;1038,ENTERPRISE_PROJECT_NUMBER30;1039,ENTERPRISE_PROJECT_NUMBER31;1040,ENTERPRISE_PROJECT_NUMBER32;1041,ENTERPRISE_PROJECT_NUMBER33;1042,ENTERPRISE_PROJECT_NUMBER34;1043,ENTERPRISE_PROJECT_NUMBER35;1044,ENTERPRISE_PROJECT_NUMBER36;1045,ENTERPRISE_PROJECT_NUMBER37;1046,ENTERPRISE_PROJECT_NUMBER38;1047,ENTERPRISE_PROJECT_NUMBER39;1048,ENTERPRISE_PROJECT_NUMBER40;1049,ENTERPRISE_PROJECT_TEXT1;1050,ENTERPRISE_PROJECT_TEXT2;1051,ENTERPRISE_PROJECT_TEXT3;1052,ENTERPRISE_PROJECT_TEXT4;1053,ENTERPRISE_PROJECT_TEXT5;1054,ENTERPRISE_PROJECT_TEXT6;1055,ENTERPRISE_PROJECT_TEXT7;1056,ENTERPRISE_PROJECT_TEXT8;1057,ENTERPRISE_PROJECT_TEXT9;1058,ENTERPRISE_PROJECT_TEXT10;1059,ENTERPRISE_PROJECT_TEXT11;1060,ENTERPRISE_PROJECT_TEXT12;1061,ENTERPRISE_PROJECT_TEXT13;1062,ENTERPRISE_PROJECT_TEXT14;1063,ENTERPRISE_PROJECT_TEXT15;1064,ENTERPRISE_PROJECT_TEXT16;1065,ENTERPRISE_PROJECT_TEXT17;1066,ENTERPRISE_PROJECT_TEXT18;1067,ENTERPRISE_PROJECT_TEXT19;1068,ENTERPRISE_PROJECT_TEXT20;1069,ENTERPRISE_PROJECT_TEXT21;1070,ENTERPRISE_PROJECT_TEXT22;1071,ENTERPRISE_PROJECT_TEXT23;1072,ENTERPRISE_PROJECT_TEXT24;1073,ENTERPRISE_PROJECT_TEXT25;1074,ENTERPRISE_PROJECT_TEXT26;1075,ENTERPRISE_PROJECT_TEXT27;1076,ENTERPRISE_PROJECT_TEXT28;1077,ENTERPRISE_PROJECT_TEXT29;1078,ENTERPRISE_PROJECT_TEXT30;1079,ENTERPRISE_PROJECT_TEXT31;1080,ENTERPRISE_PROJECT_TEXT32;1081,ENTERPRISE_PROJECT_TEXT33;1082,ENTERPRISE_PROJECT_TEXT34;1083,ENTERPRISE_PROJECT_TEXT35;1084,ENTERPRISE_PROJECT_TEXT36;1085,ENTERPRISE_PROJECT_TEXT37;1086,ENTERPRISE_PROJECT_TEXT38;1087,ENTERPRISE_PROJECT_TEXT39;1088,ENTERPRISE_PROJECT_TEXT40;1089,RESOURCE_ENTERPRISE_OUTLINE_CODE1;1090,RESOURCE_ENTERPRISE_OUTLINE_CODE2;1091,RESOURCE_ENTERPRISE_OUTLINE_CODE3;1092,RESOURCE_ENTERPRISE_OUTLINE_CODE4;1093,RESOURCE_ENTERPRISE_OUTLINE_CODE5;1094,RESOURCE_ENTERPRISE_OUTLINE_CODE6;1095,RESOURCE_ENTERPRISE_OUTLINE_CODE7;1096,RESOURCE_ENTERPRISE_OUTLINE_CODE8;1097,RESOURCE_ENTERPRISE_OUTLINE_CODE9;1098,RESOURCE_ENTERPRISE_OUTLINE_CODE10;1099,RESOURCE_ENTERPRISE_OUTLINE_CODE11;1100,RESOURCE_ENTERPRISE_OUTLINE_CODE12;1101,RESOURCE_ENTERPRISE_OUTLINE_CODE13;1102,RESOURCE_ENTERPRISE_OUTLINE_CODE14;1103,RESOURCE_ENTERPRISE_OUTLINE_CODE15;1104,RESOURCE_ENTERPRISE_OUTLINE_CODE16;1105,RESOURCE_ENTERPRISE_OUTLINE_CODE17;1106,RESOURCE_ENTERPRISE_OUTLINE_CODE18;1107,RESOURCE_ENTERPRISE_OUTLINE_CODE19;1108,RESOURCE_ENTERPRISE_OUTLINE_CODE20;1109,RESOURCE_ENTERPRISE_OUTLINE_CODE21;1110,RESOURCE_ENTERPRISE_OUTLINE_CODE22;1111,RESOURCE_ENTERPRISE_OUTLINE_CODE23;1112,RESOURCE_ENTERPRISE_OUTLINE_CODE24;1113,RESOURCE_ENTERPRISE_OUTLINE_CODE25;1114,RESOURCE_ENTERPRISE_OUTLINE_CODE26;1115,RESOURCE_ENTERPRISE_OUTLINE_CODE27;1116,RESOURCE_ENTERPRISE_OUTLINE_CODE28;1117,RESOURCE_ENTERPRISE_OUTLINE_CODE29;1118,RESOURCE_ENTERPRISE_RBS;1119,PHYSICAL_PERCENT_COMPLETE;1120,REQUEST_DEMAND;1121,STATUS_INDICATOR;1122,EARNED_VALUE_METHOD;1129,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE20;1130,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE21;1131,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE22;1132,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE23;1133,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE24;1134,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE25;1135,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE26;1136,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE27;1137,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE28;1138,RESOURCE_ENTERPRISE_MULTI_VALUE_CODE29;1139,ACTUAL_WORK_PROTECTED;1140,ACTUAL_OVERTIME_WORK_PROTECTED;1143,GUID;1144,TASK_CALENDAR_GUID;1146,DELIVERABLE_GUID;1147,DELIVERABLE_TYPE;1152,DELIVERABLE_START;1153,DELIVERABLE_FINISH;1165,PUBLISH;1166,STATUS_MANAGER;1167,ERROR_MESSAGE;1169,SUBPROJECT_GUID;1170,ASSIGNMENT_OWNER;1171,BUDGET_WORK;1172,BUDGET_COST;1173,BASELINE_FIXED_COST_ACCRUAL;1174,BASELINE_DELIVERABLE_START;1175,BASELINE_DELIVERABLE_FINISH;1176,BASELINE_BUDGET_WORK;1177,BASELINE_BUDGET_COST;1180,BASELINE1_FIXED_COST_ACCRUAL;1181,BASELINE1_DELIVERABLE_START;1182,BASELINE1_DELIVERABLE_FINISH;1183,BASELINE1_BUDGET_WORK;1184,BASELINE1_BUDGET_COST;1187,BASELINE2_FIXED_COST_ACCRUAL;1188,BASELINE2_DELIVERABLE_START;1189,BASELINE2_DELIVERABLE_FINISH;1190,BASELINE2_BUDGET_WORK;1191,BASELINE2_BUDGET_COST;1194,BASELINE3_FIXED_COST_ACCRUAL;1195,BASELINE3_DELIVERABLE_START;1196,BASELINE3_DELIVERABLE_FINISH;1197,BASELINE3_BUDGET_WORK;1198,BASELINE3_BUDGET_COST;1201,BASELINE4_FIXED_COST_ACCRUAL;1202,BASELINE4_DELIVERABLE_START;1203,BASELINE4_DELIVERABLE_FINISH;1204,BASELINE4_BUDGET_WORK;1205,BASELINE4_BUDGET_COST;1208,BASELINE5_FIXED_COST_ACCRUAL;1209,BASELINE5_DELIVERABLE_START;1210,BASELINE5_DELIVERABLE_FINISH;1211,BASELINE5_BUDGET_WORK;1212,BASELINE5_BUDGET_COST;1215,BASELINE6_FIXED_COST_ACCRUAL;1216,BASELINE6_DELIVERABLE_START;1217,BASELINE6_DELIVERABLE_FINISH;1218,BASELINE6_BUDGET_WORK;1219,BASELINE6_BUDGET_COST;1222,BASELINE7_FIXED_COST_ACCRUAL;1223,BASELINE7_DELIVERABLE_START;1224,BASELINE7_DELIVERABLE_FINISH;1225,BASELINE7_BUDGET_WORK;1226,BASELINE7_BUDGET_COST;1229,BASELINE8_FIXED_COST_ACCRUAL;1230,BASELINE8_DELIVERABLE_START;1231,BASELINE8_DELIVERABLE_FINISH;1232,BASELINE8_BUDGET_WORK;1233,BASELINE8_BUDGET_COST;1236,BASELINE9_FIXED_COST_ACCRUAL;1237,BASELINE9_DELIVERABLE_START;1238,BASELINE9_DELIVERABLE_FINISH;1239,BASELINE9_BUDGET_WORK;1240,BASELINE9_BUDGET_COST;1243,BASELINE10_FIXED_COST_ACCRUAL;1244,BASELINE10_DELIVERABLE_START;1245,BASELINE10_DELIVERABLE_FINISH;1246,BASELINE10_BUDGET_WORK;1247,BASELINE10_BUDGET_COST;1250,RECALC_OUTLINE_CODES;1276,DELIVERABLE_NAME;1279,ACTIVE;1280,TASK_MODE;1281,PLACEHOLDER;1282,WARNING;1283,START;1284,FINISH;1285,START_TEXT;1286,FINISH_TEXT;1287,DURATION_TEXT;1288,MANUAL_DURATION;1289,MANUAL_DURATION_UNITS;1295,IS_START_VALID;1296,IS_FINISH_VALID;1297,IS_DURATION_VALID;1299,BASELINE_START;1300,BASELINE_FINISH;1301,BASELINE_DURATION;1302,BASELINE1_START;1303,BASELINE1_FINISH;1304,BASELINE1_DURATION;1305,BASELINE2_START;1306,BASELINE2_FINISH;1307,BASELINE2_DURATION;1308,BASELINE3_START;1309,BASELINE3_FINISH;1310,BASELINE3_DURATION;1311,BASELINE4_START;1312,BASELINE4_FINISH;1313,BASELINE4_DURATION;1314,BASELINE5_START;1315,BASELINE5_FINISH;1316,BASELINE5_DURATION;1317,BASELINE6_START;1318,BASELINE6_FINISH;1319,BASELINE6_DURATION;1320,BASELINE7_START;1321,BASELINE7_FINISH;1322,BASELINE7_DURATION;1323,BASELINE8_START;1324,BASELINE8_FINISH;1325,BASELINE8_DURATION;1326,BASELINE9_START;1327,BASELINE9_FINISH;1328,BASELINE9_DURATION;1329,BASELINE10_START;1330,BASELINE10_FINISH;1331,BASELINE10_DURATION;1332,IGNORE_WARNINGS;1335,PEAK;1338,SCHEDULED_START;1339,SCHEDULED_FINISH;1340,SCHEDULED_DURATION;1381,PATH_DRIVING_PREDECESSOR;1382,PATH_PREDECESSOR;1383,PATH_DRIVEN_SUCCESSOR;1384,PATH_SUCCESSOR;1405,TASK_SUMMARY_NAME;1407,BOARD_STATUS;1408,SHOW_ON_BOARD;1409,SPRINT;1410,SPRINT_START;1411,SPRINT_FINISH;1412,BOARD_STATUS_ID;1413,SPRINT_ID","TT":"ACTIVE,BOOLEAN;ACTUAL_COST,CURRENCY;ACTUAL_DURATION,DURATION,ACTUAL_DURATION_UNITS;ACTUAL_DURATION_UNITS,TIME_UNITS;ACTUAL_FINISH,DATE;ACTUAL_OVERTIME_COST,CURRENCY;ACTUAL_OVERTIME_WORK,WORK;ACTUAL_OVERTIME_WORK_PROTECTED,WORK;ACTUAL_START,DATE;ACTUAL_WORK,WORK;ACTUAL_WORK_PROTECTED,WORK;ACWP,CURRENCY;ASSIGNMENT,BOOLEAN;ASSIGNMENT_DELAY,STRING;ASSIGNMENT_OWNER,STRING;ASSIGNMENT_UNITS,STRING;BASELINE10_BUDGET_COST,CURRENCY;BASELINE10_BUDGET_WORK,WORK;BASELINE10_COST,CURRENCY;BASELINE10_DELIVERABLE_FINISH,DATE;BASELINE10_DELIVERABLE_START,DATE;BASELINE10_DURATION,DURATION,BASELINE10_DURATION_UNITS;BASELINE10_DURATION_ESTIMATED,BOOLEAN;BASELINE10_DURATION_UNITS,TIME_UNITS;BASELINE10_ESTIMATED_DURATION,DURATION,BASELINE10_DURATION_UNITS;BASELINE10_ESTIMATED_FINISH,DATE;BASELINE10_ESTIMATED_START,DATE;BASELINE10_FINISH,DATE;BASELINE10_FIXED_COST,CURRENCY;BASELINE10_FIXED_COST_ACCRUAL,ACCRUE;BASELINE10_START,DATE;BASELINE10_WORK,WORK;BASELINE1_BUDGET_COST,CURRENCY;BASELINE1_BUDGET_WORK,WORK;BASELINE1_COST,CURRENCY;BASELINE1_DELIVERABLE_FINISH,DATE;BASELINE1_DELIVERABLE_START,DATE;BASELINE1_DURATION,DURATION,BASELINE1_DURATION_UNITS;BASELINE1_DURATION_ESTIMATED,BOOLEAN;BASELINE1_DURATION_UNITS,TIME_UNITS;BASELINE1_ESTIMATED_DURATION,DURATION,BASELINE1_DURATION_UNITS;BASELINE1_ESTIMATED_FINISH,DATE;BASELINE1_ESTIMATED_START,DATE;BASELINE1_FINISH,DATE;BASELINE1_FIXED_COST,CURRENCY;BASELINE1_FIXED_COST_ACCRUAL,ACCRUE;BASELINE1_START,DATE;BASELINE1_WORK,WORK;BASELINE2_BUDGET_COST,CURRENCY;BASELINE2_BUDGET_WORK,WORK;BASELINE2_COST,CURRENCY;BASELINE2_DELIVERABLE_FINISH,DATE;BASELINE2_DELIVERABLE_START,DATE;BASELINE2_DURATION,DURATION,BASELINE2_DURATION_UNITS;BASELINE2_DURATION_ESTIMATED,BOOLEAN;BASELINE2_DURATION_UNITS,TIME_UNITS;BASELINE2_ESTIMATED_DURATION,DURATION,BASELINE2_DURATION_UNITS;BASELINE2_ESTIMATED_FINISH,DATE;BASELINE2_ESTIMATED_START,DATE;BASELINE2_FINISH,DATE;BASELINE2_FIXED_COST,CURRENCY;BASELINE2_FIXED_COST_ACCRUAL,ACCRUE;BASELINE2_START,DATE;BASELINE2_WORK,WORK;BASELINE3_BUDGET_COST,CURRENCY;BASELINE3_BUDGET_WORK,WORK;BASELINE3_COST,CURRENCY;BASELINE3_DELIVERABLE_FINISH,DATE;BASELINE3_DELIVERABLE_START,DATE;BASELINE3_DURATION,DURATION,BASELINE3_DURATION_UNITS;BASELINE3_DURATION_ESTIMATED,BOOLEAN;BASELINE3_DURATION_UNITS,TIME_UNITS;BASELINE3_ESTIMATED_DURATION,DURATION,BASELINE3_DURATION_UNITS;BASELINE3_ESTIMATED_FINISH,DATE;BASELINE3_ESTIMATED_START,DATE;BASELINE3_FINISH,DATE;BASELINE3_FIXED_COST,CURRENCY;BASELINE3_FIXED_COST_ACCRUAL,ACCRUE;BASELINE3_START,DATE;BASELINE3_WORK,WORK;BASELINE4_BUDGET_COST,CURRENCY;BASELINE4_BUDGET_WORK,WORK;BASELINE4_COST,CURRENCY;BASELINE4_DELIVERABLE_FINISH,DATE;BASELINE4_DELIVERABLE_START,DATE;BASELINE4_DURATION,DURATION,BASELINE4_DURATION_UNITS;BASELINE4_DURATION_ESTIMATED,BOOLEAN;BASELINE4_DURATION_UNITS,TIME_UNITS;BASELINE4_ESTIMATED_DURATION,DURATION,BASELINE4_DURATION_UNITS;BASELINE4_ESTIMATED_FINISH,DATE;BASELINE4_ESTIMATED_START,DATE;BASELINE4_FINISH,DATE;BASELINE4_FIXED_COST,CURRENCY;BASELINE4_FIXED_COST_ACCRUAL,ACCRUE;BASELINE4_START,DATE;BASELINE4_WORK,WORK;BASELINE5_BUDGET_COST,CURRENCY;BASELINE5_BUDGET_WORK,WORK;BASELINE5_COST,CURRENCY;BASELINE5_DELIVERABLE_FINISH,DATE;BASELINE5_DELIVERABLE_START,DATE;BASELINE5_DURATION,DURATION,BASELINE5_DURATION_UNITS;BASELINE5_DURATION_ESTIMATED,BOOLEAN;BASELINE5_DURATION_UNITS,TIME_UNITS;BASELINE5_ESTIMATED_DURATION,DURATION,BASELINE5_DURATION_UNITS;BASELINE5_ESTIMATED_FINISH,DATE;BASELINE5_ESTIMATED_START,DATE;BASELINE5_FINISH,DATE;BASELINE5_FIXED_COST,CURRENCY;BASELINE5_FIXED_COST_ACCRUAL,ACCRUE;BASELINE5_START,DATE;BASELINE5_WORK,WORK;BASELINE6_BUDGET_COST,CURRENCY;BASELINE6_BUDGET_WORK,WORK;BASELINE6_COST,CURRENCY;BASELINE6_DELIVERABLE_FINISH,DATE;BASELINE6_DELIVERABLE_START,DATE;BASELINE6_DURATION,DURATION,BASELINE6_DURATION_UNITS;BASELINE6_DURATION_ESTIMATED,BOOLEAN;BASELINE6_DURATION_UNITS,TIME_UNITS;BASELINE6_ESTIMATED_DURATION,DURATION,BASELINE6_DURATION_UNITS;BASELINE6_ESTIMATED_FINISH,DATE;BASELINE6_ESTIMATED_START,DATE;BASELINE6_FINISH,DATE;BASELINE6_FIXED_COST,CURRENCY;BASELINE6_FIXED_COST_ACCRUAL,ACCRUE;BASELINE6_START,DATE;BASELINE6_WORK,WORK;BASELINE7_BUDGET_COST,CURRENCY;BASELINE7_BUDGET_WORK,WORK;BASELINE7_COST,CURRENCY;BASELINE7_DELIVERABLE_FINISH,DATE;BASELINE7_DELIVERABLE_START,DATE;BASELINE7_DURATION,DURATION,BASELINE7_DURATION_UNITS;BASELINE7_DURATION_ESTIMATED,BOOLEAN;BASELINE7_DURATION_UNITS,TIME_UNITS;BASELINE7_ESTIMATED_DURATION,DURATION,BASELINE7_DURATION_UNITS;BASELINE7_ESTIMATED_FINISH,DATE;BASELINE7_ESTIMATED_START,DATE;BASELINE7_FINISH,DATE;BASELINE7_FIXED_COST,CURRENCY;BASELINE7_FIXED_COST_ACCRUAL,ACCRUE;BASELINE7_START,DATE;BASELINE7_WORK,WORK;BASELINE8_BUDGET_COST,CURRENCY;BASELINE8_BUDGET_WORK,WORK;BASELINE8_COST,CURRENCY;BASELINE8_DELIVERABLE_FINISH,DATE;BASELINE8_DELIVERABLE_START,DATE;BASELINE8_DURATION,DURATION,BASELINE8_DURATION_UNITS;BASELINE8_DURATION_ESTIMATED,BOOLEAN;BASELINE8_DURATION_UNITS,TIME_UNITS;BASELINE8_ESTIMATED_DURATION,DURATION,BASELINE8_DURATION_UNITS;BASELINE8_ESTIMATED_FINISH,DATE;BASELINE8_ESTIMATED_START,DATE;BASELINE8_FINISH,DATE;BASELINE8_FIXED_COST,CURRENCY;BASELINE8_FIXED_COST_ACCRUAL,ACCRUE;BASELINE8_START,DATE;BASELINE8_WORK,WORK;BASELINE9_BUDGET_COST,CURRENCY;BASELINE9_BUDGET_WORK,WORK;BASELINE9_COST,CURRENCY;BASELINE9_DELIVERABLE_FINISH,DATE;BASELINE9_DELIVERABLE_START,DATE;BASELINE9_DURATION,DURATION,BASELINE9_DURATION_UNITS;BASELINE9_DURATION_ESTIMATED,BOOLEAN;BASELINE9_DURATION_UNITS,TIME_UNITS;BASELINE9_ESTIMATED_DURATION,DURATION,BASELINE9_DURATION_UNITS;BASELINE9_ESTIMATED_FINISH,DATE;BASELINE9_ESTIMATED_START,DATE;BASELINE9_FINISH,DATE;BASELINE9_FIXED_COST,CURRENCY;BASELINE9_FIXED_COST_ACCRUAL,ACCRUE;BASELINE9_START,DATE;BASELINE9_WORK,WORK;BASELINE_BUDGET_COST,CURRENCY;BASELINE_BUDGET_WORK,WORK;BASELINE_COST,CURRENCY;BASELINE_DELIVERABLE_FINISH,DATE;BASELINE_DELIVERABLE_START,DATE;BASELINE_DURATION,DURATION,BASELINE_DURATION_UNITS;BASELINE_DURATION_ESTIMATED,BOOLEAN;BASELINE_DURATION_UNITS,TIME_UNITS;BASELINE_ESTIMATED_DURATION,DURATION,BASELINE_DURATION_UNITS;BASELINE_ESTIMATED_FINISH,DATE;BASELINE_ESTIMATED_START,DATE;BASELINE_FINISH,DATE;BASELINE_FIXED_COST,CURRENCY;BASELINE_FIXED_COST_ACCRUAL,ACCRUE;BASELINE_START,DATE;BASELINE_WORK,WORK;BCWP,CURRENCY;BCWS,CURRENCY;BOARD_STATUS,STRING;BOARD_STATUS_ID,INTEGER;BUDGET_COST,CURRENCY;BUDGET_WORK,WORK;CALENDAR_UNIQUE_ID,INTEGER;COMPLETE_THROUGH,DATE;CONFIRMED,BOOLEAN;CONSTRAINT_DATE,DATE;CONSTRAINT_TYPE,CONSTRAINT;CONTACT,STRING;COST,CURRENCY;COST1,CURRENCY;COST10,CURRENCY;COST2,CURRENCY;COST3,CURRENCY;COST4,CURRENCY;COST5,CURRENCY;COST6,CURRENCY;COST7,CURRENCY;COST8,CURRENCY;COST9,CURRENCY;COST_RATE_TABLE,STRING;COST_VARIANCE,CURRENCY;CPI,NUMERIC;CREATED,DATE;CRITICAL,BOOLEAN;CV,CURRENCY;CVPERCENT,PERCENTAGE;DATE1,DATE;DATE10,DATE;DATE2,DATE;DATE3,DATE;DATE4,DATE;DATE5,DATE;DATE6,DATE;DATE7,DATE;DATE8,DATE;DATE9,DATE;DEADLINE,DATE;DELIVERABLE_FINISH,DATE;DELIVERABLE_GUID,GUID;DELIVERABLE_NAME,STRING;DELIVERABLE_START,DATE;DELIVERABLE_TYPE,STRING;DURATION,DURATION,ACTUAL_DURATION_UNITS;DURATION1,DURATION,DURATION1_UNITS;DURATION10,DURATION,DURATION10_UNITS;DURATION10_ESTIMATED,BOOLEAN;DURATION10_UNITS,TIME_UNITS;DURATION1_ESTIMATED,BOOLEAN;DURATION1_UNITS,TIME_UNITS;DURATION2,DURATION,DURATION2_UNITS;DURATION2_ESTIMATED,BOOLEAN;DURATION2_UNITS,TIME_UNITS;DURATION3,DURATION,DURATION3_UNITS;DURATION3_ESTIMATED,BOOLEAN;DURATION3_UNITS,TIME_UNITS;DURATION4,DURATION,DURATION4_UNITS;DURATION4_ESTIMATED,BOOLEAN;DURATION4_UNITS,TIME_UNITS;DURATION5,DURATION,DURATION5_UNITS;DURATION5_ESTIMATED,BOOLEAN;DURATION5_UNITS,TIME_UNITS;DURATION6,DURATION,DURATION6_UNITS;DURATION6_ESTIMATED,BOOLEAN;DURATION6_UNITS,TIME_UNITS;DURATION7,DURATION,DURATION7_UNITS;DURATION7_ESTIMATED,BOOLEAN;DURATION7_UNITS,TIME_UNITS;DURATION8,DURATION,DURATION8_UNITS;DURATION8_ESTIMATED,BOOLEAN;DURATION8_UNITS,TIME_UNITS;DURATION9,DURATION,DURATION9_UNITS;DURATION9_ESTIMATED,BOOLEAN;DURATION9_UNITS,TIME_UNITS;DURATION_TEXT,STRING;DURATION_UNITS,TIME_UNITS;DURATION_VARIANCE,DURATION;EAC,CURRENCY;EARLY_FINISH,DATE;EARLY_START,DATE;EARNED_VALUE_METHOD,EARNED_VALUE_METHOD;EFFORT_DRIVEN,BOOLEAN;ENTERPRISE_COST1,CURRENCY;ENTERPRISE_COST10,CURRENCY;ENTERPRISE_COST2,CURRENCY;ENTERPRISE_COST3,CURRENCY;ENTERPRISE_COST4,CURRENCY;ENTERPRISE_COST5,CURRENCY;ENTERPRISE_COST6,CURRENCY;ENTERPRISE_COST7,CURRENCY;ENTERPRISE_COST8,CURRENCY;ENTERPRISE_COST9,CURRENCY;ENTERPRISE_DATA,BINARY;ENTERPRISE_DATE1,DATE;ENTERPRISE_DATE10,DATE;ENTERPRISE_DATE11,DATE;ENTERPRISE_DATE12,DATE;ENTERPRISE_DATE13,DATE;ENTERPRISE_DATE14,DATE;ENTERPRISE_DATE15,DATE;ENTERPRISE_DATE16,DATE;ENTERPRISE_DATE17,DATE;ENTERPRISE_DATE18,DATE;ENTERPRISE_DATE19,DATE;ENTERPRISE_DATE2,DATE;ENTERPRISE_DATE20,DATE;ENTERPRISE_DATE21,DATE;ENTERPRISE_DATE22,DATE;ENTERPRISE_DATE23,DATE;ENTERPRISE_DATE24,DATE;ENTERPRISE_DATE25,DATE;ENTERPRISE_DATE26,DATE;ENTERPRISE_DATE27,DATE;ENTERPRISE_DATE28,DATE;ENTERPRISE_DATE29,DATE;ENTERPRISE_DATE3,DATE;ENTERPRISE_DATE30,DATE;ENTERPRISE_DATE4,DATE;ENTERPRISE_DATE5,DATE;ENTERPRISE_DATE6,DATE;ENTERPRISE_DATE7,DATE;ENTERPRISE_DATE8,DATE;ENTERPRISE_DATE9,DATE;ENTERPRISE_DURATION1,DURATION,ENTERPRISE_DURATION1_UNITS;ENTERPRISE_DURATION10,DURATION,ENTERPRISE_DURATION10_UNITS;ENTERPRISE_DURATION10_UNITS,TIME_UNITS;ENTERPRISE_DURATION1_UNITS,TIME_UNITS;ENTERPRISE_DURATION2,DURATION,ENTERPRISE_DURATION2_UNITS;ENTERPRISE_DURATION2_UNITS,TIME_UNITS;ENTERPRISE_DURATION3,DURATION,ENTERPRISE_DURATION3_UNITS;ENTERPRISE_DURATION3_UNITS,TIME_UNITS;ENTERPRISE_DURATION4,DURATION,ENTERPRISE_DURATION4_UNITS;ENTERPRISE_DURATION4_UNITS,TIME_UNITS;ENTERPRISE_DURATION5,DURATION,ENTERPRISE_DURATION5_UNITS;ENTERPRISE_DURATION5_UNITS,TIME_UNITS;ENTERPRISE_DURATION6,DURATION,ENTERPRISE_DURATION6_UNITS;ENTERPRISE_DURATION6_UNITS,TIME_UNITS;ENTERPRISE_DURATION7,DURATION,ENTERPRISE_DURATION7_UNITS;ENTERPRISE_DURATION7_UNITS,TIME_UNITS;ENTERPRISE_DURATION8,DURATION,ENTERPRISE_DURATION8_UNITS;ENTERPRISE_DURATION8_UNITS,TIME_UNITS;ENTERPRISE_DURATION9,DURATION,ENTERPRISE_DURATION9_UNITS;ENTERPRISE_DURATION9_UNITS,TIME_UNITS;ENTERPRISE_FLAG1,BOOLEAN;ENTERPRISE_FLAG10,BOOLEAN;ENTERPRISE_FLAG11,BOOLEAN;ENTERPRISE_FLAG12,BOOLEAN;ENTERPRISE_FLAG13,BOOLEAN;ENTERPRISE_FLAG14,BOOLEAN;ENTERPRISE_FLAG15,BOOLEAN;ENTERPRISE_FLAG16,BOOLEAN;ENTERPRISE_FLAG17,BOOLEAN;ENTERPRISE_FLAG18,BOOLEAN;ENTERPRISE_FLAG19,BOOLEAN;ENTERPRISE_FLAG2,BOOLEAN;ENTERPRISE_FLAG20,BOOLEAN;ENTERPRISE_FLAG3,BOOLEAN;ENTERPRISE_FLAG4,BOOLEAN;ENTERPRISE_FLAG5,BOOLEAN;ENTERPRISE_FLAG6,BOOLEAN;ENTERPRISE_FLAG7,BOOLEAN;ENTERPRISE_FLAG8,BOOLEAN;ENTERPRISE_FLAG9,BOOLEAN;ENTERPRISE_NUMBER1,NUMERIC;ENTERPRISE_NUMBER10,NUMERIC;ENTERPRISE_NUMBER11,NUMERIC;ENTERPRISE_NUMBER12,NUMERIC;ENTERPRISE_NUMBER13,NUMERIC;ENTERPRISE_NUMBER14,NUMERIC;ENTERPRISE_NUMBER15,NUMERIC;ENTERPRISE_NUMBER16,NUMERIC;ENTERPRISE_NUMBER17,NUMERIC;ENTERPRISE_NUMBER18,NUMERIC;ENTERPRISE_NUMBER19,NUMERIC;ENTERPRISE_NUMBER2,NUMERIC;ENTERPRISE_NUMBER20,NUMERIC;ENTERPRISE_NUMBER21,NUMERIC;ENTERPRISE_NUMBER22,NUMERIC;ENTERPRISE_NUMBER23,NUMERIC;ENTERPRISE_NUMBER24,NUMERIC;ENTERPRISE_NUMBER25,NUMERIC;ENTERPRISE_NUMBER26,NUMERIC;ENTERPRISE_NUMBER27,NUMERIC;ENTERPRISE_NUMBER28,NUMERIC;ENTERPRISE_NUMBER29,NUMERIC;ENTERPRISE_NUMBER3,NUMERIC;ENTERPRISE_NUMBER30,NUMERIC;ENTERPRISE_NUMBER31,NUMERIC;ENTERPRISE_NUMBER32,NUMERIC;ENTERPRISE_NUMBER33,NUMERIC;ENTERPRISE_NUMBER34,NUMERIC;ENTERPRISE_NUMBER35,NUMERIC;ENTERPRISE_NUMBER36,NUMERIC;ENTERPRISE_NUMBER37,NUMERIC;ENTERPRISE_NUMBER38,NUMERIC;ENTERPRISE_NUMBER39,NUMERIC;ENTERPRISE_NUMBER4,NUMERIC;ENTERPRISE_NUMBER40,NUMERIC;ENTERPRISE_NUMBER5,NUMERIC;ENTERPRISE_NUMBER6,NUMERIC;ENTERPRISE_NUMBER7,NUMERIC;ENTERPRISE_NUMBER8,NUMERIC;ENTERPRISE_NUMBER9,NUMERIC;ENTERPRISE_OUTLINE_CODE1,STRING;ENTERPRISE_OUTLINE_CODE10,STRING;ENTERPRISE_OUTLINE_CODE11,STRING;ENTERPRISE_OUTLINE_CODE12,STRING;ENTERPRISE_OUTLINE_CODE13,STRING;ENTERPRISE_OUTLINE_CODE14,STRING;ENTERPRISE_OUTLINE_CODE15,STRING;ENTERPRISE_OUTLINE_CODE16,STRING;ENTERPRISE_OUTLINE_CODE17,STRING;ENTERPRISE_OUTLINE_CODE18,STRING;ENTERPRISE_OUTLINE_CODE19,STRING;ENTERPRISE_OUTLINE_CODE2,STRING;ENTERPRISE_OUTLINE_CODE20,STRING;ENTERPRISE_OUTLINE_CODE21,STRING;ENTERPRISE_OUTLINE_CODE22,STRING;ENTERPRISE_OUTLINE_CODE23,STRING;ENTERPRISE_OUTLINE_CODE24,STRING;ENTERPRISE_OUTLINE_CODE25,STRING;ENTERPRISE_OUTLINE_CODE26,STRING;ENTERPRISE_OUTLINE_CODE27,STRING;ENTERPRISE_OUTLINE_CODE28,STRING;ENTERPRISE_OUTLINE_CODE29,STRING;ENTERPRISE_OUTLINE_CODE3,STRING;ENTERPRISE_OUTLINE_CODE30,STRING;ENTERPRISE_OUTLINE_CODE4,STRING;ENTERPRISE_OUTLINE_CODE5,STRING;ENTERPRISE_OUTLINE_CODE6,STRING;ENTERPRISE_OUTLINE_CODE7,STRING;ENTERPRISE_OUTLINE_CODE8,STRING;ENTERPRISE_OUTLINE_CODE9,STRING;ENTERPRISE_PROJECT_COST1,CURRENCY;ENTERPRISE_PROJECT_COST10,CURRENCY;ENTERPRISE_PROJECT_COST2,CURRENCY;ENTERPRISE_PROJECT_COST3,CURRENCY;ENTERPRISE_PROJECT_COST4,CURRENCY;ENTERPRISE_PROJECT_COST5,CURRENCY;ENTERPRISE_PROJECT_COST6,CURRENCY;ENTERPRISE_PROJECT_COST7,CURRENCY;ENTERPRISE_PROJECT_COST8,CURRENCY;ENTERPRISE_PROJECT_COST9,CURRENCY;ENTERPRISE_PROJECT_DATE1,DATE;ENTERPRISE_PROJECT_DATE10,DATE;ENTERPRISE_PROJECT_DATE11,DATE;ENTERPRISE_PROJECT_DATE12,DATE;ENTERPRISE_PROJECT_DATE13,DATE;ENTERPRISE_PROJECT_DATE14,DATE;ENTERPRISE_PROJECT_DATE15,DATE;ENTERPRISE_PROJECT_DATE16,DATE;ENTERPRISE_PROJECT_DATE17,DATE;ENTERPRISE_PROJECT_DATE18,DATE;ENTERPRISE_PROJECT_DATE19,DATE;ENTERPRISE_PROJECT_DATE2,DATE;ENTERPRISE_PROJECT_DATE20,DATE;ENTERPRISE_PROJECT_DATE21,DATE;ENTERPRISE_PROJECT_DATE22,DATE;ENTERPRISE_PROJECT_DATE23,DATE;ENTERPRISE_PROJECT_DATE24,DATE;ENTERPRISE_PROJECT_DATE25,DATE;ENTERPRISE_PROJECT_DATE26,DATE;ENTERPRISE_PROJECT_DATE27,DATE;ENTERPRISE_PROJECT_DATE28,DATE;ENTERPRISE_PROJECT_DATE29,DATE;ENTERPRISE_PROJECT_DATE3,DATE;ENTERPRISE_PROJECT_DATE30,DATE;ENTERPRISE_PROJECT_DATE4,DATE;ENTERPRISE_PROJECT_DATE5,DATE;ENTERPRISE_PROJECT_DATE6,DATE;ENTERPRISE_PROJECT_DATE7,DATE;ENTERPRISE_PROJECT_DATE8,DATE;ENTERPRISE_PROJECT_DATE9,DATE;ENTERPRISE_PROJECT_DURATION1,DURATION;ENTERPRISE_PROJECT_DURATION10,DURATION;ENTERPRISE_PROJECT_DURATION2,DURATION;ENTERPRISE_PROJECT_DURATION3,DURATION;ENTERPRISE_PROJECT_DURATION4,DURATION;ENTERPRISE_PROJECT_DURATION5,DURATION;ENTERPRISE_PROJECT_DURATION6,DURATION;ENTERPRISE_PROJECT_DURATION7,DURATION;ENTERPRISE_PROJECT_DURATION8,DURATION;ENTERPRISE_PROJECT_DURATION9,DURATION;ENTERPRISE_PROJECT_FLAG1,BOOLEAN;ENTERPRISE_PROJECT_FLAG10,BOOLEAN;ENTERPRISE_PROJECT_FLAG11,BOOLEAN;ENTERPRISE_PROJECT_FLAG12,BOOLEAN;ENTERPRISE_PROJECT_FLAG13,BOOLEAN;ENTERPRISE_PROJECT_FLAG14,BOOLEAN;ENTERPRISE_PROJECT_FLAG15,BOOLEAN;ENTERPRISE_PROJECT_FLAG16,BOOLEAN;ENTERPRISE_PROJECT_FLAG17,BOOLEAN;ENTERPRISE_PROJECT_FLAG18,BOOLEAN;ENTERPRISE_PROJECT_FLAG19,BOOLEAN;ENTERPRISE_PROJECT_FLAG2,BOOLEAN;ENTERPRISE_PROJECT_FLAG20,BOOLEAN;ENTERPRISE_PROJECT_FLAG3,BOOLEAN;ENTERPRISE_PROJECT_FLAG4,BOOLEAN;ENTERPRISE_PROJECT_FLAG5,BOOLEAN;ENTERPRISE_PROJECT_FLAG6,BOOLEAN;ENTERPRISE_PROJECT_FLAG7,BOOLEAN;ENTERPRISE_PROJECT_FLAG8,BOOLEAN;ENTERPRISE_PROJECT_FLAG9,BOOLEAN;ENTERPRISE_PROJECT_NUMBER1,NUMERIC;ENTERPRISE_PROJECT_NUMBER10,NUMERIC;ENTERPRISE_PROJECT_NUMBER11,NUMERIC;ENTERPRISE_PROJECT_NUMBER12,NUMERIC;ENTERPRISE_PROJECT_NUMBER13,NUMERIC;ENTERPRISE_PROJECT_NUMBER14,NUMERIC;ENTERPRISE_PROJECT_NUMBER15,NUMERIC;ENTERPRISE_PROJECT_NUMBER16,NUMERIC;ENTERPRISE_PROJECT_NUMBER17,NUMERIC;ENTERPRISE_PROJECT_NUMBER18,NUMERIC;ENTERPRISE_PROJECT_NUMBER19,NUMERIC;ENTERPRISE_PROJECT_NUMBER2,NUMERIC;ENTERPRISE_PROJECT_NUMBER20,NUMERIC;ENTERPRISE_PROJECT_NUMBER21,NUMERIC;ENTERPRISE_PROJECT_NUMBER22,NUMERIC;ENTERPRISE_PROJECT_NUMBER23,NUMERIC;ENTERPRISE_PROJECT_NUMBER24,NUMERIC;ENTERPRISE_PROJECT_NUMBER25,NUMERIC;ENTERPRISE_PROJECT_NUMBER26,NUMERIC;ENTERPRISE_PROJECT_NUMBER27,NUMERIC;ENTERPRISE_PROJECT_NUMBER28,NUMERIC;ENTERPRISE_PROJECT_NUMBER29,NUMERIC;ENTERPRISE_PROJECT_NUMBER3,NUMERIC;ENTERPRISE_PROJECT_NUMBER30,NUMERIC;ENTERPRISE_PROJECT_NUMBER31,NUMERIC;ENTERPRISE_PROJECT_NUMBER32,NUMERIC;ENTERPRISE_PROJECT_NUMBER33,NUMERIC;ENTERPRISE_PROJECT_NUMBER34,NUMERIC;ENTERPRISE_PROJECT_NUMBER35,NUMERIC;ENTERPRISE_PROJECT_NUMBER36,NUMERIC;ENTERPRISE_PROJECT_NUMBER37,NUMERIC;ENTERPRISE_PROJECT_NUMBER38,NUMERIC;ENTERPRISE_PROJECT_NUMBER39,NUMERIC;ENTERPRISE_PROJECT_NUMBER4,NUMERIC;ENTERPRISE_PROJECT_NUMBER40,NUMERIC;ENTERPRISE_PROJECT_NUMBER5,NUMERIC;ENTERPRISE_PROJECT_NUMBER6,NUMERIC;ENTERPRISE_PROJECT_NUMBER7,NUMERIC;ENTERPRISE_PROJECT_NUMBER8,NUMERIC;ENTERPRISE_PROJECT_NUMBER9,NUMERIC;ENTERPRISE_PROJECT_OUTLINE_CODE1,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE10,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE11,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE12,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE13,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE14,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE15,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE16,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE17,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE18,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE19,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE2,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE20,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE21,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE22,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE23,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE24,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE25,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE26,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE27,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE28,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE29,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE3,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE30,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE4,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE5,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE6,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE7,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE8,STRING;ENTERPRISE_PROJECT_OUTLINE_CODE9,STRING;ENTERPRISE_PROJECT_TEXT1,STRING;ENTERPRISE_PROJECT_TEXT10,STRING;ENTERPRISE_PROJECT_TEXT11,STRING;ENTERPRISE_PROJECT_TEXT12,STRING;ENTERPRISE_PROJECT_TEXT13,STRING;ENTERPRISE_PROJECT_TEXT14,STRING;ENTERPRISE_PROJECT_TEXT15,STRING;ENTERPRISE_PROJECT_TEXT16,STRING;ENTERPRISE_PROJECT_TEXT17,STRING;ENTERPRISE_PROJECT_TEXT18,STRING;ENTERPRISE_PROJECT_TEXT19,STRING;ENTERPRISE_PROJECT_TEXT2,STRING;ENTERPRISE_PROJECT_TEXT20,STRING;ENTERPRISE_PROJECT_TEXT21,STRING;ENTERPRISE_PROJECT_TEXT22,STRING;ENTERPRISE_PROJECT_TEXT23,STRING;ENTERPRISE_PROJECT_TEXT24,STRING;ENTERPRISE_PROJECT_TEXT25,STRING;ENTERPRISE_PROJECT_TEXT26,STRING;ENTERPRISE_PROJECT_TEXT27,STRING;ENTERPRISE_PROJECT_TEXT28,STRING;ENTERPRISE_PROJECT_TEXT29,STRING;ENTERPRISE_PROJECT_TEXT3,STRING;ENTERPRISE_PROJECT_TEXT30,STRING;ENTERPRISE_PROJECT_TEXT31,STRING;ENTERPRISE_PROJECT_TEXT32,STRING;ENTERPRISE_PROJECT_TEXT33,STRING;ENTERPRISE_PROJECT_TEXT34,STRING;ENTERPRISE_PROJECT_TEXT35,STRING;ENTERPRISE_PROJECT_TEXT36,STRING;ENTERPRISE_PROJECT_TEXT37,STRING;ENTERPRISE_PROJECT_TEXT38,STRING;ENTERPRISE_PROJECT_TEXT39,STRING;ENTERPRISE_PROJECT_TEXT4,STRING;ENTERPRISE_PROJECT_TEXT40,STRING;ENTERPRISE_PROJECT_TEXT5,STRING;ENTERPRISE_PROJECT_TEXT6,STRING;ENTERPRISE_PROJECT_TEXT7,STRING;ENTERPRISE_PROJECT_TEXT8,STRING;ENTERPRISE_PROJECT_TEXT9,STRING;ENTERPRISE_TEXT1,STRING;ENTERPRISE_TEXT10,STRING;ENTERPRISE_TEXT11,STRING;ENTERPRISE_TEXT12,STRING;ENTERPRISE_TEXT13,STRING;ENTERPRISE_TEXT14,STRING;ENTERPRISE_TEXT15,STRING;ENTERPRISE_TEXT16,STRING;ENTERPRISE_TEXT17,STRING;ENTERPRISE_TEXT18,STRING;ENTERPRISE_TEXT19,STRING;ENTERPRISE_TEXT2,STRING;ENTERPRISE_TEXT20,STRING;ENTERPRISE_TEXT21,STRING;ENTERPRISE_TEXT22,STRING;ENTERPRISE_TEXT23,STRING;ENTERPRISE_TEXT24,STRING;ENTERPRISE_TEXT25,STRING;ENTERPRISE_TEXT26,STRING;ENTERPRISE_TEXT27,STRING;ENTERPRISE_TEXT28,STRING;ENTERPRISE_TEXT29,STRING;ENTERPRISE_TEXT3,STRING;ENTERPRISE_TEXT30,STRING;ENTERPRISE_TEXT31,STRING;ENTERPRISE_TEXT32,STRING;ENTERPRISE_TEXT33,STRING;ENTERPRISE_TEXT34,STRING;ENTERPRISE_TEXT35,STRING;ENTERPRISE_TEXT36,STRING;ENTERPRISE_TEXT37,STRING;ENTERPRISE_TEXT38,STRING;ENTERPRISE_TEXT39,STRING;ENTERPRISE_TEXT4,STRING;ENTERPRISE_TEXT40,STRING;ENTERPRISE_TEXT5,STRING;ENTERPRISE_TEXT6,STRING;ENTERPRISE_TEXT7,STRING;ENTERPRISE_TEXT8,STRING;ENTERPRISE_TEXT9,STRING;ERROR_MESSAGE,STRING;ESTIMATED,BOOLEAN;EXTERNAL_TASK,BOOLEAN;FINISH,DATE;FINISH1,DATE;FINISH10,DATE;FINISH2,DATE;FINISH3,DATE;FINISH4,DATE;FINISH5,DATE;FINISH6,DATE;FINISH7,DATE;FINISH8,DATE;FINISH9,DATE;FINISH_SLACK,DURATION,ACTUAL_DURATION_UNITS;FINISH_TEXT,STRING;FINISH_VARIANCE,DURATION;FIXED_COST,CURRENCY;FIXED_COST_ACCRUAL,ACCRUE;FIXED_DURATION,BOOLEAN;FLAG1,BOOLEAN;FLAG10,BOOLEAN;FLAG11,BOOLEAN;FLAG12,BOOLEAN;FLAG13,BOOLEAN;FLAG14,BOOLEAN;FLAG15,BOOLEAN;FLAG16,BOOLEAN;FLAG17,BOOLEAN;FLAG18,BOOLEAN;FLAG19,BOOLEAN;FLAG2,BOOLEAN;FLAG20,BOOLEAN;FLAG3,BOOLEAN;FLAG4,BOOLEAN;FLAG5,BOOLEAN;FLAG6,BOOLEAN;FLAG7,BOOLEAN;FLAG8,BOOLEAN;FLAG9,BOOLEAN;FREE_SLACK,DURATION,ACTUAL_DURATION_UNITS;GROUP_BY_SUMMARY,STRING;GUID,GUID;HIDE_BAR,BOOLEAN;HYPERLINK,STRING;HYPERLINK_ADDRESS,STRING;HYPERLINK_DATA,BINARY;HYPERLINK_HREF,STRING;HYPERLINK_SCREEN_TIP,STRING;HYPERLINK_SUBADDRESS,STRING;ID,INTEGER;IGNORE_RESOURCE_CALENDAR,BOOLEAN;IGNORE_WARNINGS,BOOLEAN;INDEX,INTEGER;INDICATORS,STRING;IS_DURATION_VALID,BOOLEAN;IS_FINISH_VALID,BOOLEAN;IS_START_VALID,BOOLEAN;LATE_FINISH,DATE;LATE_START,DATE;LEVELING_CAN_SPLIT,BOOLEAN;LEVELING_DELAY,DURATION,LEVELING_DELAY_UNITS;LEVELING_DELAY_UNITS,TIME_UNITS;LEVEL_ASSIGNMENTS,BOOLEAN;LINKED_FIELDS,BOOLEAN;MANUAL_DURATION,DURATION,MANUAL_DURATION_UNITS;MANUAL_DURATION_UNITS,TIME_UNITS;MARKED,BOOLEAN;MILESTONE,BOOLEAN;NAME,STRING;NOTES,NOTES;NUMBER1,NUMERIC;NUMBER10,NUMERIC;NUMBER11,NUMERIC;NUMBER12,NUMERIC;NUMBER13,NUMERIC;NUMBER14,NUMERIC;NUMBER15,NUMERIC;NUMBER16,NUMERIC;NUMBER17,NUMERIC;NUMBER18,NUMERIC;NUMBER19,NUMERIC;NUMBER2,NUMERIC;NUMBER20,NUMERIC;NUMBER3,NUMERIC;NUMBER4,NUMERIC;NUMBER5,NUMERIC;NUMBER6,NUMERIC;NUMBER7,NUMERIC;NUMBER8,NUMERIC;NUMBER9,NUMERIC;OBJECTS,NUMERIC;OUTLINE_CODE1,STRING;OUTLINE_CODE10,STRING;OUTLINE_CODE10_INDEX,INTEGER;OUTLINE_CODE1_INDEX,INTEGER;OUTLINE_CODE2,STRING;OUTLINE_CODE2_INDEX,INTEGER;OUTLINE_CODE3,STRING;OUTLINE_CODE3_INDEX,INTEGER;OUTLINE_CODE4,STRING;OUTLINE_CODE4_INDEX,INTEGER;OUTLINE_CODE5,STRING;OUTLINE_CODE5_INDEX,INTEGER;OUTLINE_CODE6,STRING;OUTLINE_CODE6_INDEX,INTEGER;OUTLINE_CODE7,STRING;OUTLINE_CODE7_INDEX,INTEGER;OUTLINE_CODE8,STRING;OUTLINE_CODE8_INDEX,INTEGER;OUTLINE_CODE9,STRING;OUTLINE_CODE9_INDEX,INTEGER;OUTLINE_LEVEL,SHORT;OUTLINE_NUMBER,STRING;OVERALLOCATED,BOOLEAN;OVERTIME_COST,CURRENCY;OVERTIME_WORK,DURATION;PARENT_TASK_UNIQUE_ID,INTEGER;PATH_DRIVEN_SUCCESSOR,BOOLEAN;PATH_DRIVING_PREDECESSOR,BOOLEAN;PATH_PREDECESSOR,BOOLEAN;PATH_SUCCESSOR,BOOLEAN;PEAK,UNITS;PERCENT_COMPLETE,PERCENTAGE;PERCENT_WORK_COMPLETE,PERCENTAGE;PHYSICAL_PERCENT_COMPLETE,PERCENTAGE;PLACEHOLDER,BOOLEAN;PREDECESSORS,RELATION_LIST;PRELEVELED_FINISH,DATE;PRELEVELED_START,DATE;PRIORITY,PRIORITY;PROJECT,STRING;PUBLISH,BOOLEAN;RECALC_OUTLINE_CODES,BOOLEAN;RECURRING,BOOLEAN;RECURRING_DATA,BINARY;REGULAR_WORK,DURATION;REMAINING_COST,CURRENCY;REMAINING_DURATION,DURATION,ACTUAL_DURATION_UNITS;REMAINING_OVERTIME_COST,CURRENCY;REMAINING_OVERTIME_WORK,WORK;REMAINING_WORK,WORK;REQUEST_DEMAND,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE20,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE21,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE22,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE23,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE24,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE25,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE26,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE27,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE28,STRING;RESOURCE_ENTERPRISE_MULTI_VALUE_CODE29,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE1,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE10,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE11,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE12,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE13,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE14,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE15,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE16,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE17,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE18,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE19,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE2,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE20,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE21,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE22,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE23,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE24,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE25,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE26,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE27,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE28,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE29,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE3,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE4,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE5,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE6,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE7,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE8,STRING;RESOURCE_ENTERPRISE_OUTLINE_CODE9,STRING;RESOURCE_ENTERPRISE_RBS,STRING;RESOURCE_GROUP,STRING;RESOURCE_INITIALS,STRING;RESOURCE_NAMES,STRING;RESOURCE_PHONETICS,STRING;RESOURCE_TYPE,STRING;RESPONSE_PENDING,BOOLEAN;RESUME,DATE;RESUME_NO_EARLIER_THAN,DATE;ROLLUP,BOOLEAN;SCHEDULED_DURATION,DURATION,ACTUAL_DURATION_UNITS;SCHEDULED_FINISH,DATE;SCHEDULED_START,DATE;SHOW_ON_BOARD,STRING;SPI,NUMERIC;SPRINT,STRING;SPRINT_FINISH,DATE;SPRINT_ID,INTEGER;SPRINT_START,DATE;START,DATE;START1,DATE;START10,DATE;START2,DATE;START3,DATE;START4,DATE;START5,DATE;START6,DATE;START7,DATE;START8,DATE;START9,DATE;START_SLACK,DURATION,ACTUAL_DURATION_UNITS;START_TEXT,STRING;START_VARIANCE,DURATION;STATUS,STRING;STATUS_INDICATOR,STRING;STATUS_MANAGER,STRING;STOP,DATE;SUBPROJECT_FILE,STRING;SUBPROJECT_GUID,GUID;SUBPROJECT_READ_ONLY,BOOLEAN;SUBPROJECT_TASKS_UNIQUEID_OFFSET,INTEGER;SUBPROJECT_TASK_ID,INTEGER;SUBPROJECT_TASK_UNIQUE_ID,INTEGER;SUCCESSORS,RELATION_LIST;SUMMARY,BOOLEAN;SUMMARY_PROGRESS,DATE;SV,CURRENCY;SVPERCENT,PERCENTAGE;TASK_CALENDAR,STRING;TASK_CALENDAR_GUID,GUID;TASK_MODE,TASK_MODE;TASK_SUMMARY_NAME,STRING;TCPI,NUMERIC;TEAMSTATUS_PENDING,BOOLEAN;TEXT1,STRING;TEXT10,STRING;TEXT11,STRING;TEXT12,STRING;TEXT13,STRING;TEXT14,STRING;TEXT15,STRING;TEXT16,STRING;TEXT17,STRING;TEXT18,STRING;TEXT19,STRING;TEXT2,STRING;TEXT20,STRING;TEXT21,STRING;TEXT22,STRING;TEXT23,STRING;TEXT24,STRING;TEXT25,STRING;TEXT26,STRING;TEXT27,STRING;TEXT28,STRING;TEXT29,STRING;TEXT3,STRING;TEXT30,STRING;TEXT4,STRING;TEXT5,STRING;TEXT6,STRING;TEXT7,STRING;TEXT8,STRING;TEXT9,STRING;TOTAL_SLACK,DURATION;TYPE,TASK_TYPE;UNIQUE_ID,INTEGER;UNIQUE_ID_PREDECESSORS,STRING;UNIQUE_ID_SUCCESSORS,STRING;UPDATE_NEEDED,BOOLEAN;VAC,CURRENCY;WARNING,BOOLEAN;WBS,STRING;WBS_PREDECESSORS,RELATION_LIST;WBS_SUCCESSORS,RELATION_LIST;WORK,WORK;WORK_CONTOUR,WORK_CONTOUR;WORK_VARIANCE,DURATION","T14":"27,BASELINE_ESTIMATED_DURATION;29,SCHEDULED_DURATION;35,SCHEDULED_START;36,SCHEDULED_FINISH;43,BASELINE_ESTIMATED_START;44,BASELINE_ESTIMATED_FINISH;482,BASELINE1_ESTIMATED_START;483,BASELINE1_ESTIMATED_FINISH;487,BASELINE1_ESTIMATED_DURATION;493,BASELINE2_ESTIMATED_START;494,BASELINE2_ESTIMATED_FINISH;498,BASELINE2_ESTIMATED_DURATION;504,BASELINE3_ESTIMATED_START;505,BASELINE3_ESTIMATED_FINISH;509,BASELINE3_ESTIMATED_DURATION;515,BASELINE4_ESTIMATED_START;516,BASELINE4_ESTIMATED_FINISH;520,BASELINE4_ESTIMATED_DURATION;526,BASELINE5_ESTIMATED_START;527,BASELINE5_ESTIMATED_FINISH;531,BASELINE5_ESTIMATED_DURATION;544,BASELINE6_ESTIMATED_START;545,BASELINE6_ESTIMATED_FINISH;549,BASELINE6_ESTIMATED_DURATION;555,BASELINE7_ESTIMATED_START;556,BASELINE7_ESTIMATED_FINISH;560,BASELINE7_ESTIMATED_DURATION;566,BASELINE8_ESTIMATED_START;567,BASELINE8_ESTIMATED_FINISH;571,BASELINE8_ESTIMATED_DURATION;577,BASELINE9_ESTIMATED_START;578,BASELINE9_ESTIMATED_FINISH;582,BASELINE9_ESTIMATED_DURATION;588,BASELINE10_ESTIMATED_START;589,BASELINE10_ESTIMATED_FINISH;593,BASELINE10_ESTIMATED_DURATION","R":"0,ID;1,NAME;2,INITIALS;3,GROUP;4,MAX_UNITS;5,BASE_CALENDAR;6,STANDARD_RATE;7,OVERTIME_RATE;8,TEXT1;9,TEXT2;10,CODE;11,ACTUAL_COST;12,COST;13,WORK;14,ACTUAL_WORK;15,BASELINE_WORK;16,OVERTIME_WORK;17,BASELINE_COST;18,COST_PER_USE;19,ACCRUE_AT;20,NOTES;21,REMAINING_COST;22,REMAINING_WORK;23,WORK_VARIANCE;24,COST_VARIANCE;25,OVERALLOCATED;26,PEAK;27,UNIQUE_ID;28,NOTES;29,PERCENT_WORK_COMPLETE;30,TEXT3;31,TEXT4;32,TEXT5;33,OBJECTS;34,LINKED_FIELDS;35,EMAIL_ADDRESS;38,REGULAR_WORK;39,ACTUAL_OVERTIME_WORK;40,REMAINING_OVERTIME_WORK;47,OVERTIME_COST;48,ACTUAL_OVERTIME_COST;49,REMAINING_OVERTIME_COST;51,BCWS;52,BCWP;53,ACWP;54,SV;57,AVAILABLE_FROM;58,AVAILABLE_TO;61,COST_RATE_A;62,COST_RATE_B;63,COST_RATE_C;64,COST_RATE_D;65,COST_RATE_E;70,STANDARD_RATE_UNITS;71,OVERTIME_RATE_UNITS;86,INDICATORS;97,TEXT6;98,TEXT7;99,TEXT8;100,TEXT9;101,TEXT10;102,START1;103,START2;104,START3;105,START4;106,START5;107,FINISH1;108,FINISH2;109,FINISH3;110,FINISH4;111,FINISH5;112,NUMBER1;113,NUMBER2;114,NUMBER3;115,NUMBER4;116,NUMBER5;117,DURATION1;118,DURATION2;119,DURATION3;120,DURATION1_UNITS;121,DURATION2_UNITS;122,DURATION3_UNITS;123,COST1;124,COST2;125,COST3;126,FLAG10;127,FLAG1;128,FLAG2;129,FLAG3;130,FLAG4;131,FLAG5;132,FLAG6;133,FLAG7;134,FLAG8;135,FLAG9;136,HYPERLINK_DATA;138,HYPERLINK;139,HYPERLINK_ADDRESS;140,HYPERLINK_SUBADDRESS;141,HYPERLINK_HREF;144,ASSIGNMENT;152,SUBPROJECT_RESOURCE_UNIQUE_ID;159,TASK_SUMMARY_NAME;163,CAN_LEVEL;164,WORK_CONTOUR;166,COST4;167,COST5;168,COST6;169,COST7;170,COST8;171,COST9;172,COST10;173,DATE1;174,DATE2;175,DATE3;176,DATE4;177,DATE5;178,DATE6;179,DATE7;180,DATE8;181,DATE9;182,DATE10;183,DURATION4;184,DURATION5;185,DURATION6;186,DURATION7;187,DURATION8;188,DURATION9;189,DURATION10;190,FINISH6;191,FINISH7;192,FINISH8;193,FINISH9;194,FINISH10;195,FLAG11;196,FLAG12;197,FLAG13;198,FLAG14;199,FLAG15;200,FLAG16;201,FLAG17;202,FLAG18;203,FLAG19;204,FLAG20;205,NUMBER6;206,NUMBER7;207,NUMBER8;208,NUMBER9;209,NUMBER10;210,NUMBER11;211,NUMBER12;212,NUMBER13;213,NUMBER14;214,NUMBER15;215,NUMBER16;216,NUMBER17;217,NUMBER18;218,NUMBER19;219,NUMBER20;220,START6;221,START7;222,START8;223,START9;224,START10;225,TEXT11;226,TEXT12;227,TEXT13;228,TEXT14;229,TEXT15;230,TEXT16;231,TEXT17;232,TEXT18;233,TEXT19;234,TEXT20;235,TEXT21;236,TEXT22;237,TEXT23;238,TEXT24;239,TEXT25;240,TEXT26;241,TEXT27;242,TEXT28;243,TEXT29;244,TEXT30;245,DURATION4_UNITS;246,DURATION5_UNITS;247,DURATION6_UNITS;248,DURATION7_UNITS;249,DURATION8_UNITS;250,DURATION9_UNITS;251,DURATION10_UNITS;252,PHONETICS;253,INDEX;257,ASSIGNMENT_DELAY;258,ASSIGNMENT_UNITS;259,BASELINE_START;260,BASELINE_FINISH;261,CONFIRMED;262,FINISH;263,LEVELING_DELAY;264,RESPONSE_PENDING;265,START;266,TEAM_STATUS_PENDING;267,UPDATE_NEEDED;268,CV;269,COST_RATE_TABLE;270,ACTUAL_START;271,ACTUAL_FINISH;272,WORKGROUP;273,PROJECT;276,AVAILABILITY_DATA;278,OUTLINE_CODE1;279,OUTLINE_CODE1_INDEX;280,OUTLINE_CODE2;281,OUTLINE_CODE2_INDEX;282,OUTLINE_CODE3;283,OUTLINE_CODE3_INDEX;284,OUTLINE_CODE4;285,OUTLINE_CODE4_INDEX;286,OUTLINE_CODE5;287,OUTLINE_CODE5_INDEX;288,OUTLINE_CODE6;289,OUTLINE_CODE6_INDEX;290,OUTLINE_CODE7;291,OUTLINE_CODE7_INDEX;292,OUTLINE_CODE8;293,OUTLINE_CODE8_INDEX;294,OUTLINE_CODE9;295,OUTLINE_CODE9_INDEX;296,OUTLINE_CODE10;297,OUTLINE_CODE10_INDEX;299,MATERIAL_LABEL;300,TYPE;301,VAC;306,GROUP_BY_SUMMARY;311,WINDOWS_USER_ACCOUNT;312,HYPERLINK_SCREEN_TIP;340,WBS;341,ENTERPRISE_DATA;342,BASELINE1_WORK;343,BASELINE1_COST;348,BASELINE1_START;349,BASELINE1_FINISH;352,BASELINE2_WORK;353,BASELINE2_COST;358,BASELINE2_START;359,BASELINE2_FINISH;362,BASELINE3_WORK;363,BASELINE3_COST;368,BASELINE3_START;369,BASELINE3_FINISH;372,BASELINE4_WORK;373,BASELINE4_COST;378,BASELINE4_START;379,BASELINE4_FINISH;382,BASELINE5_WORK;383,BASELINE5_COST;388,BASELINE5_START;389,BASELINE5_FINISH;392,BASELINE6_WORK;393,BASELINE6_COST;398,BASELINE6_START;399,BASELINE6_FINISH;402,BASELINE7_WORK;403,BASELINE7_COST;408,BASELINE7_START;409,BASELINE7_FINISH;412,BASELINE8_WORK;413,BASELINE8_COST;418,BASELINE8_START;419,BASELINE8_FINISH;422,BASELINE9_WORK;423,BASELINE9_COST;428,BASELINE9_START;429,BASELINE9_FINISH;432,BASELINE10_WORK;433,BASELINE10_COST;438,BASELINE10_START;439,BASELINE10_FINISH;442,TASK_OUTLINE_NUMBER;443,ENTERPRISE_UNIQUE_ID;446,ENTERPRISE_COST1;447,ENTERPRISE_COST2;448,ENTERPRISE_COST3;449,ENTERPRISE_COST4;450,ENTERPRISE_COST5;451,ENTERPRISE_COST6;452,ENTERPRISE_COST7;453,ENTERPRISE_COST8;454,ENTERPRISE_COST9;455,ENTERPRISE_COST10;456,ENTERPRISE_DATE1;457,ENTERPRISE_DATE2;458,ENTERPRISE_DATE3;459,ENTERPRISE_DATE4;460,ENTERPRISE_DATE5;461,ENTERPRISE_DATE6;462,ENTERPRISE_DATE7;463,ENTERPRISE_DATE8;464,ENTERPRISE_DATE9;465,ENTERPRISE_DATE10;466,ENTERPRISE_DATE11;467,ENTERPRISE_DATE12;468,ENTERPRISE_DATE13;469,ENTERPRISE_DATE14;470,ENTERPRISE_DATE15;471,ENTERPRISE_DATE16;472,ENTERPRISE_DATE17;473,ENTERPRISE_DATE18;474,ENTERPRISE_DATE19;475,ENTERPRISE_DATE20;476,ENTERPRISE_DATE21;477,ENTERPRISE_DATE22;478,ENTERPRISE_DATE23;479,ENTERPRISE_DATE24;480,ENTERPRISE_DATE25;481,ENTERPRISE_DATE26;482,ENTERPRISE_DATE27;483,ENTERPRISE_DATE28;484,ENTERPRISE_DATE29;485,ENTERPRISE_DATE30;486,ENTERPRISE_DURATION1;487,ENTERPRISE_DURATION2;488,ENTERPRISE_DURATION3;489,ENTERPRISE_DURATION4;490,ENTERPRISE_DURATION5;491,ENTERPRISE_DURATION6;492,ENTERPRISE_DURATION7;493,ENTERPRISE_DURATION8;494,ENTERPRISE_DURATION9;495,ENTERPRISE_DURATION10;496,ENTERPRISE_DURATION1_UNITS;497,ENTERPRISE_DURATION2_UNITS;498,ENTERPRISE_DURATION3_UNITS;499,ENTERPRISE_DURATION4_UNITS;500,ENTERPRISE_DURATION5_UNITS;501,ENTERPRISE_DURATION6_UNITS;502,ENTERPRISE_DURATION7_UNITS;503,ENTERPRISE_DURATION8_UNITS;504,ENTERPRISE_DURATION9_UNITS;505,ENTERPRISE_DURATION10_UNITS;506,ENTERPRISE_FLAG1;507,ENTERPRISE_FLAG2;508,ENTERPRISE_FLAG3;509,ENTERPRISE_FLAG4;510,ENTERPRISE_FLAG5;511,ENTERPRISE_FLAG6;512,ENTERPRISE_FLAG7;513,ENTERPRISE_FLAG8;514,ENTERPRISE_FLAG9;515,ENTERPRISE_FLAG10;516,ENTERPRISE_FLAG11;517,ENTERPRISE_FLAG12;518,ENTERPRISE_FLAG13;519,ENTERPRISE_FLAG14;520,ENTERPRISE_FLAG15;521,ENTERPRISE_FLAG16;522,ENTERPRISE_FLAG17;523,ENTERPRISE_FLAG18;524,ENTERPRISE_FLAG19;525,ENTERPRISE_FLAG20;546,ENTERPRISE_NUMBER1;547,ENTERPRISE_NUMBER2;548,ENTERPRISE_NUMBER3;549,ENTERPRISE_NUMBER4;550,ENTERPRISE_NUMBER5;551,ENTERPRISE_NUMBER6;552,ENTERPRISE_NUMBER7;553,ENTERPRISE_NUMBER8;554,ENTERPRISE_NUMBER9;555,ENTERPRISE_NUMBER10;556,ENTERPRISE_NUMBER11;557,ENTERPRISE_NUMBER12;558,ENTERPRISE_NUMBER13;559,ENTERPRISE_NUMBER14;560,ENTERPRISE_NUMBER15;561,ENTERPRISE_NUMBER16;562,ENTERPRISE_NUMBER17;563,ENTERPRISE_NUMBER18;564,ENTERPRISE_NUMBER19;565,ENTERPRISE_NUMBER20;566,ENTERPRISE_NUMBER21;567,ENTERPRISE_NUMBER22;568,ENTERPRISE_NUMBER23;569,ENTERPRISE_NUMBER24;570,ENTERPRISE_NUMBER25;571,ENTERPRISE_NUMBER26;572,ENTERPRISE_NUMBER27;573,ENTERPRISE_NUMBER28;574,ENTERPRISE_NUMBER29;575,ENTERPRISE_NUMBER30;576,ENTERPRISE_NUMBER31;577,ENTERPRISE_NUMBER32;578,ENTERPRISE_NUMBER33;579,ENTERPRISE_NUMBER34;580,ENTERPRISE_NUMBER35;581,ENTERPRISE_NUMBER36;582,ENTERPRISE_NUMBER37;583,ENTERPRISE_NUMBER38;584,ENTERPRISE_NUMBER39;585,ENTERPRISE_NUMBER40;586,ENTERPRISE_OUTLINE_CODE1;588,ENTERPRISE_OUTLINE_CODE2;590,ENTERPRISE_OUTLINE_CODE3;592,ENTERPRISE_OUTLINE_CODE4;594,ENTERPRISE_OUTLINE_CODE5;596,ENTERPRISE_OUTLINE_CODE6;598,ENTERPRISE_OUTLINE_CODE7;600,ENTERPRISE_OUTLINE_CODE8;602,ENTERPRISE_OUTLINE_CODE9;604,ENTERPRISE_OUTLINE_CODE10;606,ENTERPRISE_OUTLINE_CODE11;608,ENTERPRISE_OUTLINE_CODE12;610,ENTERPRISE_OUTLINE_CODE13;612,ENTERPRISE_OUTLINE_CODE14;614,ENTERPRISE_OUTLINE_CODE15;616,ENTERPRISE_OUTLINE_CODE16;618,ENTERPRISE_OUTLINE_CODE17;620,ENTERPRISE_OUTLINE_CODE18;622,ENTERPRISE_OUTLINE_CODE19;624,ENTERPRISE_OUTLINE_CODE20;626,ENTERPRISE_OUTLINE_CODE21;628,ENTERPRISE_OUTLINE_CODE22;630,ENTERPRISE_OUTLINE_CODE23;632,ENTERPRISE_OUTLINE_CODE24;634,ENTERPRISE_OUTLINE_CODE25;636,ENTERPRISE_OUTLINE_CODE26;638,ENTERPRISE_OUTLINE_CODE27;640,ENTERPRISE_OUTLINE_CODE28;642,ENTERPRISE_OUTLINE_CODE29;644,ENTERPRISE_RBS;646,ENTERPRISE_TEXT1;647,ENTERPRISE_TEXT2;648,ENTERPRISE_TEXT3;649,ENTERPRISE_TEXT4;650,ENTERPRISE_TEXT5;651,ENTERPRISE_TEXT6;652,ENTERPRISE_TEXT7;653,ENTERPRISE_TEXT8;654,ENTERPRISE_TEXT9;655,ENTERPRISE_TEXT10;656,ENTERPRISE_TEXT11;657,ENTERPRISE_TEXT12;658,ENTERPRISE_TEXT13;659,ENTERPRISE_TEXT14;660,ENTERPRISE_TEXT15;661,ENTERPRISE_TEXT16;662,ENTERPRISE_TEXT17;663,ENTERPRISE_TEXT18;664,ENTERPRISE_TEXT19;665,ENTERPRISE_TEXT20;666,ENTERPRISE_TEXT21;667,ENTERPRISE_TEXT22;668,ENTERPRISE_TEXT23;669,ENTERPRISE_TEXT24;670,ENTERPRISE_TEXT25;671,ENTERPRISE_TEXT26;672,ENTERPRISE_TEXT27;673,ENTERPRISE_TEXT28;674,ENTERPRISE_TEXT29;675,ENTERPRISE_TEXT30;676,ENTERPRISE_TEXT31;677,ENTERPRISE_TEXT32;678,ENTERPRISE_TEXT33;679,ENTERPRISE_TEXT34;680,ENTERPRISE_TEXT35;681,ENTERPRISE_TEXT36;682,ENTERPRISE_TEXT37;683,ENTERPRISE_TEXT38;684,ENTERPRISE_TEXT39;685,ENTERPRISE_TEXT40;686,GENERIC;687,ENTERPRISE_BASE_CALENDAR;688,ENTERPRISE_REQUIRED_VALUES;689,ENTERPRISE_NAME_USED;690,REQUEST_DEMAND;691,ENTERPRISE;692,ENTERPRISE_IS_CHECKED_OUT;693,ENTERPRISE_CHECKED_OUT_BY;694,ENTERPRISE_LAST_MODIFIED_DATE;695,ENTERPRISE_TEAM_MEMBER;696,INACTIVE;699,BOOKING_TYPE;700,ENTERPRISE_MULTI_VALUE20;702,ENTERPRISE_MULTI_VALUE21;704,ENTERPRISE_MULTI_VALUE22;706,ENTERPRISE_MULTI_VALUE23;708,ENTERPRISE_MULTI_VALUE24;710,ENTERPRISE_MULTI_VALUE25;712,ENTERPRISE_MULTI_VALUE26;714,ENTERPRISE_MULTI_VALUE27;716,ENTERPRISE_MULTI_VALUE28;718,ENTERPRISE_MULTI_VALUE29;720,ACTUAL_WORK_PROTECTED;721,ACTUAL_OVERTIME_WORK_PROTECTED;726,CREATED;728,GUID;729,CALENDAR_GUID;737,SUMMARY;738,ERROR_MESSAGE;740,DEFAULT_ASSIGNMENT_OWNER;752,BUDGET;753,BUDGET_WORK;754,BUDGET_COST;755,IMPORT;756,BASELINE_BUDGET_WORK;757,BASELINE_BUDGET_COST;760,BASELINE1_BUDGET_WORK;761,BASELINE1_BUDGET_COST;764,BASELINE2_BUDGET_WORK;765,BASELINE2_BUDGET_COST;768,BASELINE3_BUDGET_WORK;769,BASELINE3_BUDGET_COST;772,BASELINE4_BUDGET_WORK;773,BASELINE4_BUDGET_COST;776,BASELINE5_BUDGET_WORK;777,BASELINE5_BUDGET_COST;780,BASELINE6_BUDGET_WORK;781,BASELINE6_BUDGET_COST;784,BASELINE7_BUDGET_WORK;785,BASELINE7_BUDGET_COST;788,BASELINE8_BUDGET_WORK;789,BASELINE8_BUDGET_COST;792,BASELINE9_BUDGET_WORK;793,BASELINE9_BUDGET_COST;796,BASELINE10_BUDGET_WORK;797,BASELINE10_BUDGET_COST;800,TEAM_ASSIGNMENT_POOL;801,COST_CENTER;803,ASSIGNMENT_OWNER;808,ACTIVE;853,PROPOSED_START;856,PROPOSED_FINISH;859,PROPOSED_MAX_UNITS;862,ENGAGEMENT_STATUS","RT":"ACCRUE_AT,ACCRUE;ACTIVE,BOOLEAN;ACTUAL_COST,CURRENCY;ACTUAL_FINISH,DATE;ACTUAL_OVERTIME_COST,CURRENCY;ACTUAL_OVERTIME_WORK,WORK;ACTUAL_OVERTIME_WORK_PROTECTED,WORK;ACTUAL_START,DATE;ACTUAL_WORK,WORK;ACTUAL_WORK_PROTECTED,WORK;ACWP,CURRENCY;ASSIGNMENT,BOOLEAN;ASSIGNMENT_DELAY,DELAY;ASSIGNMENT_OWNER,STRING;ASSIGNMENT_UNITS,UNITS;AVAILABILITY_DATA,BINARY;AVAILABLE_FROM,DATE;AVAILABLE_TO,DATE;BASELINE10_BUDGET_COST,CURRENCY;BASELINE10_BUDGET_WORK,WORK;BASELINE10_COST,CURRENCY;BASELINE10_FINISH,DATE;BASELINE10_START,DATE;BASELINE10_WORK,WORK;BASELINE1_BUDGET_COST,CURRENCY;BASELINE1_BUDGET_WORK,WORK;BASELINE1_COST,CURRENCY;BASELINE1_FINISH,DATE;BASELINE1_START,DATE;BASELINE1_WORK,WORK;BASELINE2_BUDGET_COST,CURRENCY;BASELINE2_BUDGET_WORK,WORK;BASELINE2_COST,CURRENCY;BASELINE2_FINISH,DATE;BASELINE2_START,DATE;BASELINE2_WORK,WORK;BASELINE3_BUDGET_COST,CURRENCY;BASELINE3_BUDGET_WORK,WORK;BASELINE3_COST,CURRENCY;BASELINE3_FINISH,DATE;BASELINE3_START,DATE;BASELINE3_WORK,WORK;BASELINE4_BUDGET_COST,CURRENCY;BASELINE4_BUDGET_WORK,WORK;BASELINE4_COST,CURRENCY;BASELINE4_FINISH,DATE;BASELINE4_START,DATE;BASELINE4_WORK,WORK;BASELINE5_BUDGET_COST,CURRENCY;BASELINE5_BUDGET_WORK,WORK;BASELINE5_COST,CURRENCY;BASELINE5_FINISH,DATE;BASELINE5_START,DATE;BASELINE5_WORK,WORK;BASELINE6_BUDGET_COST,CURRENCY;BASELINE6_BUDGET_WORK,WORK;BASELINE6_COST,CURRENCY;BASELINE6_FINISH,DATE;BASELINE6_START,DATE;BASELINE6_WORK,WORK;BASELINE7_BUDGET_COST,CURRENCY;BASELINE7_BUDGET_WORK,WORK;BASELINE7_COST,CURRENCY;BASELINE7_FINISH,DATE;BASELINE7_START,DATE;BASELINE7_WORK,WORK;BASELINE8_BUDGET_COST,CURRENCY;BASELINE8_BUDGET_WORK,WORK;BASELINE8_COST,CURRENCY;BASELINE8_FINISH,DATE;BASELINE8_START,DATE;BASELINE8_WORK,WORK;BASELINE9_BUDGET_COST,CURRENCY;BASELINE9_BUDGET_WORK,WORK;BASELINE9_COST,CURRENCY;BASELINE9_FINISH,DATE;BASELINE9_START,DATE;BASELINE9_WORK,WORK;BASELINE_BUDGET_COST,CURRENCY;BASELINE_BUDGET_WORK,WORK;BASELINE_COST,CURRENCY;BASELINE_FINISH,DATE;BASELINE_START,DATE;BASELINE_WORK,WORK;BASE_CALENDAR,STRING;BCWP,CURRENCY;BCWS,CURRENCY;BOOKING_TYPE,BOOKING_TYPE;BUDGET,BOOLEAN;BUDGET_COST,CURRENCY;BUDGET_WORK,WORK;CALENDAR_GUID,GUID;CAN_LEVEL,BOOLEAN;CODE,STRING;CONFIRMED,BOOLEAN;COST,CURRENCY;COST1,CURRENCY;COST10,CURRENCY;COST2,CURRENCY;COST3,CURRENCY;COST4,CURRENCY;COST5,CURRENCY;COST6,CURRENCY;COST7,CURRENCY;COST8,CURRENCY;COST9,CURRENCY;COST_CENTER,STRING;COST_PER_USE,CURRENCY;COST_RATE_A,BINARY;COST_RATE_B,BINARY;COST_RATE_C,BINARY;COST_RATE_D,BINARY;COST_RATE_E,BINARY;COST_RATE_TABLE,SHORT;COST_VARIANCE,CURRENCY;CREATED,DATE;CV,CURRENCY;DATE1,DATE;DATE10,DATE;DATE2,DATE;DATE3,DATE;DATE4,DATE;DATE5,DATE;DATE6,DATE;DATE7,DATE;DATE8,DATE;DATE9,DATE;DEFAULT_ASSIGNMENT_OWNER,STRING;DURATION1,DURATION,DURATION1_UNITS;DURATION10,DURATION,DURATION10_UNITS;DURATION10_UNITS,TIME_UNITS;DURATION1_UNITS,TIME_UNITS;DURATION2,DURATION,DURATION2_UNITS;DURATION2_UNITS,TIME_UNITS;DURATION3,DURATION,DURATION3_UNITS;DURATION3_UNITS,TIME_UNITS;DURATION4,DURATION,DURATION4_UNITS;DURATION4_UNITS,TIME_UNITS;DURATION5,DURATION,DURATION5_UNITS;DURATION5_UNITS,TIME_UNITS;DURATION6,DURATION,DURATION6_UNITS;DURATION6_UNITS,TIME_UNITS;DURATION7,DURATION,DURATION7_UNITS;DURATION7_UNITS,TIME_UNITS;DURATION8,DURATION,DURATION8_UNITS;DURATION8_UNITS,TIME_UNITS;DURATION9,DURATION,DURATION9_UNITS;DURATION9_UNITS,TIME_UNITS;EMAIL_ADDRESS,STRING;ENGAGEMENT_STATUS,STRING;ENTERPRISE,BOOLEAN;ENTERPRISE_BASE_CALENDAR,BOOLEAN;ENTERPRISE_CHECKED_OUT_BY,STRING;ENTERPRISE_COST1,CURRENCY;ENTERPRISE_COST10,CURRENCY;ENTERPRISE_COST2,CURRENCY;ENTERPRISE_COST3,CURRENCY;ENTERPRISE_COST4,CURRENCY;ENTERPRISE_COST5,CURRENCY;ENTERPRISE_COST6,CURRENCY;ENTERPRISE_COST7,CURRENCY;ENTERPRISE_COST8,CURRENCY;ENTERPRISE_COST9,CURRENCY;ENTERPRISE_DATA,BINARY;ENTERPRISE_DATE1,DATE;ENTERPRISE_DATE10,DATE;ENTERPRISE_DATE11,DATE;ENTERPRISE_DATE12,DATE;ENTERPRISE_DATE13,DATE;ENTERPRISE_DATE14,DATE;ENTERPRISE_DATE15,DATE;ENTERPRISE_DATE16,DATE;ENTERPRISE_DATE17,DATE;ENTERPRISE_DATE18,DATE;ENTERPRISE_DATE19,DATE;ENTERPRISE_DATE2,DATE;ENTERPRISE_DATE20,DATE;ENTERPRISE_DATE21,DATE;ENTERPRISE_DATE22,DATE;ENTERPRISE_DATE23,DATE;ENTERPRISE_DATE24,DATE;ENTERPRISE_DATE25,DATE;ENTERPRISE_DATE26,DATE;ENTERPRISE_DATE27,DATE;ENTERPRISE_DATE28,DATE;ENTERPRISE_DATE29,DATE;ENTERPRISE_DATE3,DATE;ENTERPRISE_DATE30,DATE;ENTERPRISE_DATE4,DATE;ENTERPRISE_DATE5,DATE;ENTERPRISE_DATE6,DATE;ENTERPRISE_DATE7,DATE;ENTERPRISE_DATE8,DATE;ENTERPRISE_DATE9,DATE;ENTERPRISE_DURATION1,DURATION,ENTERPRISE_DURATION1_UNITS;ENTERPRISE_DURATION10,DURATION,ENTERPRISE_DURATION10_UNITS;ENTERPRISE_DURATION10_UNITS,TIME_UNITS;ENTERPRISE_DURATION1_UNITS,TIME_UNITS;ENTERPRISE_DURATION2,DURATION,ENTERPRISE_DURATION2_UNITS;ENTERPRISE_DURATION2_UNITS,TIME_UNITS;ENTERPRISE_DURATION3,DURATION,ENTERPRISE_DURATION3_UNITS;ENTERPRISE_DURATION3_UNITS,TIME_UNITS;ENTERPRISE_DURATION4,DURATION,ENTERPRISE_DURATION4_UNITS;ENTERPRISE_DURATION4_UNITS,TIME_UNITS;ENTERPRISE_DURATION5,DURATION,ENTERPRISE_DURATION5_UNITS;ENTERPRISE_DURATION5_UNITS,TIME_UNITS;ENTERPRISE_DURATION6,DURATION,ENTERPRISE_DURATION6_UNITS;ENTERPRISE_DURATION6_UNITS,TIME_UNITS;ENTERPRISE_DURATION7,DURATION,ENTERPRISE_DURATION7_UNITS;ENTERPRISE_DURATION7_UNITS,TIME_UNITS;ENTERPRISE_DURATION8,DURATION,ENTERPRISE_DURATION8_UNITS;ENTERPRISE_DURATION8_UNITS,TIME_UNITS;ENTERPRISE_DURATION9,DURATION,ENTERPRISE_DURATION9_UNITS;ENTERPRISE_DURATION9_UNITS,TIME_UNITS;ENTERPRISE_FLAG1,BOOLEAN;ENTERPRISE_FLAG10,BOOLEAN;ENTERPRISE_FLAG11,BOOLEAN;ENTERPRISE_FLAG12,BOOLEAN;ENTERPRISE_FLAG13,BOOLEAN;ENTERPRISE_FLAG14,BOOLEAN;ENTERPRISE_FLAG15,BOOLEAN;ENTERPRISE_FLAG16,BOOLEAN;ENTERPRISE_FLAG17,BOOLEAN;ENTERPRISE_FLAG18,BOOLEAN;ENTERPRISE_FLAG19,BOOLEAN;ENTERPRISE_FLAG2,BOOLEAN;ENTERPRISE_FLAG20,BOOLEAN;ENTERPRISE_FLAG3,BOOLEAN;ENTERPRISE_FLAG4,BOOLEAN;ENTERPRISE_FLAG5,BOOLEAN;ENTERPRISE_FLAG6,BOOLEAN;ENTERPRISE_FLAG7,BOOLEAN;ENTERPRISE_FLAG8,BOOLEAN;ENTERPRISE_FLAG9,BOOLEAN;ENTERPRISE_IS_CHECKED_OUT,BOOLEAN;ENTERPRISE_LAST_MODIFIED_DATE,DATE;ENTERPRISE_MULTI_VALUE20,STRING;ENTERPRISE_MULTI_VALUE21,STRING;ENTERPRISE_MULTI_VALUE22,STRING;ENTERPRISE_MULTI_VALUE23,STRING;ENTERPRISE_MULTI_VALUE24,STRING;ENTERPRISE_MULTI_VALUE25,STRING;ENTERPRISE_MULTI_VALUE26,STRING;ENTERPRISE_MULTI_VALUE27,STRING;ENTERPRISE_MULTI_VALUE28,STRING;ENTERPRISE_MULTI_VALUE29,STRING;ENTERPRISE_NAME_USED,STRING;ENTERPRISE_NUMBER1,NUMERIC;ENTERPRISE_NUMBER10,NUMERIC;ENTERPRISE_NUMBER11,NUMERIC;ENTERPRISE_NUMBER12,NUMERIC;ENTERPRISE_NUMBER13,NUMERIC;ENTERPRISE_NUMBER14,NUMERIC;ENTERPRISE_NUMBER15,NUMERIC;ENTERPRISE_NUMBER16,NUMERIC;ENTERPRISE_NUMBER17,NUMERIC;ENTERPRISE_NUMBER18,NUMERIC;ENTERPRISE_NUMBER19,NUMERIC;ENTERPRISE_NUMBER2,NUMERIC;ENTERPRISE_NUMBER20,NUMERIC;ENTERPRISE_NUMBER21,NUMERIC;ENTERPRISE_NUMBER22,NUMERIC;ENTERPRISE_NUMBER23,NUMERIC;ENTERPRISE_NUMBER24,NUMERIC;ENTERPRISE_NUMBER25,NUMERIC;ENTERPRISE_NUMBER26,NUMERIC;ENTERPRISE_NUMBER27,NUMERIC;ENTERPRISE_NUMBER28,NUMERIC;ENTERPRISE_NUMBER29,NUMERIC;ENTERPRISE_NUMBER3,NUMERIC;ENTERPRISE_NUMBER30,NUMERIC;ENTERPRISE_NUMBER31,NUMERIC;ENTERPRISE_NUMBER32,NUMERIC;ENTERPRISE_NUMBER33,NUMERIC;ENTERPRISE_NUMBER34,NUMERIC;ENTERPRISE_NUMBER35,NUMERIC;ENTERPRISE_NUMBER36,NUMERIC;ENTERPRISE_NUMBER37,NUMERIC;ENTERPRISE_NUMBER38,NUMERIC;ENTERPRISE_NUMBER39,NUMERIC;ENTERPRISE_NUMBER4,NUMERIC;ENTERPRISE_NUMBER40,NUMERIC;ENTERPRISE_NUMBER5,NUMERIC;ENTERPRISE_NUMBER6,NUMERIC;ENTERPRISE_NUMBER7,NUMERIC;ENTERPRISE_NUMBER8,NUMERIC;ENTERPRISE_NUMBER9,NUMERIC;ENTERPRISE_OUTLINE_CODE1,STRING;ENTERPRISE_OUTLINE_CODE10,STRING;ENTERPRISE_OUTLINE_CODE11,STRING;ENTERPRISE_OUTLINE_CODE12,STRING;ENTERPRISE_OUTLINE_CODE13,STRING;ENTERPRISE_OUTLINE_CODE14,STRING;ENTERPRISE_OUTLINE_CODE15,STRING;ENTERPRISE_OUTLINE_CODE16,STRING;ENTERPRISE_OUTLINE_CODE17,STRING;ENTERPRISE_OUTLINE_CODE18,STRING;ENTERPRISE_OUTLINE_CODE19,STRING;ENTERPRISE_OUTLINE_CODE2,STRING;ENTERPRISE_OUTLINE_CODE20,STRING;ENTERPRISE_OUTLINE_CODE21,STRING;ENTERPRISE_OUTLINE_CODE22,STRING;ENTERPRISE_OUTLINE_CODE23,STRING;ENTERPRISE_OUTLINE_CODE24,STRING;ENTERPRISE_OUTLINE_CODE25,STRING;ENTERPRISE_OUTLINE_CODE26,STRING;ENTERPRISE_OUTLINE_CODE27,STRING;ENTERPRISE_OUTLINE_CODE28,STRING;ENTERPRISE_OUTLINE_CODE29,STRING;ENTERPRISE_OUTLINE_CODE3,STRING;ENTERPRISE_OUTLINE_CODE4,STRING;ENTERPRISE_OUTLINE_CODE5,STRING;ENTERPRISE_OUTLINE_CODE6,STRING;ENTERPRISE_OUTLINE_CODE7,STRING;ENTERPRISE_OUTLINE_CODE8,STRING;ENTERPRISE_OUTLINE_CODE9,STRING;ENTERPRISE_RBS,STRING;ENTERPRISE_REQUIRED_VALUES,BOOLEAN;ENTERPRISE_TEAM_MEMBER,BOOLEAN;ENTERPRISE_TEXT1,STRING;ENTERPRISE_TEXT10,STRING;ENTERPRISE_TEXT11,STRING;ENTERPRISE_TEXT12,STRING;ENTERPRISE_TEXT13,STRING;ENTERPRISE_TEXT14,STRING;ENTERPRISE_TEXT15,STRING;ENTERPRISE_TEXT16,STRING;ENTERPRISE_TEXT17,STRING;ENTERPRISE_TEXT18,STRING;ENTERPRISE_TEXT19,STRING;ENTERPRISE_TEXT2,STRING;ENTERPRISE_TEXT20,STRING;ENTERPRISE_TEXT21,STRING;ENTERPRISE_TEXT22,STRING;ENTERPRISE_TEXT23,STRING;ENTERPRISE_TEXT24,STRING;ENTERPRISE_TEXT25,STRING;ENTERPRISE_TEXT26,STRING;ENTERPRISE_TEXT27,STRING;ENTERPRISE_TEXT28,STRING;ENTERPRISE_TEXT29,STRING;ENTERPRISE_TEXT3,STRING;ENTERPRISE_TEXT30,STRING;ENTERPRISE_TEXT31,STRING;ENTERPRISE_TEXT32,STRING;ENTERPRISE_TEXT33,STRING;ENTERPRISE_TEXT34,STRING;ENTERPRISE_TEXT35,STRING;ENTERPRISE_TEXT36,STRING;ENTERPRISE_TEXT37,STRING;ENTERPRISE_TEXT38,STRING;ENTERPRISE_TEXT39,STRING;ENTERPRISE_TEXT4,STRING;ENTERPRISE_TEXT40,STRING;ENTERPRISE_TEXT5,STRING;ENTERPRISE_TEXT6,STRING;ENTERPRISE_TEXT7,STRING;ENTERPRISE_TEXT8,STRING;ENTERPRISE_TEXT9,STRING;ENTERPRISE_UNIQUE_ID,INTEGER;ERROR_MESSAGE,STRING;FINISH,DATE;FINISH1,DATE;FINISH10,DATE;FINISH2,DATE;FINISH3,DATE;FINISH4,DATE;FINISH5,DATE;FINISH6,DATE;FINISH7,DATE;FINISH8,DATE;FINISH9,DATE;FLAG1,BOOLEAN;FLAG10,BOOLEAN;FLAG11,BOOLEAN;FLAG12,BOOLEAN;FLAG13,BOOLEAN;FLAG14,BOOLEAN;FLAG15,BOOLEAN;FLAG16,BOOLEAN;FLAG17,BOOLEAN;FLAG18,BOOLEAN;FLAG19,BOOLEAN;FLAG2,BOOLEAN;FLAG20,BOOLEAN;FLAG3,BOOLEAN;FLAG4,BOOLEAN;FLAG5,BOOLEAN;FLAG6,BOOLEAN;FLAG7,BOOLEAN;FLAG8,BOOLEAN;FLAG9,BOOLEAN;GENERIC,BOOLEAN;GROUP,STRING;GROUP_BY_SUMMARY,BOOLEAN;GUID,GUID;HYPERLINK,STRING;HYPERLINK_ADDRESS,STRING;HYPERLINK_DATA,BINARY;HYPERLINK_HREF,STRING;HYPERLINK_SCREEN_TIP,STRING;HYPERLINK_SUBADDRESS,STRING;ID,INTEGER;IMPORT,BOOLEAN;INACTIVE,BOOLEAN;INDEX,INTEGER;INDICATORS,STRING;INITIALS,STRING;LEVELING_DELAY,DURATION;LINKED_FIELDS,BOOLEAN;MATERIAL_LABEL,STRING;MAX_UNITS,UNITS;NAME,STRING;NOTES,NOTES;NUMBER1,NUMERIC;NUMBER10,NUMERIC;NUMBER11,NUMERIC;NUMBER12,NUMERIC;NUMBER13,NUMERIC;NUMBER14,NUMERIC;NUMBER15,NUMERIC;NUMBER16,NUMERIC;NUMBER17,NUMERIC;NUMBER18,NUMERIC;NUMBER19,NUMERIC;NUMBER2,NUMERIC;NUMBER20,NUMERIC;NUMBER3,NUMERIC;NUMBER4,NUMERIC;NUMBER5,NUMERIC;NUMBER6,NUMERIC;NUMBER7,NUMERIC;NUMBER8,NUMERIC;NUMBER9,NUMERIC;OBJECTS,NUMERIC;OUTLINE_CODE1,STRING;OUTLINE_CODE10,STRING;OUTLINE_CODE10_INDEX,INTEGER;OUTLINE_CODE1_INDEX,INTEGER;OUTLINE_CODE2,STRING;OUTLINE_CODE2_INDEX,INTEGER;OUTLINE_CODE3,STRING;OUTLINE_CODE3_INDEX,INTEGER;OUTLINE_CODE4,STRING;OUTLINE_CODE4_INDEX,INTEGER;OUTLINE_CODE5,STRING;OUTLINE_CODE5_INDEX,INTEGER;OUTLINE_CODE6,STRING;OUTLINE_CODE6_INDEX,INTEGER;OUTLINE_CODE7,STRING;OUTLINE_CODE7_INDEX,INTEGER;OUTLINE_CODE8,STRING;OUTLINE_CODE8_INDEX,INTEGER;OUTLINE_CODE9,STRING;OUTLINE_CODE9_INDEX,INTEGER;OVERALLOCATED,BOOLEAN;OVERTIME_COST,CURRENCY;OVERTIME_RATE,RATE;OVERTIME_RATE_UNITS,RATE_UNITS;OVERTIME_WORK,WORK;PEAK,UNITS;PERCENT_WORK_COMPLETE,PERCENTAGE;PHONETICS,STRING;PROJECT,STRING;PROPOSED_FINISH,DATE;PROPOSED_MAX_UNITS,UNITS;PROPOSED_START,DATE;REGULAR_WORK,WORK;REMAINING_COST,CURRENCY;REMAINING_OVERTIME_COST,CURRENCY;REMAINING_OVERTIME_WORK,WORK;REMAINING_WORK,WORK;REQUEST_DEMAND,STRING;RESPONSE_PENDING,BOOLEAN;STANDARD_RATE,RATE;STANDARD_RATE_UNITS,RATE_UNITS;START,DATE;START1,DATE;START10,DATE;START2,DATE;START3,DATE;START4,DATE;START5,DATE;START6,DATE;START7,DATE;START8,DATE;START9,DATE;SUBPROJECT_RESOURCE_UNIQUE_ID,INTEGER;SUMMARY,STRING;SV,CURRENCY;TASK_OUTLINE_NUMBER,STRING;TASK_SUMMARY_NAME,STRING;TEAM_ASSIGNMENT_POOL,BOOLEAN;TEAM_STATUS_PENDING,BOOLEAN;TEXT1,STRING;TEXT10,STRING;TEXT11,STRING;TEXT12,STRING;TEXT13,STRING;TEXT14,STRING;TEXT15,STRING;TEXT16,STRING;TEXT17,STRING;TEXT18,STRING;TEXT19,STRING;TEXT2,STRING;TEXT20,STRING;TEXT21,STRING;TEXT22,STRING;TEXT23,STRING;TEXT24,STRING;TEXT25,STRING;TEXT26,STRING;TEXT27,STRING;TEXT28,STRING;TEXT29,STRING;TEXT3,STRING;TEXT30,STRING;TEXT4,STRING;TEXT5,STRING;TEXT6,STRING;TEXT7,STRING;TEXT8,STRING;TEXT9,STRING;TYPE,RESOURCE_TYPE;UNIQUE_ID,INTEGER;UPDATE_NEEDED,BOOLEAN;VAC,CURRENCY;WBS,STRING;WINDOWS_USER_ACCOUNT,STRING;WORK,WORK;WORKGROUP,WORKGROUP;WORK_CONTOUR,WORK_CONTOUR;WORK_VARIANCE,DURATION","A":"0,UNIQUE_ID;1,TASK_UNIQUE_ID;2,RESOURCE_UNIQUE_ID;3,TASK_ID;4,RESOURCE_ID;5,TASK_NAME;6,RESOURCE_NAME;7,ASSIGNMENT_UNITS;8,WORK;9,OVERTIME_WORK;10,FLAG1;11,FLAG2;12,FLAG3;13,FLAG4;14,FLAG5;15,FLAG6;16,FLAG7;17,FLAG8;18,FLAG9;19,FLAG10;20,FLAG11;21,FLAG12;22,FLAG13;23,FLAG14;24,FLAG15;25,FLAG16;26,FLAG17;27,FLAG18;28,FLAG19;29,FLAG20;30,COST1;31,COST2;32,COST3;33,COST4;34,COST5;35,COST6;36,COST7;37,COST8;38,COST9;39,COST10;40,DURATION1;41,DURATION2;42,DURATION3;43,DURATION4;44,DURATION5;45,DURATION6;46,DURATION7;47,DURATION8;48,DURATION9;49,DURATION10;50,FINISH1;51,FINISH2;52,FINISH3;53,FINISH4;54,FINISH5;55,FINISH6;56,FINISH7;57,FINISH8;58,FINISH9;59,FINISH10;60,NUMBER1;61,NUMBER2;62,NUMBER3;63,NUMBER4;64,NUMBER5;65,NUMBER6;66,NUMBER7;67,NUMBER8;68,NUMBER9;69,NUMBER10;70,NUMBER11;71,NUMBER12;72,NUMBER13;73,NUMBER14;74,NUMBER15;75,NUMBER16;76,NUMBER17;77,NUMBER18;78,NUMBER19;79,NUMBER20;80,COST_RATE_TABLE;87,TIMEPHASED_ACTUAL_IRREGULAR_WORK;88,TEXT1;89,TEXT2;90,START1;91,START2;92,START3;93,START4;94,START5;95,START6;96,START7;97,START8;98,START9;99,START10;100,TEXT1;101,TEXT2;102,TEXT3;103,TEXT4;104,TEXT5;105,TEXT6;106,TEXT7;107,TEXT8;108,TEXT9;109,TEXT10;110,TEXT11;111,TEXT12;112,TEXT13;113,TEXT14;114,TEXT15;115,TEXT16;116,TEXT17;117,TEXT18;118,TEXT19;119,TEXT20;120,TEXT21;121,TEXT22;122,TEXT23;123,TEXT24;124,TEXT25;125,TEXT26;126,TEXT27;127,TEXT28;128,TEXT29;129,TEXT30;130,FLAG8;131,FLAG9;132,LINKED_FIELDS;135,OVERALLOCATED;142,TASK_SUMMARY_NAME;144,RAW_TIMEPHASED_ACTUAL_COST;145,LEVELING_DELAY;146,BASELINE_START;147,BASELINE_FINISH;150,HYPERLINK_DATA;152,HYPERLINK;153,HYPERLINK_ADDRESS;154,HYPERLINK_SUBADDRESS;155,HYPERLINK_HREF;159,COST4;160,COST5;161,COST6;162,COST7;163,COST8;164,COST9;165,COST10;166,DATE1;167,DATE2;168,DATE3;169,DATE4;170,DATE5;171,DATE6;172,DATE7;173,DATE8;174,DATE9;175,DATE10;176,DURATION4;177,DURATION5;178,DURATION6;179,DURATION7;180,DURATION8;181,DURATION9;182,DURATION10;183,FINISH6;184,FINISH7;185,FINISH8;186,FINISH9;187,FINISH10;188,FLAG11;189,FLAG12;190,FLAG13;191,FLAG14;192,FLAG15;193,FLAG16;194,FLAG17;195,FLAG18;196,FLAG19;197,FLAG20;198,NUMBER6;199,NUMBER7;200,NUMBER8;201,NUMBER9;202,NUMBER10;203,NUMBER11;204,NUMBER12;205,NUMBER13;206,NUMBER14;207,NUMBER15;208,NUMBER16;209,NUMBER17;210,NUMBER18;211,NUMBER19;212,NUMBER20;213,START6;214,START7;215,START8;216,START9;217,START10;218,TEXT11;219,TEXT12;220,TEXT13;221,TEXT14;222,TEXT15;223,TEXT16;224,TEXT17;225,TEXT18;226,TEXT19;227,TEXT20;228,TEXT21;229,TEXT22;230,TEXT23;231,TEXT24;232,TEXT25;233,TEXT26;234,TEXT27;235,TEXT28;236,TEXT29;237,TEXT30;238,DURATION4_UNITS;239,DURATION5_UNITS;240,DURATION6_UNITS;241,DURATION7_UNITS;242,DURATION8_UNITS;243,DURATION9_UNITS;244,DURATION10_UNITS;246,INDEX;247,CV;248,WORK_VARIANCE;262,START_VARIANCE;263,FINISH_VARIANCE;264,STOP;270,VARIABLE_RATE_UNITS;271,VAC;275,FIXED_MATERIAL_ASSIGNMENT;276,RESOURCE_TYPE;279,HYPERLINK_SCREEN_TIP;286,WBS;289,BASELINE1_WORK;290,BASELINE1_COST;291,RAW_TIMEPHASED_BASELINE1_WORK;292,RAW_TIMEPHASED_BASELINE1_COST;295,BASELINE1_START;296,BASELINE1_FINISH;298,BASELINE2_WORK;299,BASELINE2_COST;300,RAW_TIMEPHASED_BASELINE2_WORK;301,RAW_TIMEPHASED_BASELINE2_COST;304,BASELINE2_START;305,BASELINE2_FINISH;307,BASELINE3_WORK;308,BASELINE3_COST;309,RAW_TIMEPHASED_BASELINE3_WORK;310,RAW_TIMEPHASED_BASELINE3_COST;313,BASELINE3_START;314,BASELINE3_FINISH;316,BASELINE4_WORK;317,BASELINE4_COST;318,RAW_TIMEPHASED_BASELINE4_WORK;319,RAW_TIMEPHASED_BASELINE4_COST;322,BASELINE4_START;323,BASELINE4_FINISH;325,BASELINE5_WORK;326,BASELINE5_COST;327,RAW_TIMEPHASED_BASELINE5_WORK;328,RAW_TIMEPHASED_BASELINE5_COST;331,BASELINE5_START;332,BASELINE5_FINISH;334,BASELINE6_WORK;335,BASELINE6_COST;336,RAW_TIMEPHASED_BASELINE6_WORK;337,RAW_TIMEPHASED_BASELINE6_COST;340,BASELINE6_START;341,BASELINE6_FINISH;343,BASELINE7_WORK;344,BASELINE7_COST;345,RAW_TIMEPHASED_BASELINE7_WORK;346,RAW_TIMEPHASED_BASELINE7_COST;349,BASELINE7_START;350,BASELINE7_FINISH;352,BASELINE8_WORK;353,BASELINE8_COST;354,RAW_TIMEPHASED_BASELINE8_WORK;355,RAW_TIMEPHASED_BASELINE8_COST;358,BASELINE8_START;359,BASELINE8_FINISH;361,BASELINE9_WORK;362,BASELINE9_COST;363,RAW_TIMEPHASED_BASELINE9_WORK;364,RAW_TIMEPHASED_BASELINE9_COST;367,BASELINE9_START;368,BASELINE9_FINISH;370,BASELINE10_WORK;371,BASELINE10_COST;372,RAW_TIMEPHASED_BASELINE10_WORK;373,RAW_TIMEPHASED_BASELINE10_COST;376,BASELINE10_START;377,BASELINE10_FINISH;379,TASK_OUTLINE_NUMBER;381,ENTERPRISE_COST1;382,ENTERPRISE_COST2;383,ENTERPRISE_COST3;384,ENTERPRISE_COST4;385,ENTERPRISE_COST5;386,ENTERPRISE_COST6;387,ENTERPRISE_COST7;388,ENTERPRISE_COST8;389,ENTERPRISE_COST9;390,ENTERPRISE_COST10;391,ENTERPRISE_DATE1;392,ENTERPRISE_DATE2;393,ENTERPRISE_DATE3;394,ENTERPRISE_DATE4;395,ENTERPRISE_DATE5;396,ENTERPRISE_DATE6;397,ENTERPRISE_DATE7;398,ENTERPRISE_DATE8;399,ENTERPRISE_DATE9;400,ENTERPRISE_DATE10;401,ENTERPRISE_DATE11;402,ENTERPRISE_DATE12;403,ENTERPRISE_DATE13;404,ENTERPRISE_DATE14;405,ENTERPRISE_DATE15;406,ENTERPRISE_DATE16;407,ENTERPRISE_DATE17;408,ENTERPRISE_DATE18;409,ENTERPRISE_DATE19;410,ENTERPRISE_DATE20;411,ENTERPRISE_DATE21;412,ENTERPRISE_DATE22;413,ENTERPRISE_DATE23;414,ENTERPRISE_DATE24;415,ENTERPRISE_DATE25;416,ENTERPRISE_DATE26;417,ENTERPRISE_DATE27;418,ENTERPRISE_DATE28;419,ENTERPRISE_DATE29;420,ENTERPRISE_DATE30;421,ENTERPRISE_DURATION1;422,ENTERPRISE_DURATION2;423,ENTERPRISE_DURATION3;424,ENTERPRISE_DURATION4;425,ENTERPRISE_DURATION5;426,ENTERPRISE_DURATION6;427,ENTERPRISE_DURATION7;428,ENTERPRISE_DURATION8;429,ENTERPRISE_DURATION9;430,ENTERPRISE_DURATION10;441,ENTERPRISE_FLAG1;442,ENTERPRISE_FLAG2;443,ENTERPRISE_FLAG3;444,ENTERPRISE_FLAG4;445,ENTERPRISE_FLAG5;446,ENTERPRISE_FLAG6;447,ENTERPRISE_FLAG7;448,ENTERPRISE_FLAG8;449,ENTERPRISE_FLAG9;450,ENTERPRISE_FLAG10;451,ENTERPRISE_FLAG11;452,ENTERPRISE_FLAG12;453,ENTERPRISE_FLAG13;454,ENTERPRISE_FLAG14;455,ENTERPRISE_FLAG15;456,ENTERPRISE_FLAG16;457,ENTERPRISE_FLAG17;458,ENTERPRISE_FLAG18;459,ENTERPRISE_FLAG19;460,ENTERPRISE_FLAG20;461,ENTERPRISE_NUMBER1;462,ENTERPRISE_NUMBER2;463,ENTERPRISE_NUMBER3;464,ENTERPRISE_NUMBER4;465,ENTERPRISE_NUMBER5;466,ENTERPRISE_NUMBER6;467,ENTERPRISE_NUMBER7;468,ENTERPRISE_NUMBER8;469,ENTERPRISE_NUMBER9;470,ENTERPRISE_NUMBER10;471,ENTERPRISE_NUMBER11;472,ENTERPRISE_NUMBER12;473,ENTERPRISE_NUMBER13;474,ENTERPRISE_NUMBER14;475,ENTERPRISE_NUMBER15;476,ENTERPRISE_NUMBER16;477,ENTERPRISE_NUMBER17;478,ENTERPRISE_NUMBER18;479,ENTERPRISE_NUMBER19;480,ENTERPRISE_NUMBER20;481,ENTERPRISE_NUMBER21;482,ENTERPRISE_NUMBER22;483,ENTERPRISE_NUMBER23;484,ENTERPRISE_NUMBER24;485,ENTERPRISE_NUMBER25;486,ENTERPRISE_NUMBER26;487,ENTERPRISE_NUMBER27;488,ENTERPRISE_NUMBER28;489,ENTERPRISE_NUMBER29;490,ENTERPRISE_NUMBER30;491,ENTERPRISE_NUMBER31;492,ENTERPRISE_NUMBER32;493,ENTERPRISE_NUMBER33;494,ENTERPRISE_NUMBER34;495,ENTERPRISE_NUMBER35;496,ENTERPRISE_NUMBER36;497,ENTERPRISE_NUMBER37;498,ENTERPRISE_NUMBER38;499,ENTERPRISE_NUMBER39;500,ENTERPRISE_NUMBER40;501,ENTERPRISE_TEXT1;502,ENTERPRISE_TEXT2;503,ENTERPRISE_TEXT3;504,ENTERPRISE_TEXT4;505,ENTERPRISE_TEXT5;506,ENTERPRISE_TEXT6;507,ENTERPRISE_TEXT7;508,ENTERPRISE_TEXT8;509,ENTERPRISE_TEXT9;510,ENTERPRISE_TEXT10;511,ENTERPRISE_TEXT11;512,ENTERPRISE_TEXT12;513,ENTERPRISE_TEXT13;514,ENTERPRISE_TEXT14;515,ENTERPRISE_TEXT15;516,ENTERPRISE_TEXT16;517,ENTERPRISE_TEXT17;518,ENTERPRISE_TEXT18;519,ENTERPRISE_TEXT19;520,ENTERPRISE_TEXT20;521,ENTERPRISE_TEXT21;522,ENTERPRISE_TEXT22;523,ENTERPRISE_TEXT23;524,ENTERPRISE_TEXT24;525,ENTERPRISE_TEXT25;526,ENTERPRISE_TEXT26;527,ENTERPRISE_TEXT27;528,ENTERPRISE_TEXT28;529,ENTERPRISE_TEXT29;530,ENTERPRISE_TEXT30;531,ENTERPRISE_TEXT31;532,ENTERPRISE_TEXT32;533,ENTERPRISE_TEXT33;534,ENTERPRISE_TEXT34;535,ENTERPRISE_TEXT35;536,ENTERPRISE_TEXT36;537,ENTERPRISE_TEXT37;538,ENTERPRISE_TEXT38;539,ENTERPRISE_TEXT39;540,ENTERPRISE_TEXT40;545,ENTERPRISE_RESOURCE_OUTLINE_CODE1;546,ENTERPRISE_RESOURCE_OUTLINE_CODE2;547,ENTERPRISE_RESOURCE_OUTLINE_CODE3;548,ENTERPRISE_RESOURCE_OUTLINE_CODE4;549,ENTERPRISE_RESOURCE_OUTLINE_CODE5;550,ENTERPRISE_RESOURCE_OUTLINE_CODE6;551,ENTERPRISE_RESOURCE_OUTLINE_CODE7;552,ENTERPRISE_RESOURCE_OUTLINE_CODE8;553,ENTERPRISE_RESOURCE_OUTLINE_CODE9;554,ENTERPRISE_RESOURCE_OUTLINE_CODE10;555,ENTERPRISE_RESOURCE_OUTLINE_CODE11;556,ENTERPRISE_RESOURCE_OUTLINE_CODE12;557,ENTERPRISE_RESOURCE_OUTLINE_CODE13;558,ENTERPRISE_RESOURCE_OUTLINE_CODE14;559,ENTERPRISE_RESOURCE_OUTLINE_CODE15;560,ENTERPRISE_RESOURCE_OUTLINE_CODE16;561,ENTERPRISE_RESOURCE_OUTLINE_CODE17;562,ENTERPRISE_RESOURCE_OUTLINE_CODE18;563,ENTERPRISE_RESOURCE_OUTLINE_CODE19;564,ENTERPRISE_RESOURCE_OUTLINE_CODE20;565,ENTERPRISE_RESOURCE_OUTLINE_CODE21;566,ENTERPRISE_RESOURCE_OUTLINE_CODE22;567,ENTERPRISE_RESOURCE_OUTLINE_CODE23;568,ENTERPRISE_RESOURCE_OUTLINE_CODE24;569,ENTERPRISE_RESOURCE_OUTLINE_CODE25;570,ENTERPRISE_RESOURCE_OUTLINE_CODE26;571,ENTERPRISE_RESOURCE_OUTLINE_CODE27;572,ENTERPRISE_RESOURCE_OUTLINE_CODE28;573,ENTERPRISE_RESOURCE_OUTLINE_CODE29;574,ENTERPRISE_RESOURCE_RBS;605,RESOURCE_REQUEST_TYPE;607,ENTERPRISE_TEAM_MEMBER;610,ENTERPRISE_RESOURCE_MULTI_VALUE20;612,ENTERPRISE_RESOURCE_MULTI_VALUE21;614,ENTERPRISE_RESOURCE_MULTI_VALUE22;616,ENTERPRISE_RESOURCE_MULTI_VALUE23;618,ENTERPRISE_RESOURCE_MULTI_VALUE24;620,ENTERPRISE_RESOURCE_MULTI_VALUE25;622,ENTERPRISE_RESOURCE_MULTI_VALUE26;624,ENTERPRISE_RESOURCE_MULTI_VALUE27;626,ENTERPRISE_RESOURCE_MULTI_VALUE28;628,ENTERPRISE_RESOURCE_MULTI_VALUE29;630,ACTUAL_WORK_PROTECTED;631,ACTUAL_OVERTIME_WORK_PROTECTED;634,CREATED;636,GUID;637,ASSIGNMENT_TASK_GUID;638,ASSIGNMENT_RESOURCE_GUID;646,SUMMARY;668,OWNER;669,BUDGET_WORK;670,BUDGET_COST;671,RAW_TIMEPHASED_BUDGET_WORK;672,RAW_TIMEPHASED_BUDGET_COST;673,BASELINE_BUDGET_WORK;674,BASELINE_BUDGET_COST;675,RAW_TIMEPHASED_BASELINE_BUDGET_WORK;676,RAW_TIMEPHASED_BASELINE_BUDGET_COST;677,BASELINE1_BUDGET_WORK;678,BASELINE1_BUDGET_COST;679,RAW_TIMEPHASED_BASELINE1_BUDGET_WORK;680,RAW_TIMEPHASED_BASELINE1_BUDGET_COST;681,BASELINE2_BUDGET_WORK;682,BASELINE2_BUDGET_COST;683,RAW_TIMEPHASED_BASELINE2_BUDGET_WORK;684,RAW_TIMEPHASED_BASELINE2_BUDGET_COST;685,BASELINE3_BUDGET_WORK;686,BASELINE3_BUDGET_COST;687,RAW_TIMEPHASED_BASELINE3_BUDGET_WORK;688,RAW_TIMEPHASED_BASELINE3_BUDGET_COST;689,BASELINE4_BUDGET_WORK;690,BASELINE4_BUDGET_COST;691,RAW_TIMEPHASED_BASELINE4_BUDGET_WORK;692,RAW_TIMEPHASED_BASELINE4_BUDGET_COST;693,BASELINE5_BUDGET_WORK;694,BASELINE5_BUDGET_COST;695,RAW_TIMEPHASED_BASELINE5_BUDGET_WORK;696,RAW_TIMEPHASED_BASELINE5_BUDGET_COST;697,BASELINE6_BUDGET_WORK;698,BASELINE6_BUDGET_COST;699,RAW_TIMEPHASED_BASELINE6_BUDGET_WORK;700,RAW_TIMEPHASED_BASELINE6_BUDGET_COST;701,BASELINE7_BUDGET_WORK;702,BASELINE7_BUDGET_COST;703,RAW_TIMEPHASED_BASELINE7_BUDGET_WORK;704,RAW_TIMEPHASED_BASELINE7_BUDGET_COST;705,BASELINE8_BUDGET_WORK;706,BASELINE8_BUDGET_COST;707,RAW_TIMEPHASED_BASELINE8_BUDGET_WORK;708,RAW_TIMEPHASED_BASELINE8_BUDGET_COST;709,BASELINE9_BUDGET_WORK;710,BASELINE9_BUDGET_COST;711,RAW_TIMEPHASED_BASELINE9_BUDGET_WORK;712,RAW_TIMEPHASED_BASELINE9_BUDGET_COST;713,BASELINE10_BUDGET_WORK;714,BASELINE10_BUDGET_COST;715,RAW_TIMEPHASED_BASELINE10_BUDGET_WORK;716,RAW_TIMEPHASED_BASELINE10_BUDGET_COST;16394,FLAG1;16395,FLAG2;16396,FLAG3;16397,FLAG4;16398,FLAG5;16399,FLAG6;16400,FLAG7;16401,FLAG8;16402,FLAG9;16403,FLAG10;16404,FLAG11;16405,FLAG12;16406,FLAG13;16407,FLAG14;16408,FLAG15;16409,FLAG16;16410,FLAG17;16411,FLAG18;16412,FLAG19;16413,FLAG20;16414,COST1;16415,COST2;16416,COST3;16417,COST4;16418,COST5;16419,COST6;16420,COST7;16421,COST8;16422,COST9;16423,COST10;16424,DURATION1;16425,DURATION2;16426,DURATION3;16427,DURATION4;16428,DURATION5;16429,DURATION6;16430,DURATION7;16431,DURATION8;16432,DURATION9;16433,DURATION10;16434,FINISH1;16435,FINISH2;16436,FINISH3;16437,FINISH4;16438,FINISH5;16439,FINISH6;16440,FINISH7;16441,FINISH8;16442,FINISH9;16443,FINISH10;16444,NUMBER1;16445,NUMBER2;16446,NUMBER3;16447,NUMBER4;16448,NUMBER5;16449,NUMBER6;16450,NUMBER7;16451,NUMBER8;16452,NUMBER9;16453,NUMBER10;16454,NUMBER11;16455,NUMBER12;16456,NUMBER13;16457,NUMBER14;16458,NUMBER15;16459,NUMBER16;16460,NUMBER17;16461,NUMBER18;16462,NUMBER19;16463,NUMBER20;16474,START1;16475,START2;16476,START3;16477,START4;16478,START5;16479,START6;16480,START7;16481,START8;16482,START9;16483,START10;16484,TEXT1;16485,TEXT2;16486,TEXT3;16487,TEXT4;16488,TEXT5;16489,TEXT6;16490,TEXT7;16491,TEXT8;16492,TEXT9;16493,TEXT10;16494,TEXT11;16495,TEXT12;16496,TEXT13;16497,TEXT14;16498,TEXT15;16499,TEXT16;16500,TEXT17;16501,TEXT18;16502,TEXT19;16503,TEXT20;16504,TEXT21;16505,TEXT22;16506,TEXT23;16507,TEXT24;16508,TEXT25;16509,TEXT26;16510,TEXT27;16511,TEXT28;16512,TEXT29;16513,TEXT30","AT":"ACTUAL_COST,CURRENCY;ACTUAL_OVERTIME_COST,CURRENCY;ACTUAL_OVERTIME_WORK,WORK;ACTUAL_OVERTIME_WORK_PROTECTED,WORK;ACTUAL_WORK,WORK;ACTUAL_WORK_PROTECTED,WORK;ASSIGNMENT_DELAY,DELAY;ASSIGNMENT_RESOURCE_GUID,GUID;ASSIGNMENT_TASK_GUID,GUID;ASSIGNMENT_UNITS,UNITS;BASELINE10_BUDGET_COST,CURRENCY;BASELINE10_BUDGET_WORK,WORK;BASELINE10_COST,CURRENCY;BASELINE10_FINISH,DATE;BASELINE10_START,DATE;BASELINE10_WORK,WORK;BASELINE1_BUDGET_COST,CURRENCY;BASELINE1_BUDGET_WORK,WORK;BASELINE1_COST,CURRENCY;BASELINE1_FINISH,DATE;BASELINE1_START,DATE;BASELINE1_WORK,WORK;BASELINE2_BUDGET_COST,CURRENCY;BASELINE2_BUDGET_WORK,WORK;BASELINE2_COST,CURRENCY;BASELINE2_FINISH,DATE;BASELINE2_START,DATE;BASELINE2_WORK,WORK;BASELINE3_BUDGET_COST,CURRENCY;BASELINE3_BUDGET_WORK,WORK;BASELINE3_COST,CURRENCY;BASELINE3_FINISH,DATE;BASELINE3_START,DATE;BASELINE3_WORK,WORK;BASELINE4_BUDGET_COST,CURRENCY;BASELINE4_BUDGET_WORK,WORK;BASELINE4_COST,CURRENCY;BASELINE4_FINISH,DATE;BASELINE4_START,DATE;BASELINE4_WORK,WORK;BASELINE5_BUDGET_COST,CURRENCY;BASELINE5_BUDGET_WORK,WORK;BASELINE5_COST,CURRENCY;BASELINE5_FINISH,DATE;BASELINE5_START,DATE;BASELINE5_WORK,WORK;BASELINE6_BUDGET_COST,CURRENCY;BASELINE6_BUDGET_WORK,WORK;BASELINE6_COST,CURRENCY;BASELINE6_FINISH,DATE;BASELINE6_START,DATE;BASELINE6_WORK,WORK;BASELINE7_BUDGET_COST,CURRENCY;BASELINE7_BUDGET_WORK,WORK;BASELINE7_COST,CURRENCY;BASELINE7_FINISH,DATE;BASELINE7_START,DATE;BASELINE7_WORK,WORK;BASELINE8_BUDGET_COST,CURRENCY;BASELINE8_BUDGET_WORK,WORK;BASELINE8_COST,CURRENCY;BASELINE8_FINISH,DATE;BASELINE8_START,DATE;BASELINE8_WORK,WORK;BASELINE9_BUDGET_COST,CURRENCY;BASELINE9_BUDGET_WORK,WORK;BASELINE9_COST,CURRENCY;BASELINE9_FINISH,DATE;BASELINE9_START,DATE;BASELINE9_WORK,WORK;BASELINE_BUDGET_COST,CURRENCY;BASELINE_BUDGET_WORK,WORK;BASELINE_COST,CURRENCY;BASELINE_FINISH,DATE;BASELINE_START,DATE;BASELINE_WORK,WORK;BUDGET_COST,CURRENCY;BUDGET_WORK,WORK;COST,CURRENCY;COST1,CURRENCY;COST10,CURRENCY;COST2,CURRENCY;COST3,CURRENCY;COST4,CURRENCY;COST5,CURRENCY;COST6,CURRENCY;COST7,CURRENCY;COST8,CURRENCY;COST9,CURRENCY;COST_RATE_TABLE,SHORT;CREATED,DATE;CV,CURRENCY;DATE1,DATE;DATE10,DATE;DATE2,DATE;DATE3,DATE;DATE4,DATE;DATE5,DATE;DATE6,DATE;DATE7,DATE;DATE8,DATE;DATE9,DATE;DURATION1,DURATION,DURATION1_UNITS;DURATION10,DURATION,DURATION10_UNITS;DURATION10_UNITS,TIME_UNITS;DURATION1_UNITS,TIME_UNITS;DURATION2,DURATION,DURATION2_UNITS;DURATION2_UNITS,TIME_UNITS;DURATION3,DURATION,DURATION3_UNITS;DURATION3_UNITS,TIME_UNITS;DURATION4,DURATION,DURATION4_UNITS;DURATION4_UNITS,TIME_UNITS;DURATION5,DURATION,DURATION5_UNITS;DURATION5_UNITS,TIME_UNITS;DURATION6,DURATION,DURATION6_UNITS;DURATION6_UNITS,TIME_UNITS;DURATION7,DURATION,DURATION7_UNITS;DURATION7_UNITS,TIME_UNITS;DURATION8,DURATION,DURATION8_UNITS;DURATION8_UNITS,TIME_UNITS;DURATION9,DURATION,DURATION9_UNITS;DURATION9_UNITS,TIME_UNITS;ENTERPRISE_COST1,CURRENCY;ENTERPRISE_COST10,CURRENCY;ENTERPRISE_COST2,CURRENCY;ENTERPRISE_COST3,CURRENCY;ENTERPRISE_COST4,CURRENCY;ENTERPRISE_COST5,CURRENCY;ENTERPRISE_COST6,CURRENCY;ENTERPRISE_COST7,CURRENCY;ENTERPRISE_COST8,CURRENCY;ENTERPRISE_COST9,CURRENCY;ENTERPRISE_DATE1,DATE;ENTERPRISE_DATE10,DATE;ENTERPRISE_DATE11,DATE;ENTERPRISE_DATE12,DATE;ENTERPRISE_DATE13,DATE;ENTERPRISE_DATE14,DATE;ENTERPRISE_DATE15,DATE;ENTERPRISE_DATE16,DATE;ENTERPRISE_DATE17,DATE;ENTERPRISE_DATE18,DATE;ENTERPRISE_DATE19,DATE;ENTERPRISE_DATE2,DATE;ENTERPRISE_DATE20,DATE;ENTERPRISE_DATE21,DATE;ENTERPRISE_DATE22,DATE;ENTERPRISE_DATE23,DATE;ENTERPRISE_DATE24,DATE;ENTERPRISE_DATE25,DATE;ENTERPRISE_DATE26,DATE;ENTERPRISE_DATE27,DATE;ENTERPRISE_DATE28,DATE;ENTERPRISE_DATE29,DATE;ENTERPRISE_DATE3,DATE;ENTERPRISE_DATE30,DATE;ENTERPRISE_DATE4,DATE;ENTERPRISE_DATE5,DATE;ENTERPRISE_DATE6,DATE;ENTERPRISE_DATE7,DATE;ENTERPRISE_DATE8,DATE;ENTERPRISE_DATE9,DATE;ENTERPRISE_DURATION1,DURATION;ENTERPRISE_DURATION10,DURATION;ENTERPRISE_DURATION2,DURATION;ENTERPRISE_DURATION3,DURATION;ENTERPRISE_DURATION4,DURATION;ENTERPRISE_DURATION5,DURATION;ENTERPRISE_DURATION6,DURATION;ENTERPRISE_DURATION7,DURATION;ENTERPRISE_DURATION8,DURATION;ENTERPRISE_DURATION9,DURATION;ENTERPRISE_FLAG1,BOOLEAN;ENTERPRISE_FLAG10,BOOLEAN;ENTERPRISE_FLAG11,BOOLEAN;ENTERPRISE_FLAG12,BOOLEAN;ENTERPRISE_FLAG13,BOOLEAN;ENTERPRISE_FLAG14,BOOLEAN;ENTERPRISE_FLAG15,BOOLEAN;ENTERPRISE_FLAG16,BOOLEAN;ENTERPRISE_FLAG17,BOOLEAN;ENTERPRISE_FLAG18,BOOLEAN;ENTERPRISE_FLAG19,BOOLEAN;ENTERPRISE_FLAG2,BOOLEAN;ENTERPRISE_FLAG20,BOOLEAN;ENTERPRISE_FLAG3,BOOLEAN;ENTERPRISE_FLAG4,BOOLEAN;ENTERPRISE_FLAG5,BOOLEAN;ENTERPRISE_FLAG6,BOOLEAN;ENTERPRISE_FLAG7,BOOLEAN;ENTERPRISE_FLAG8,BOOLEAN;ENTERPRISE_FLAG9,BOOLEAN;ENTERPRISE_NUMBER1,NUMERIC;ENTERPRISE_NUMBER10,NUMERIC;ENTERPRISE_NUMBER11,NUMERIC;ENTERPRISE_NUMBER12,NUMERIC;ENTERPRISE_NUMBER13,NUMERIC;ENTERPRISE_NUMBER14,NUMERIC;ENTERPRISE_NUMBER15,NUMERIC;ENTERPRISE_NUMBER16,NUMERIC;ENTERPRISE_NUMBER17,NUMERIC;ENTERPRISE_NUMBER18,NUMERIC;ENTERPRISE_NUMBER19,NUMERIC;ENTERPRISE_NUMBER2,NUMERIC;ENTERPRISE_NUMBER20,NUMERIC;ENTERPRISE_NUMBER21,NUMERIC;ENTERPRISE_NUMBER22,NUMERIC;ENTERPRISE_NUMBER23,NUMERIC;ENTERPRISE_NUMBER24,NUMERIC;ENTERPRISE_NUMBER25,NUMERIC;ENTERPRISE_NUMBER26,NUMERIC;ENTERPRISE_NUMBER27,NUMERIC;ENTERPRISE_NUMBER28,NUMERIC;ENTERPRISE_NUMBER29,NUMERIC;ENTERPRISE_NUMBER3,NUMERIC;ENTERPRISE_NUMBER30,NUMERIC;ENTERPRISE_NUMBER31,NUMERIC;ENTERPRISE_NUMBER32,NUMERIC;ENTERPRISE_NUMBER33,NUMERIC;ENTERPRISE_NUMBER34,NUMERIC;ENTERPRISE_NUMBER35,NUMERIC;ENTERPRISE_NUMBER36,NUMERIC;ENTERPRISE_NUMBER37,NUMERIC;ENTERPRISE_NUMBER38,NUMERIC;ENTERPRISE_NUMBER39,NUMERIC;ENTERPRISE_NUMBER4,NUMERIC;ENTERPRISE_NUMBER40,NUMERIC;ENTERPRISE_NUMBER5,NUMERIC;ENTERPRISE_NUMBER6,NUMERIC;ENTERPRISE_NUMBER7,NUMERIC;ENTERPRISE_NUMBER8,NUMERIC;ENTERPRISE_NUMBER9,NUMERIC;ENTERPRISE_RESOURCE_MULTI_VALUE20,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE21,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE22,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE23,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE24,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE25,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE26,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE27,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE28,STRING;ENTERPRISE_RESOURCE_MULTI_VALUE29,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE1,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE10,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE11,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE12,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE13,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE14,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE15,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE16,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE17,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE18,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE19,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE2,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE20,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE21,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE22,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE23,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE24,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE25,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE26,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE27,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE28,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE29,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE3,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE4,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE5,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE6,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE7,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE8,STRING;ENTERPRISE_RESOURCE_OUTLINE_CODE9,STRING;ENTERPRISE_RESOURCE_RBS,STRING;ENTERPRISE_TEAM_MEMBER,STRING;ENTERPRISE_TEXT1,STRING;ENTERPRISE_TEXT10,STRING;ENTERPRISE_TEXT11,STRING;ENTERPRISE_TEXT12,STRING;ENTERPRISE_TEXT13,STRING;ENTERPRISE_TEXT14,STRING;ENTERPRISE_TEXT15,STRING;ENTERPRISE_TEXT16,STRING;ENTERPRISE_TEXT17,STRING;ENTERPRISE_TEXT18,STRING;ENTERPRISE_TEXT19,STRING;ENTERPRISE_TEXT2,STRING;ENTERPRISE_TEXT20,STRING;ENTERPRISE_TEXT21,STRING;ENTERPRISE_TEXT22,STRING;ENTERPRISE_TEXT23,STRING;ENTERPRISE_TEXT24,STRING;ENTERPRISE_TEXT25,STRING;ENTERPRISE_TEXT26,STRING;ENTERPRISE_TEXT27,STRING;ENTERPRISE_TEXT28,STRING;ENTERPRISE_TEXT29,STRING;ENTERPRISE_TEXT3,STRING;ENTERPRISE_TEXT30,STRING;ENTERPRISE_TEXT31,STRING;ENTERPRISE_TEXT32,STRING;ENTERPRISE_TEXT33,STRING;ENTERPRISE_TEXT34,STRING;ENTERPRISE_TEXT35,STRING;ENTERPRISE_TEXT36,STRING;ENTERPRISE_TEXT37,STRING;ENTERPRISE_TEXT38,STRING;ENTERPRISE_TEXT39,STRING;ENTERPRISE_TEXT4,STRING;ENTERPRISE_TEXT40,STRING;ENTERPRISE_TEXT5,STRING;ENTERPRISE_TEXT6,STRING;ENTERPRISE_TEXT7,STRING;ENTERPRISE_TEXT8,STRING;ENTERPRISE_TEXT9,STRING;FINISH,DATE;FINISH1,DATE;FINISH10,DATE;FINISH2,DATE;FINISH3,DATE;FINISH4,DATE;FINISH5,DATE;FINISH6,DATE;FINISH7,DATE;FINISH8,DATE;FINISH9,DATE;FINISH_VARIANCE,DURATION;FIXED_MATERIAL_ASSIGNMENT,STRING;FLAG1,BOOLEAN;FLAG10,BOOLEAN;FLAG11,BOOLEAN;FLAG12,BOOLEAN;FLAG13,BOOLEAN;FLAG14,BOOLEAN;FLAG15,BOOLEAN;FLAG16,BOOLEAN;FLAG17,BOOLEAN;FLAG18,BOOLEAN;FLAG19,BOOLEAN;FLAG2,BOOLEAN;FLAG20,BOOLEAN;FLAG3,BOOLEAN;FLAG4,BOOLEAN;FLAG5,BOOLEAN;FLAG6,BOOLEAN;FLAG7,BOOLEAN;FLAG8,BOOLEAN;FLAG9,BOOLEAN;GUID,GUID;HYPERLINK,STRING;HYPERLINK_ADDRESS,STRING;HYPERLINK_DATA,BINARY;HYPERLINK_HREF,STRING;HYPERLINK_SCREEN_TIP,STRING;HYPERLINK_SUBADDRESS,STRING;INDEX,INTEGER;LEVELING_DELAY,DURATION,LEVELING_DELAY_UNITS;LEVELING_DELAY_UNITS,TIME_UNITS;LINKED_FIELDS,BOOLEAN;NOTES,NOTES;NUMBER1,NUMERIC;NUMBER10,NUMERIC;NUMBER11,NUMERIC;NUMBER12,NUMERIC;NUMBER13,NUMERIC;NUMBER14,NUMERIC;NUMBER15,NUMERIC;NUMBER16,NUMERIC;NUMBER17,NUMERIC;NUMBER18,NUMERIC;NUMBER19,NUMERIC;NUMBER2,NUMERIC;NUMBER20,NUMERIC;NUMBER3,NUMERIC;NUMBER4,NUMERIC;NUMBER5,NUMERIC;NUMBER6,NUMERIC;NUMBER7,NUMERIC;NUMBER8,NUMERIC;NUMBER9,NUMERIC;OVERALLOCATED,BOOLEAN;OVERTIME_WORK,WORK;OWNER,STRING;RAW_TIMEPHASED_ACTUAL_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_ACTUAL_REGULAR_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE10_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE10_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE10_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE10_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE1_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE1_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE1_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE1_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE2_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE2_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE2_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE2_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE3_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE3_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE3_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE3_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE4_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE4_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE4_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE4_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE5_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE5_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE5_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE5_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE6_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE6_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE6_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE6_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE7_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE7_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE7_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE7_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE8_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE8_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE8_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE8_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE9_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE9_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE9_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE9_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BASELINE_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BASELINE_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_BUDGET_COST,TIMEPHASED_COST_LIST;RAW_TIMEPHASED_BUDGET_WORK,TIMEPHASED_WORK_LIST;RAW_TIMEPHASED_REMAINING_REGULAR_WORK,TIMEPHASED_WORK_LIST;REGULAR_WORK,WORK;REMAINING_COST,CURRENCY;REMAINING_OVERTIME_COST,CURRENCY;REMAINING_OVERTIME_WORK,WORK;REMAINING_WORK,WORK;RESOURCE_ID,INTEGER;RESOURCE_NAME,STRING;RESOURCE_REQUEST_TYPE,RESOURCE_REQUEST_TYPE;RESOURCE_TYPE,RESOURCE_TYPE;RESOURCE_UNIQUE_ID,INTEGER;START,DATE;START1,DATE;START10,DATE;START2,DATE;START3,DATE;START4,DATE;START5,DATE;START6,DATE;START7,DATE;START8,DATE;START9,DATE;START_VARIANCE,DURATION;STOP,DATE;SUMMARY,STRING;TASK_ID,INTEGER;TASK_NAME,STRING;TASK_OUTLINE_NUMBER,STRING;TASK_SUMMARY_NAME,STRING;TASK_UNIQUE_ID,INTEGER;TEXT1,STRING;TEXT10,STRING;TEXT11,STRING;TEXT12,STRING;TEXT13,STRING;TEXT14,STRING;TEXT15,STRING;TEXT16,STRING;TEXT17,STRING;TEXT18,STRING;TEXT19,STRING;TEXT2,STRING;TEXT20,STRING;TEXT21,STRING;TEXT22,STRING;TEXT23,STRING;TEXT24,STRING;TEXT25,STRING;TEXT26,STRING;TEXT27,STRING;TEXT28,STRING;TEXT29,STRING;TEXT3,STRING;TEXT30,STRING;TEXT4,STRING;TEXT5,STRING;TEXT6,STRING;TEXT7,STRING;TEXT8,STRING;TEXT9,STRING;TIMEPHASED_ACTUAL_IRREGULAR_WORK,TIMEPHASED_WORK_LIST;UNIQUE_ID,INTEGER;VAC,CURRENCY;VARIABLE_RATE_UNITS,WORK_UNITS;WBS,STRING;WORK,WORK;WORK_VARIANCE,WORK"};
+
+/* ===================== field tables (generated from MPXJ) ===================== */
+var FT = null;
+function tables(){
+  if(FT) return FT;
+  function idx(s){ var m = {}; s.split(";").forEach(function(p){ var i = p.indexOf(","); m[+p.slice(0, i)] = p.slice(i + 1); }); return m; }
+  function typ(s){ var m = {}; s.split(";").forEach(function(p){ var a = p.split(","); m[a[0]] = { dt: a[1], units: a[2] || null }; }); return m; }
+  FT = { T: idx(MT.T), T14: idx(MT.T14), TT: typ(MT.TT), R: idx(MT.R), RT: typ(MT.RT), A: idx(MT.A), AT: typ(MT.AT) };
+  return FT;
+}
+var TASK_BASE = 0x0B400000, RESOURCE_BASE = 0x0C400000, ASSIGNMENT_BASE = 0x0F400000;
+var _ph = 0;
+function fieldType(P, fieldID){
+  /* FieldTypeHelper.getInstance */
+  if(fieldID === -1) return null;
+  var t = tables(), prefix = (fieldID & 0xFFFF0000) >>> 0, index = fieldID & 0xFFFF, cls, name = null, types;
+  if(prefix === TASK_BASE){ cls = "T"; types = t.TT; }
+  else if(prefix === RESOURCE_BASE){ cls = "R"; types = t.RT; }
+  else if(prefix === ASSIGNMENT_BASE){ cls = "A"; types = t.AT; }
+  else return { key: "?" + (_ph++), cls: "U", name: "UNKNOWN", dt: null };
+  if(index & 0x8000) return { key: cls + "#UDF" + index, cls: cls, name: "UDF" + index, dt: "CUSTOM", udf: true };
+  if(cls === "T" && P.mppFileType === 14) name = t.T14[index] || null;
+  if(!name) name = t[cls][index] || null;
+  if(!name) return { key: "?" + (_ph++), cls: "U", name: "UNKNOWN", dt: null };
+  return namedField(cls, name);
+}
+function namedField(cls, name){
+  var t = tables(), ty = t[cls + "T"][name] || { dt: null, units: null };
+  return { key: cls + "." + name, cls: cls, name: name, dt: ty.dt, units: ty.units };
+}
+function fixedSize(dt){
+  switch(dt){
+    case "DATE": case "INTEGER": case "DURATION": return 4;
+    case "TIME_UNITS": case "CONSTRAINT": case "PRIORITY": case "PERCENTAGE": case "TASK_TYPE": case "ACCRUE": case "SHORT":
+    case "BOOLEAN": case "DELAY": case "WORKGROUP": case "RATE_UNITS": case "EARNED_VALUE_METHOD": case "RESOURCE_REQUEST_TYPE": return 2;
+    case "CURRENCY": case "UNITS": case "RATE": case "WORK": return 8;
+    case "WORK_UNITS": return 1;
+    case "GUID": return 16;
+    default: return 0;
+  }
+}
+
+/* ===================== FieldMap ===================== */
+function FieldMap(P, v14){
+  this.P = P; this.v14 = v14; this.map = new Map(); this.max = [0, 0];
+}
+FieldMap.prototype.create = function(data){
+  var index = 0, lastOff = 0, block = 0;
+  while(index + 28 <= data.length){
+    var dataBlockOffset = getShort(data, index + 4), typeValue = getInt(data, index + 12), type = fieldType(this.P, typeValue);
+    var category = getShort(data, index + 20);
+    var varDataKey = typeValue & 0xFFFF; /* FieldMap12 and FieldMap14 both use the type as var data key */
+    var loc;
+    if(category === 0x0B || category === 0x64) loc = "META";
+    else if(dataBlockOffset !== 65535){
+      loc = "FIXED";
+      if(dataBlockOffset < lastOff) ++block;
+      lastOff = dataBlockOffset;
+      var sz = fixedSize(type.dt);
+      if(block < 2 && dataBlockOffset + sz > this.max[block]) this.max[block] = dataBlockOffset + sz;
+    } else loc = varDataKey !== 0 ? "VAR" : "UNKNOWN";
+    this.map.set(type.key, { type: type, loc: loc, block: block, off: dataBlockOffset, key: varDataKey });
+    index += 28;
+  }
+};
+FieldMap.prototype.createFrom = function(props, keys, what){
+  var data = null;
+  for(var i = 0; i < keys.length && !data; i++) data = props.bytes(keys[i]);
+  if(!data) throw MPPError("UNSUPPORTED_VERSION", "No " + what + " field map in file");
+  this.create(data);
+};
+FieldMap.prototype.createEnterprise = function(props, cls){
+  var data = props.bytes(PK.ENTERPRISE_CUSTOM_FIELD_MAP); if(!data) return;
+  for(var index = 4; index + 4 <= data.length; index += 4){
+    var tv = getInt(data, index), type = fieldType(this.P, tv);
+    if(type && type.cls === cls && type.udf) this.map.set(type.key, { type: type, loc: "VAR", block: 0, off: 0, key: tv & 0xFFFF });
+  }
+};
+FieldMap.prototype.item = function(cls, name){ return this.map.get(cls + "." + name); };
+FieldMap.prototype.fixedOffset = function(cls, name){ var it = this.item(cls, name); return it ? it.off : -1; };
+FieldMap.prototype.varKey = function(cls, name){ var it = this.item(cls, name); return it ? it.key : null; };
+FieldMap.prototype.populate = function(cls, obj, id, fixed, varData){
+  var self = this;
+  this.map.forEach(function(it){ if(it.type.cls === cls) obj[it.type.name] = self.read(it, id, fixed, varData); });
+};
+FieldMap.prototype.fieldData = function(cls, name, id, fixed, varData){ var it = name ? this.item(cls, name) : null; return it ? this.read(it, id, fixed, varData) : null; };
+FieldMap.prototype.read = function(it, id, fixed, varData){
+  var P = this.P, dt = it.type.dt, off = it.off, units;
+  if(it.loc === "FIXED"){
+    if(!fixed || it.block >= fixed.length) return null;
+    var d = fixed[it.block]; if(!d || off >= d.length) return null;
+    switch(dt){
+      case "DATE": return getTimestamp(d, off);
+      case "INTEGER": return getInt(d, off);
+      case "DURATION":
+        units = this.fieldData(it.type.cls, it.type.units, id, fixed, varData) || P.defaultDurationUnits;
+        return adjustedDuration(P, getInt(d, off), units);
+      case "TIME_UNITS": return durationUnits(getShort(d, off), P.defaultDurationUnits);
+      case "CONSTRAINT": { var c = getShort(d, off); return c < 10 ? c : 0; }
+      case "PRIORITY": return getShort(d, off);
+      case "PERCENTAGE": return getPercentage(d, off);
+      case "TASK_TYPE": { var tt = getShort(d, off); return tt <= 2 ? tt : 2; }
+      case "ACCRUE": { var ac = getShort(d, off); return (ac >= 1 && ac <= 3) ? ac : 3; }
+      case "CURRENCY": case "UNITS": { var a = getDouble(d, off); a = Math.abs(a) < 0.1 ? 0 : a; return a / 100; }
+      case "RATE": return { amount: getDouble(d, off), u: "HOURS" };
+      case "WORK": { var w = getDouble(d, off); w = Math.abs(w) < 1000 ? 0 : w; return Dur(w / 60000, "HOURS"); }
+      case "SHORT": return getShort(d, off);
+      case "BOOLEAN": return getShort(d, off) !== 0;
+      case "DELAY": return rawDuration(getShort(d, off), "HOURS");
+      case "WORK_UNITS": { var wu = getByte(d, off); return wu === 0 ? null : timeUnitInstance(wu - 1); }
+      case "WORKGROUP": case "EARNED_VALUE_METHOD": case "RESOURCE_REQUEST_TYPE": return getShort(d, off);
+      case "RATE_UNITS": return timeUnitInstance(getShort(d, off) - 1);
+      case "GUID": return getGUID(d, off);
+      default: return null;
+    }
+  }
+  if(it.loc === "VAR"){
+    var k = it.key;
+    switch(dt){
+      case "DURATION": {
+        units = this.fieldData(it.type.cls, it.type.units, id, fixed, varData) || "HOURS";
+        var vd = varData.bytes(id, k); if(!vd) return null;
+        if(vd.length === 512) return getUnicodeString(vd, 0);
+        return vd.length >= 4 ? adjustedDuration(P, getInt(vd, 0), units) : null;
+      }
+      case "TIME_UNITS": return durationUnits(varData.short(id, k), P.defaultDurationUnits);
+      case "CURRENCY": { var a2 = varData.double(id, k); a2 = Math.abs(a2) < 0.1 ? 0 : a2; return a2 / 100; }
+      case "STRING": { var fl = varData.short(id, k); if(fl === 0x0701 || fl === 0x0401) return null; return varData.ustr(id, k); }
+      case "DATE": { var fl2 = varData.short(id, k); if(fl2 === 0x0701 || fl2 === 0x0401) return null; var tb = varData.bytes(id, k); if(!tb) return null; if(tb.length === 512) return null; return tb.length >= 4 ? getTimestamp(tb, 0) : null; }
+      case "NUMERIC": { var fl3 = varData.short(id, k); if(fl3 === 0x0701 || fl3 === 0x0401) return null; return varData.double(id, k); }
+      case "INTEGER": return varData.int(id, k);
+      case "WORK": { var w2 = varData.double(id, k); w2 = Math.abs(w2) < 1000 ? 0 : w2; return Dur(w2 / 60000, "HOURS"); }
+      case "NOTES": { var n = varData.str(id, k); return n == null ? null : rtfStrip(n); }
+      case "DELAY": return rawDuration(varData.short(id, k), "HOURS");
+      case "PERCENTAGE": case "SHORT": case "ACCRUE": case "WORKGROUP": case "EARNED_VALUE_METHOD": case "RESOURCE_REQUEST_TYPE": case "BOOKING_TYPE": return varData.short(id, k);
+      case "BOOLEAN": return varData.short(id, k) !== 0;
+      case "BINARY": return varData.bytes(id, k);
+      default: return null;
+    }
+  }
+  return null;
+};
+
+/* ===================== RTF → text (RtfHelper.strip equivalent for notes) ===================== */
+function rtfStrip(text){
+  if(!text) return text;
+  if(text.indexOf("{\\rtf") !== 0) return text;
+  var out = "", i = 0, n = text.length, stack = [], skip = false, uc = 1, ucSkip = 0, cp = 1252, hexBuf = [];
+  var SKIP_DEST = { fonttbl:1, colortbl:1, stylesheet:1, info:1, pict:1, object:1, header:1, footer:1, headerl:1, headerr:1, footerl:1, footerr:1, listtable:1, listoverridetable:1, rsidtbl:1, generator:1, xmlnstbl:1, themedata:1, colorschememapping:1, datastore:1, latentstyles:1, fldinst:1, filetbl:1, revtbl:1, mmathPr:1, pgdsctbl:1, nonshppict:1, bkmkstart:1, bkmkend:1 };
+  function flushHex(){ if(!hexBuf.length) return; var bytes = new Uint8Array(hexBuf); hexBuf = [];
+    if(skip) return;
+    try{ out += new TextDecoder(cp === 936 ? "gbk" : cp === 950 ? "big5" : cp === 932 ? "shift_jis" : cp === 949 ? "euc-kr" : cp === 65001 ? "utf-8" : ("windows-" + cp)).decode(bytes); }
+    catch(e){ for(var k = 0; k < bytes.length; k++) out += String.fromCharCode(bytes[k]); } }
+  function emit(s){ flushHex(); if(!skip) out += s; }
+  while(i < n){
+    var c = text[i];
+    if(c === "{"){ flushHex(); stack.push({ skip: skip, uc: uc }); i++; continue; }
+    if(c === "}"){ flushHex(); var st = stack.pop(); if(st){ skip = st.skip; uc = st.uc; } i++; continue; }
+    if(c === "\\"){
+      var nx = text[i + 1];
+      if(nx === "'"){ var h = parseInt(text.substr(i + 2, 2), 16); i += 4; if(ucSkip > 0){ ucSkip--; continue; } if(!isNaN(h)) hexBuf.push(h); continue; }
+      if(nx === "\\" || nx === "{" || nx === "}"){ emit(nx); i += 2; continue; }
+      if(nx === "*"){ skip = true; i += 2; continue; }
+      if(nx === "~"){ emit("\u00a0"); i += 2; continue; }
+      if(nx === "-" || nx === "_"){ i += 2; continue; }
+      if(nx === "\n" || nx === "\r"){ emit("\n"); i += 2; continue; }
+      var m = /^\\([a-zA-Z]+)(-?\d+)? ?/.exec(text.substr(i, 40));
+      if(!m){ i += 2; continue; }
+      i += m[0].length;
+      var w = m[1], arg = m[2] != null ? parseInt(m[2], 10) : null;
+      if(SKIP_DEST[w]){ skip = true; continue; }
+      if(w === "ansicpg" && arg){ cp = arg; continue; }
+      if(w === "uc"){ uc = arg == null ? 1 : arg; continue; }
+      if(w === "u"){ flushHex(); var code = arg < 0 ? arg + 65536 : arg; if(!skip) out += String.fromCharCode(code); ucSkip = uc; continue; }
+      if(w === "par" || w === "line" || w === "sect" || w === "row"){ emit("\n"); continue; }
+      if(w === "tab" || w === "cell"){ emit("\t"); continue; }
+      if(w === "emdash"){ emit("\u2014"); continue; } if(w === "endash"){ emit("\u2013"); continue; }
+      if(w === "bullet"){ emit("\u2022"); continue; }
+      if(w === "lquote"){ emit("\u2018"); continue; } if(w === "rquote"){ emit("\u2019"); continue; }
+      if(w === "ldblquote"){ emit("\u201c"); continue; } if(w === "rdblquote"){ emit("\u201d"); continue; }
+      continue;
+    }
+    if(c === "\r" || c === "\n"){ i++; continue; }
+    if(ucSkip > 0){ ucSkip--; i++; continue; }
+    emit(c); i++;
+  }
+  flushHex();
+  if(out.slice(-1) === "\n") out = out.slice(0, -1);
+  return out;
+}
+
+/* ===================== OLE property sets (SummaryInformation) ===================== */
+function propertySet(d){
+  var res = {};
+  if(!d || d.length < 48) return res;
+  try{
+    var secOff = getInt(d, 44), n = getInt(d, secOff + 4), cp = 1252, items = [];
+    for(var i = 0; i < n && i < 512; i++) items.push([getInt(d, secOff + 8 + i * 8), getInt(d, secOff + 12 + i * 8)]);
+    items.forEach(function(it){ if(it[0] === 1) cp = getShort(d, secOff + it[1] + 4); });
+    items.forEach(function(it){
+      var o = secOff + it[1], type = getInt(d, o) & 0xFFFF;
+      if(type === 30){ var len = getInt(d, o + 4), bytes = d.subarray(o + 8, o + 8 + Math.max(0, len)); var z = bytes.indexOf(0); if(z >= 0) bytes = bytes.subarray(0, z);
+        var s; if(cp === 1200) s = utf16(bytes, 0, bytes.length); else { try{ s = new TextDecoder(cp === 65001 ? "utf-8" : cp === 936 ? "gbk" : cp === 950 ? "big5" : cp === 932 ? "shift_jis" : cp === 949 ? "euc-kr" : ("windows-" + cp)).decode(bytes); }catch(e){ s = ""; for(var k = 0; k < bytes.length; k++) s += String.fromCharCode(bytes[k]); } }
+        res[it[0]] = s; }
+      else if(type === 31){ var cnt = getInt(d, o + 4); res[it[0]] = getUnicodeString(d.subarray(o + 8, o + 8 + cnt * 2), 0); }
+    });
+  }catch(e){}
+  return res;
+}
+
+/* ===================== dates ===================== */
+function fmtTs(s){ if(s == null) return null; var dt = new Date(EPOCH_MS + s * 1000); return dt.toISOString().slice(0, 19); }
+function fmtDay(days){ var dt = new Date(EPOCH_MS + days * 86400000); return dt.toISOString().slice(0, 10); }
+function dayOfWeekSun1(days){ return new Date(EPOCH_MS + days * 86400000).getUTCDay() + 1; } /* 1 = Sunday */
+
+/* ===================== recurring calendar exceptions (RecurringData.getDates) ===================== */
+function ymd(days){ var dt = new Date(EPOCH_MS + days * 86400000); return [dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate()]; }
+function dOf(y, m, dd){ return Math.round((Date.UTC(y, m - 1, dd) - EPOCH_MS) / 86400000); }
+function monthLen(y, m){ return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
+function addMonths(days, k){ var a = ymd(days), y = a[0], m = a[1] - 1 + k; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return dOf(y, m + 1, Math.min(a[2], monthLen(y, m + 1))); }
+function recurringDates(rd){
+  var out = [], freq = rd.frequency < 1 ? 1 : rd.frequency, start = rd.start, finish = rd.finish, g = 0;
+  function more(date){ if(finish == null){ var oc = rd.occurrences < 1 ? 1 : rd.occurrences; return out.length < oc; } return date <= finish; }
+  function ordinal(date, dn){ var cur = dayOfWeekSun1(date), req = rd.dow, off = 0; if(req > cur) off = req - cur; else if(req < cur) off = 7 - (cur - req); date += off; if(dn > 1) date += 7 * (dn - 1); return date; }
+  function lastRel(date){ var a = ymd(date); date = dOf(a[0], a[1], monthLen(a[0], a[1])); var cur = dayOfWeekSun1(date), req = rd.dow, off = 0; if(cur > req) off = req - cur; else if(cur < req) off = -7 + (req - cur); return date + off; }
+  var date, a;
+  if(rd.type === "DAILY"){ date = start; while(more(date) && g++ < 5000){ out.push(date); date += freq; } }
+  else if(rd.type === "WEEKLY"){
+    date = start; var cd = dayOfWeekSun1(date); if(cd !== 1){ date -= (cd - 1 === 0 ? 7 : cd - 1); }
+    /* Java: date.minusDays(currentDay.getValue()) where Monday=1..Sunday=7 → back to previous Sunday */
+    var curDay = 1;
+    if(!rd.days || !rd.days.some(Boolean)) return out;
+    while(more(date) && g++ < 5000){
+      var off = 0;
+      for(var di = 0; di < 7; di++){
+        if(rd.days[curDay]){ if(off !== 0){ date += off; off = 0; } if(!more(date)) break; if(date >= start) out.push(date); }
+        ++off; curDay = curDay % 7 + 1;
+      }
+      if(freq > 1) off += 7 * (freq - 1);
+      date += off;
+    }
+  }
+  else if(rd.type === "MONTHLY"){
+    if(rd.relative){
+      a = ymd(start); date = dOf(a[0], a[1], 1);
+      while(more(date) && g++ < 5000){ date = rd.dayNumber > 4 ? lastRel(date) : ordinal(date, rd.dayNumber);
+        if(date >= start){ out.push(date); if(!more(date)) break; }
+        a = ymd(date); date = addMonths(dOf(a[0], a[1], 1), freq); }
+    } else {
+      a = ymd(start); var curDN = a[2]; date = dOf(a[0], a[1], 1); if(rd.dayNumber < curDN) date = addMonths(date, 1);
+      while(more(date) && g++ < 5000){ a = ymd(date); date = dOf(a[0], a[1], Math.min(rd.dayNumber, monthLen(a[0], a[1]))); out.push(date); a = ymd(date); date = addMonths(dOf(a[0], a[1], 1), freq); }
+    }
+  }
+  else if(rd.type === "YEARLY"){
+    a = ymd(start); date = dOf(a[0], rd.month, 1);
+    if(rd.relative){
+      while(more(date) && g++ < 5000){ date = rd.dayNumber > 4 ? lastRel(date) : ordinal(date, rd.dayNumber);
+        if(date >= start){ out.push(date); if(!more(date)) break; }
+        a = ymd(date); date = dOf(a[0] + 1, a[1], 1); }
+    } else {
+      while(more(date) && g++ < 5000){ a = ymd(date); date = dOf(a[0], a[1], Math.min(rd.dayNumber, monthLen(a[0], a[1])));
+        if(date < start){ a = ymd(date); date = dOf(a[0] + 1, a[1], Math.min(a[2], monthLen(a[0] + 1, a[1]))); }
+        out.push(date); a = ymd(date); date = dOf(a[0] + 1, a[1], 1); }
+    }
+  }
+  return out;
+}
+
+/* ===================== calendars (AbstractCalendarFactory / AbstractCalendarAndExceptionFactory) ===================== */
+var DEFAULT_WORKING_WEEK = [false, true, true, true, true, true, false];
+function newCalendar(){ return { uid: null, name: null, base: null, days: [null,null,null,null,null,null,null], hours: [null,null,null,null,null,null,null], exceptions: [], derived: false }; }
+function processCalendars(R){
+  var P = R.P, calDir = R.projectDir.dir("TBkndCal");
+  var calVarMeta = VarMeta12(IS(calDir.stream("VarMeta")));
+  var calVarData = Var2Data(calVarMeta, IS(calDir.stream("Var2Data")));
+  var calFixedMeta = FixedMeta(IS(calDir.stream("FixedMeta")), 10);
+  var calFixedData = FixedData(calFixedMeta, R.stream(calDir, "FixedData"), 12);
+  var calFixed2Data = null;
+  if(calDir.has("Fixed2Meta")){ var fm2 = FixedMeta(IS(calDir.stream("Fixed2Meta")), 9); calFixed2Data = FixedData(fm2, R.stream(calDir, "Fixed2Data"), 48); }
+  var idOff, baseOff, resOff;
+  if(P.mppFileType === 14 && P.appVersion > 14){ idOff = 8; baseOff = 0; resOff = 4; } else { idOff = 0; baseOff = 4; resOff = 8; }
+  var calendarMap = new Map(), baseCalendars = [], defaultCalendarData = R.projectProps.bytes(PK.DEFAULT_CALENDAR_HOURS);
+  var defaultCalendar = newCalendar(); calHours(defaultCalendarData, null, defaultCalendar, true);
+  for(var loop = 0; loop < calFixedData.count; loop++){
+    var fixedData = calFixedData.get(loop), fixedData2 = calFixed2Data ? calFixed2Data.get(loop) : null;
+    if(!fixedData || fixedData.length < 8) continue;
+    for(var offset = 0; offset + 12 <= fixedData.length; offset += 12){
+      var calendarID = getInt(fixedData, offset + idOff), baseCalendarID = getInt(fixedData, offset + baseOff);
+      if(!(calendarID > 0) || calendarMap.has(calendarID)) continue;
+      var varData = calVarData.bytes(calendarID, 8), cal;
+      if(baseCalendarID <= 0 || baseCalendarID === calendarID){
+        cal = newCalendar();
+        if(varData != null || defaultCalendarData != null){ if(varData == null) varData = defaultCalendarData; }
+        else cal.defaultBase = true;
+        cal.name = calVarData.ustr(calendarID, 1);
+        var resourceID = getInt(fixedData, offset + resOff);
+        if(resourceID > 0 && !R.resourceCal.has(resourceID)) R.resourceCal.set(resourceID, cal);
+      } else {
+        cal = newCalendar(); cal.derived = true;
+        baseCalendars.push([cal, baseCalendarID]);
+        R.resourceCal.set(getInt(fixedData, offset + resOff), cal);
+      }
+      R.calendars.push(cal);
+      cal.uid = calendarID;
+      cal.guid = getGUID(fixedData2, 0);
+      if(varData == null){
+        if(baseCalendarID <= 0){ for(var i = 0; i < 7; i++){ cal.days[i] = DEFAULT_WORKING_WEEK[i] ? "W" : "N"; cal.hours[i] = DEFAULT_WORKING_WEEK[i] ? [[8 * 3600, 12 * 3600], [13 * 3600, 17 * 3600]] : []; } }
+        else for(var j = 0; j < 7; j++) cal.days[j] = "D";
+      } else {
+        calHours(varData, defaultCalendar, cal, baseCalendarID <= 0);
+        calExceptions(varData, cal);
+      }
+      calendarMap.set(calendarID, cal);
+    }
+  }
+  baseCalendars.forEach(function(p){
+    var bc = calendarMap.get(p[1]);
+    if(bc && bc.name != null) p[0].base = bc;
+    else { var ix = R.calendars.indexOf(p[0]); if(ix >= 0) R.calendars.splice(ix, 1); }
+  });
+  var dn = R.projectProps.ustr(PK.DEFAULT_CALENDAR_NAME), def = null;
+  R.calendars.forEach(function(c){ if(!def && dn != null && c.name === dn) def = c; });
+  if(!def){
+    /* findOrCreateDefaultCalendar */
+    R.calendars.forEach(function(c){ if(!def && c.name === "Standard") def = c; });
+    if(!def){ def = newCalendar(); def.name = "Standard"; for(var q = 0; q < 7; q++) def.days[q] = DEFAULT_WORKING_WEEK[q] ? "W" : "N"; def.uid = R.calendars.reduce(function(m, c){ return Math.max(m, c.uid || 0); }, 0) + 1; R.calendars.push(def); }
+  }
+  R.defaultCalendar = def;
+}
+function calHours(data, defaultCalendar, cal, isBase){
+  for(var index = 0; index < 7; index++){
+    var offset = 60 * index, defaultFlag = data == null ? 1 : getShort(data, offset);
+    if(defaultFlag === 1){
+      if(isBase){
+        if(defaultCalendar == null){ cal.days[index] = DEFAULT_WORKING_WEEK[index] ? "W" : "N"; cal.hours[index] = DEFAULT_WORKING_WEEK[index] ? [[8 * 3600, 12 * 3600], [13 * 3600, 17 * 3600]] : []; }
+        else { cal.days[index] = defaultCalendar.days[index] === "W" ? "W" : "N"; cal.hours[index] = (defaultCalendar.hours[index] || []).slice(); }
+      } else cal.days[index] = "D";
+    } else {
+      var ranges = [], periodCount = getShort(data, offset + 2);
+      for(var pi = 0; pi < periodCount; pi++){ var st = getTime(data, offset + 8 + pi * 2), du = getDurationMs(data, offset + 20 + pi * 4); ranges.push([st, st + Math.floor(du / 1000)]); }
+      if(!ranges.length){ cal.days[index] = "N"; cal.hours[index] = []; }
+      else { cal.days[index] = "W"; cal.hours[index] = ranges; }
+    }
+  }
+}
+var RECUR_TYPES = [null, "DAILY", "YEARLY", "YEARLY", "MONTHLY", "MONTHLY", "WEEKLY", "DAILY"], RELATIVE = [false, false, false, true, false, true];
+var DAY_MASKS = [0, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40];
+function calExceptions(data, cal){
+  if(data.length <= 420) return;
+  var offset = 420, count = getShort(data, offset);
+  offset += 4;
+  for(var index = 0; index < count; index++){
+    if(offset + 92 > data.length) break;
+    var from = getDate(data, offset), to = getDate(data, offset + 2), rv = getShort(data, offset + 72);
+    var ex = { from: from, to: to, ranges: [], name: null, rd: null };
+    var type = RECUR_TYPES[rv] || null;
+    if(type && from != null){
+      var rd = { type: type, relative: !!RELATIVE[rv], start: from, finish: to, occurrences: getShort(data, offset + 4), frequency: 1, dayNumber: 0, month: 1, dow: 1, days: null };
+      if(type === "DAILY") rd.frequency = rv === 1 ? 1 : getShort(data, offset + 76);
+      else if(type === "WEEKLY"){ var bm = getByte(data, offset + 76); rd.days = [false]; for(var dd = 1; dd <= 7; dd++) rd.days[dd] = (bm & DAY_MASKS[dd]) !== 0; rd.frequency = getShort(data, offset + 78); }
+      else if(type === "MONTHLY"){ if(rd.relative){ rd.dow = getByte(data, offset + 77) - 2; rd.dayNumber = getByte(data, offset + 76) + 1; rd.frequency = getShort(data, offset + 78); } else { rd.dayNumber = getByte(data, offset + 76); rd.frequency = getByte(data, offset + 78); } }
+      else if(type === "YEARLY"){ if(rd.relative){ rd.dow = getByte(data, offset + 78) - 2; rd.dayNumber = getByte(data, offset + 77) + 1; } else rd.dayNumber = getByte(data, offset + 77); rd.month = getByte(data, offset + 76) + 1; }
+      if(!(rd.type === "DAILY" && rd.frequency === 1)) ex.rd = rd;
+    }
+    var pc = getShort(data, offset + 14);
+    for(var k = 0; k < pc; k++){ var s0 = getTime(data, offset + 20 + k * 2), du = getDurationMs(data, offset + 32 + k * 4); ex.ranges.push([s0, s0 + Math.floor(du / 1000)]); }
+    var nameLen = getInt(data, offset + 88);
+    if(nameLen % 4 !== 0) nameLen = (Math.floor(nameLen / 4) + 1) * 4;
+    if(nameLen !== 0) ex.name = getUnicodeString(data, offset + 92);
+    offset += 92 + nameLen;
+    cal.exceptions.push(ex);
+  }
+}
+
+/* ===================== project model helpers ===================== */
+function Project(){
+  this.tasks = []; this.byUid = new Map(); this.byId = new Map();
+  this.resources = []; this.resByUid = new Map();
+  this.assignments = []; this.relations = [];
+}
+Project.prototype.addTask = function(){ var t = { _null: false, _children: [], _parent: null, _preds: [] }; this.tasks.push(t); return t; };
+Project.prototype.setUid = function(t, uid){ t.UNIQUE_ID = uid; this.byUid.set(uid, t); };
+Project.prototype.setId = function(t, id){ if(t.ID != null && this.byId.get(t.ID) === t) this.byId.delete(t.ID); t.ID = id; this.byId.set(id, t); };
+Project.prototype.removeTask = function(t){
+  var i = this.tasks.indexOf(t); if(i >= 0) this.tasks.splice(i, 1);
+  if(this.byUid.get(t.UNIQUE_ID) === t) this.byUid.delete(t.UNIQUE_ID);
+  if(this.byId.get(t.ID) === t) this.byId.delete(t.ID);
+};
+
+function bitFlags(obj, flags, data){ if(!data) return; flags.forEach(function(f){ obj[f[0]] = (getInt(data, f[1]) & f[2]) !== 0; }); }
+var T2010_META = [["MILESTONE",8,0x20],["MARKED",9,0x40],["IGNORE_RESOURCE_CALENDAR",10,0x02],["ROLLUP",10,0x08],["HIDE_BAR",10,0x80],["EFFORT_DRIVEN",11,0x10],["LEVEL_ASSIGNMENTS",13,0x04],["LEVELING_CAN_SPLIT",13,0x02]];
+var T2013_META = [["MILESTONE",10,0x02],["MARKED",12,0x02],["ROLLUP",12,0x04],["HIDE_BAR",12,0x80],["EFFORT_DRIVEN",13,0x08],["LEVEL_ASSIGNMENTS",16,0x04],["LEVELING_CAN_SPLIT",16,0x02],["IGNORE_RESOURCE_CALENDAR",17,0x20]];
+var T2010_META2 = [["ACTIVE",8,0x04],["TASK_MODE",8,0x08]];
+var T2013_META2 = [["ACTIVE",8,0x40],["TASK_MODE",8,0x80]];
+var T12_META = [["EFFORT_DRIVEN",11,0x10],["HIDE_BAR",10,0x80],["IGNORE_RESOURCE_CALENDAR",10,0x02],["LEVEL_ASSIGNMENTS",13,0x04],["LEVELING_CAN_SPLIT",13,0x02],["MARKED",9,0x40],["MILESTONE",8,0x20],["ROLLUP",10,0x08]];
+function bytesFlags(obj, flags, data){ flags.forEach(function(f){ obj[f[0]] = (b(data, f[1]) & f[2]) !== 0; }); }
+
+/* ===================== tasks ===================== */
+function createTaskMap(R, fieldMap, fixedMeta, fixedData, fixed2Data, varData){
+  var taskMap = new Map(), uidOff = fieldMap.fixedOffset("T", "UNIQUE_ID"), itemCount = fixedMeta.adjusted, maxSize = fieldMap.max[0];
+  for(var loop = itemCount - 1; loop > 2; loop--){
+    var data = fixedData.get(loop), data2 = fixed2Data.get(loop);
+    if(!data || !data2) continue;
+    var flags = getInt(fixedMeta.get(loop), 0), key;
+    if(flags & 0x02){
+      key = getShort(data, 0);
+      if(R.v14){ if(!taskMap.has(key)) taskMap.set(key, null); } else taskMap.set(key, null);
+    } else if(data.length === 16){
+      key = getInt(data, 0); if(!taskMap.has(key)) taskMap.set(key, loop);
+    } else if(maxSize === 0 || Math.floor(data.length * 100 / maxSize) > 75){
+      key = getInt(data, uidOff);
+      if(!taskMap.has(key) || varData.meta.typeCount(key) > 0){
+        if(!taskMap.has(key) || (flags & 0x04) === 0) taskMap.set(key, loop);
+      }
+    }
+  }
+  return taskMap;
+}
+function processTasks(R){
+  var P = R.P, proj = R.proj, v14 = R.v14;
+  var fieldMap = new FieldMap(P, v14); fieldMap.createFrom(R.projectProps, [PK.TASK_FIELD_MAP, PK.TASK_FIELD_MAP2], "task");
+  var ent = new FieldMap(P, v14); ent.createEnterprise(R.projectProps, "T");
+  var taskDir = R.projectDir.dir("TBkndTask");
+  var varMeta = VarMeta12(IS(taskDir.stream("VarMeta")));
+  var varData = Var2Data(varMeta, IS(taskDir.stream("Var2Data")));
+  var fixedMeta = FixedMeta(IS(taskDir.stream("FixedMeta")), 47);
+  var fixedData = v14 ? FixedData(fixedMeta, IS(taskDir.stream("FixedData")), fieldMap.max[0]) : FixedData(fixedMeta, IS(taskDir.stream("FixedData")), 768, fieldMap.max[0]);
+  var fixed2Meta = v14 ? FixedMeta(IS(taskDir.stream("Fixed2Meta")), multiSize(fixedData, [92, 93, 94, 95, 96])) : FixedMeta(IS(taskDir.stream("Fixed2Meta")), 86);
+  var fixed2Data = FixedData(fixed2Meta, IS(taskDir.stream("Fixed2Data")));
+  var taskMap = createTaskMap(R, fieldMap, fixedMeta, fixedData, fixed2Data, varData);
+  var uids = Array.from(taskMap.keys()).sort(function(a, c){ return a - c; });
+  var metaFlags, meta2Flags;
+  if(v14){
+    if(P.appVersion <= 14){ metaFlags = T2010_META; meta2Flags = T2010_META2; } else { metaFlags = T2013_META; meta2Flags = T2013_META2; }
+  }
+  var idOff = fieldMap.fixedOffset("T", "ID"), maxSize = fieldMap.max[0], hyperKey = fieldMap.varKey("T", "HYPERLINK_DATA");
+  uids.forEach(function(uniqueID){
+    var offset = taskMap.get(uniqueID);
+    if(!fixedData.valid(offset)) return;
+    var data = fixedData.get(offset);
+    if(!data) return;
+    var id = getInt(data, idOff), t;
+    if(data.length === 16){
+      var nid = v14 ? getInt(data, 4) : getShort(data, 4);
+      if(!R.nullOrder.has(nid)){ t = proj.addTask(); t._null = true; proj.setUid(t, v14 ? getInt(data, 0) : getShort(data, 0)); proj.setId(t, nid); R.nullOrder.set(nid, t.UNIQUE_ID); }
+      return;
+    }
+    if(data.length < maxSize){
+      if(v14 || uniqueID === 0){ var nd = new Uint8Array(maxSize + 8); nd.set(data); data = nd; }
+      else return;
+    }
+    var metaData = fixedMeta.get(offset), metaData2 = fixed2Meta.get(offset), data2 = fixed2Data.get(offset);
+    var temp = proj.byId.get(id);
+    if(temp){
+      if(!varMeta.hasId(uniqueID)) return;
+      if(temp.NAME == null) proj.removeTask(temp);
+    }
+    t = proj.addTask();
+    fieldMap.populate("T", t, uniqueID, [data, data2], varData);
+    ent.populate("T", t, uniqueID, null, varData);
+    t._estimated = (getShort(data, fieldMap.fixedOffset("T", "ACTUAL_DURATION_UNITS")) & 0x20) !== 0;
+    var hl = hyperKey != null ? varData.bytes(uniqueID, hyperKey) : null;
+    if(hl){ var o = 24, h = getUnicodeString(hl, o); o += (h.length + 1) * 2 + 12; var ad = getUnicodeString(hl, o); o += (ad.length + 1) * 2 + 12; var sa = getUnicodeString(hl, o); t.HYPERLINK = h; t.HYPERLINK_ADDRESS = ad; t.HYPERLINK_SUBADDRESS = sa; }
+    proj.setId(t, id);
+    proj.setUid(t, uniqueID);
+    if(v14){
+      bitFlags(t, metaFlags, metaData); bitFlags(t, meta2Flags, metaData2);
+      t._manual = !!t.TASK_MODE;
+      var auto = !t._manual;
+      if(t.START == null || (t.SCHEDULED_START != null && auto)) t.START = t.SCHEDULED_START == null ? null : t.SCHEDULED_START;
+      if(t.FINISH == null || (t.SCHEDULED_FINISH != null && auto)) t.FINISH = t.SCHEDULED_FINISH == null ? null : t.SCHEDULED_FINISH;
+      if(t.DURATION == null || (t.SCHEDULED_DURATION != null && auto)) t.DURATION = t.SCHEDULED_DURATION == null ? null : t.SCHEDULED_DURATION;
+    } else {
+      bytesFlags(t, T12_META, metaData); t._manual = false;
+    }
+    var ct = t.CONSTRAINT_TYPE || 0;
+    if(ct === 1){
+      if(cmpTs(t.START, t.LATE_START) < 0) t.START = t.LATE_START;
+      if(cmpTs(t.FINISH, t.LATE_FINISH) < 0) t.FINISH = t.LATE_FINISH;
+    } else if(ct === 5 || ct === 7){
+      if(cmpTs(t.FINISH, t.START) < 0) t.FINISH = t.LATE_FINISH;
+    }
+    var calId = t.CALENDAR_UNIQUE_ID;
+    t._cal = null;
+    if(calId != null && calId !== -1){ var c = R.calendars.filter(function(x){ return x.uid === calId; })[0]; if(c) t._cal = c; }
+    if(v14){ if(t._manual) t.DURATION = t.MANUAL_DURATION == null ? null : t.MANUAL_DURATION; }
+    var epoch0 = function(v){ return v == null || v === 0; };
+    if(t.NAME == null && (epoch0(t.START) || epoch0(t.FINISH) || (v14 && epoch0(t.CREATED)))){
+      proj.removeTask(t);
+      var nid2 = getInt(data, 4);
+      if(!R.nullOrder.has(nid2)){ var nt = proj.addTask(); nt._null = true; proj.setUid(nt, getInt(data, 0)); proj.setId(nt, nid2); R.nullOrder.set(nid2, nt.UNIQUE_ID); }
+      return;
+    }
+    if(!data2 || data2.length < 24) R.nullOrder.set(t.ID, t.UNIQUE_ID);
+    else R.taskOrder.push([getLongKey(data2, 16), t.UNIQUE_ID]);
+  });
+}
+function cmpTs(a, c){ if(a == null) return c == null ? 0 : 1; if(c == null) return -1; return a < c ? -1 : a > c ? 1 : 0; } /* LocalDateTimeHelper.compare: null is "later" */
+function postProcessTasks(R){
+  var proj = R.proj;
+  /* TreeMap<Long,uid>: later puts for an existing key overwrite */
+  var order = new Map(), keyOf = {}; R.taskOrder.forEach(function(e){ var k = e[0][0] + ":" + e[0][1]; keyOf[k] = e[0]; order.set(k, e[1]); });
+  var orderKeys = Array.from(order.keys()).sort(function(a, c){ return cmpLong(keyOf[a], keyOf[c]); });
+  var nullKeys = Array.from(R.nullOrder.keys()).sort(function(a, c){ return a - c; });
+  var inc = (Math.floor(R.nullOrder.size / 1000) + 1) * 2000;
+  var taskMap = new Map(), nextID = proj.byUid.get(0) == null ? inc : 0;
+  orderKeys.forEach(function(k){ taskMap.set(nextID, order.get(k)); nextID += inc; });
+  var insertion = 0, offsetMap = new Map();
+  nullKeys.forEach(function(idValue){
+    var base = (idValue - insertion) * inc, target = base, prev = offsetMap.get(base), off = prev == null ? 0 : prev + 1;
+    ++insertion;
+    while(taskMap.has(target)){ ++off; if(off === inc) throw MPPError("CORRUPT", "Unable to fix task order"); target = base - (inc - off); }
+    offsetMap.set(base, off);
+    taskMap.set(target, R.nullOrder.get(idValue));
+  });
+  nextID = proj.byUid.get(0) == null ? 1 : 0;
+  Array.from(taskMap.keys()).sort(function(a, c){ return a - c; }).forEach(function(k){ var t = proj.byUid.get(taskMap.get(k)); if(t) proj.setId(t, nextID); nextID++; });
+}
+
+/* ===================== relations (ConstraintFactory) ===================== */
+function processRelations(R){
+  var P = R.P, proj = R.proj, consDir = R.projectDir.optDir("TBkndCons");
+  if(!consDir) return;
+  var meta = FixedMeta(IS(consDir.stream("FixedMeta")), 10);
+  var fd = FixedDataSized(meta, 20, R.stream(consDir, "FixedData"));
+  var p15 = P.mppFileType === 14 && P.appVersion > 14, unitsOff = p15 ? 18 : 14, durOff = p15 ? 14 : 16;
+  for(var loop = 0; loop < meta.itemCount; loop++){
+    var md = meta.get(loop); if(!md) continue;
+    if(getShort(md, 0) !== 0) continue;
+    var index = fd.indexFromOffset(getInt(md, 4)); if(index === -1) continue;
+    var data = fd.get(index); if(!data || data.length < 14) continue;
+    var id1 = getInt(data, 4), id2 = getInt(data, 8);
+    if(id1 === 0 || id2 === 0 || id1 === id2) continue;
+    var t1 = proj.byUid.get(id1), t2 = proj.byUid.get(id2);
+    if(!t1 || !t2) continue;
+    var ty = getShort(data, 12); if(ty < 0 || ty > 3) ty = 1;
+    var lag = adjustedDuration(P, getInt(data, durOff), durationUnits(getShort(data, unitsOff)));
+    if(!lag) lag = Dur(0, "DAYS");
+    var dup = false;
+    for(var k = 0; k < t2._preds.length; k++){ var r = t2._preds[k]; if(r.pred === t1){ if(r.type === ty && Math.abs(convertUnits(lag.v, lag.u, r.lag.u, { minutesPerDay: 480, minutesPerWeek: 2400, daysPerMonth: 20 }) - r.lag.v) < 1e-9) dup = true; break; } }
+    if(dup) continue;
+    t2._preds.push({ pred: t1, type: ty, lag: lag, uid: getInt(data, 0) });
+  }
+}
+
+/* ===================== resources & assignments ===================== */
+var R2010_META = [["FLAG10",28,0x20]], R2013_META = [];
+function processResources(R){
+  var P = R.P, proj = R.proj, v14 = R.v14;
+  var fieldMap = new FieldMap(P, v14); fieldMap.createFrom(R.projectProps, [PK.RESOURCE_FIELD_MAP, PK.RESOURCE_FIELD_MAP2], "resource");
+  var dir = R.projectDir.dir("TBkndRsc");
+  var varMeta = VarMeta12(IS(dir.stream("VarMeta")));
+  var varData = Var2Data(varMeta, IS(dir.stream("Var2Data")));
+  var fixedMeta = FixedMeta(IS(dir.stream("FixedMeta")), 37);
+  var fixedData = FixedData(fixedMeta, R.stream(dir, "FixedData"));
+  var fixed2Meta = v14 ? FixedMeta(IS(dir.stream("Fixed2Meta")), multiSize(fixedData, [50, 51])) : FixedMeta(IS(dir.stream("Fixed2Meta")), 49);
+  var fixed2Data = FixedData(fixed2Meta, R.stream(dir, "Fixed2Data"));
+  /* createResourceMap */
+  var map = new Map(), maxSize = fieldMap.max[0], uidOff = v14 ? fieldMap.fixedOffset("R", "UNIQUE_ID") : 0;
+  for(var loop = 0; loop < fixedMeta.adjusted; loop++){
+    var d = fixedData.get(loop); if(!d || d.length < maxSize) continue;
+    var u = getShort(d, uidOff); if(!map.has(u)) map.set(u, loop);
+  }
+  var typeOff, typeMask;
+  if(v14 && P.appVersion > 14){ typeOff = 12; typeMask = 0x10; } else { typeOff = 9; typeMask = 0x02; }
+  var idOff = fieldMap.fixedOffset("R", "ID");
+  varMeta.ids().forEach(function(id){
+    var offset = map.get(id); if(offset == null) return;
+    var data = fixedData.get(offset), metaData2 = fixed2Meta.get(offset), data2 = fixed2Data.get(offset), metaData = fixedMeta.get(offset);
+    var r = { _cal: null };
+    fieldMap.populate("R", r, id, [data, data2], varData);
+    r.ID = getInt(data, idOff);
+    r.UNIQUE_ID = id;
+    r._cal = R.resourceCal.get(id) || null;
+    if((b(metaData, typeOff) & typeMask) !== 0) r._type = 1;
+    else r._type = (b(metaData2, 8) & 0x10) !== 0 ? 2 : 0;
+    /* CostRateTableFactory, table A only */
+    var crKey = fieldMap.varKey("R", "COST_RATE_A"), cr = crKey != null ? varData.bytes(id, crKey) : null, ent = [];
+    var ENDNA = dOf(2049, 12, 31) * 86400 + 23 * 3600 + 59 * 60, STARTNA = dOf(1984, 1, 1) * 86400;
+    if(!cr) ent.push({ end: ENDNA, std: r.STANDARD_RATE ? r.STANDARD_RATE.amount : 0, ot: r.OVERTIME_RATE ? r.OVERTIME_RATE.amount : 0, cpu: r.COST_PER_USE || 0 });
+    else for(var ci = 16; ci + 44 <= cr.length; ci += 44){
+      var end = getInt(cr, ci + 40) * 6;
+      if(end > ENDNA) end = ENDNA; else if((Math.floor(end / 60) % 60) % 5 === 0) end -= 60;
+      if(end % 60 !== 0) continue;
+      ent.push({ end: end, std: getDouble(cr, ci), ot: getDouble(cr, ci + 16), cpu: getDouble(cr, ci + 32) / 100 });
+    }
+    ent.sort(function(x, y){ return x.end - y.end; });
+    ent.forEach(function(e, k){ e.start = k === 0 ? STARTNA : ent[k - 1].end + 60; });
+    r._rates = ent;
+    var nowS = Math.floor((Date.now() - EPOCH_MS) / 1000), cur = null;
+    ent.forEach(function(e){ if(!cur && nowS >= e.start && nowS <= e.end) cur = e; });
+    if(!cur && ent.length) cur = nowS < ent[0].start ? ent[0] : ent[ent.length - 1];
+    if(cur){ r._std = cur.std; r._ot = cur.ot; r._cpu = cur.cpu; }
+    proj.resources.push(r); proj.resByUid.set(id, r);
+  });
+}
+function processAssignments(R){
+  var P = R.P, proj = R.proj, v14 = R.v14;
+  var fieldMap = new FieldMap(P, v14); fieldMap.createFrom(R.projectProps, [PK.ASSIGNMENT_FIELD_MAP, PK.ASSIGNMENT_FIELD_MAP2], "assignment");
+  var dir = R.projectDir.dir("TBkndAssn");
+  var varMeta = VarMeta12(IS(dir.stream("VarMeta")));
+  var varData = Var2Data(varMeta, IS(dir.stream("Var2Data")));
+  var fixedMeta = FixedMeta(IS(dir.stream("FixedMeta")), 34);
+  var fixedData = v14 ? FixedDataBlocks(110, R.stream(dir, "FixedData")) : FixedData(fixedMeta, R.stream(dir, "FixedData"));
+  var fixedData2 = FixedDataBlocks(48, R.stream(dir, "Fixed2Data"));
+  var count = v14 ? fixedMeta.itemCount : fixedMeta.adjusted;
+  var uidOff = fieldMap.fixedOffset("A", "UNIQUE_ID"), tOff = fieldMap.fixedOffset("A", "TASK_UNIQUE_ID"), rOff = fieldMap.fixedOffset("A", "RESOURCE_UNIQUE_ID");
+  for(var loop = 0; loop < count; loop++){
+    var meta = fixedMeta.get(loop); if(!meta || meta[0] !== 0) continue;
+    var offset = getInt(meta, 4), ix = fixedData.indexFromOffset(offset), data = fixedData.get(ix);
+    if(!data) continue;
+    if(data.length < fieldMap.max[0]){ var nd = new Uint8Array(fieldMap.max[0]); nd.set(data); data = nd; }
+    var id = getInt(data, uidOff);
+    if(!varMeta.hasId(id)) continue;
+    var data2 = fixedData2.get(ix);
+    var task = proj.byUid.get(getInt(data, tOff)); if(!task) continue;
+    var res = proj.resByUid.get(getInt(data, rOff)) || null;
+    if(task._asg && task._asg.some(function(a){ return a._res === res; })) continue;
+    var a = { _res: res, _task: task };
+    fieldMap.populate("A", a, id, [data, data2], varData);
+    if(a.RESOURCE_UNIQUE_ID === -65535) a.RESOURCE_UNIQUE_ID = null;
+    (task._asg = task._asg || []).push(a);
+    proj.assignments.push(a);
+  }
+}
+
+/* ===================== structure (TaskContainer.updateStructure + MPPReader post-processing) ===================== */
+function updateStructure(proj){
+  var tasks = proj.tasks.slice().map(function(t, i){ return [t, i]; });
+  tasks.sort(function(a, c){ return (a[0].ID | 0) - (c[0].ID | 0) || a[1] - c[1]; });
+  proj.tasks = tasks.map(function(x){ return x[0]; });
+  if(proj.tasks.length <= 1){ proj.tasks.forEach(function(t){ t._children = []; t._parent = null; t._outline = null; }); return; }
+  var lastTask = null, lastLevel = -1, rootKids = [];
+  proj.tasks.forEach(function(t){
+    t._children = [];
+    var parent = null;
+    if(!t._null){
+      var level = t.OUTLINE_LEVEL | 0;
+      if(lastTask){
+        if(level === lastLevel){ parent = lastTask._parent; level = lastLevel; }
+        else if(level > lastLevel) parent = lastTask;
+        else {
+          while(level <= lastLevel){ parent = lastTask._parent; if(!parent) break; lastLevel = parent.OUTLINE_LEVEL | 0; lastTask = parent; }
+        }
+      }
+      lastTask = t; lastLevel = level;
+      /* generateOutlineNumber */
+      if(parent == null) t._outline = t.UNIQUE_ID === 0 ? "0" : String(rootKids.length + 1);
+      else { var po = parent._outline || "", ix = po.lastIndexOf(".0"); if(ix !== -1) po = po.slice(0, ix); t._outline = po === "0" ? String(parent._children.length + 1) : po + "." + (parent._children.length + 1); }
+    }
+    t._parent = parent;
+    if(parent) parent._children.push(t); else rootKids.push(t);
+  });
+}
+
+/* ===================== MSPDI output (MSPDIWriter / DatatypeConverter conventions) ===================== */
+function xesc(s){ return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function jround(x){ return Math.floor(x + 0.5); }
+function xsdHours(h){
+  var time = jround(h * 3600), neg = time < 0, a = Math.abs(time);
+  var sec = a % 60, min = Math.floor(a / 60) % 60, hrs = Math.floor(a / 3600);
+  var s = "PT" + hrs + "H" + min + "M" + sec + "S";
+  if(neg){ var m = /[1-9]/.exec(s); if(m) s = s.slice(0, m.index) + "-" + s.slice(m.index); }
+  return s;
+}
+function printDurationMandatory(P, d){
+  if(d == null || typeof d !== "object") return "PT0H0M0S";
+  var h = (d.u === "HOURS" || d.u === "ELAPSED_HOURS") ? d.v : convertUnits(d.v, d.u, "HOURS", P);
+  return xsdHours(h);
+}
+function printDuration(P, d){ return (d && typeof d === "object" && d.v !== 0) ? printDurationMandatory(P, d) : null; }
+var FMT = { MINUTES:[3,35], ELAPSED_MINUTES:[4,36], HOURS:[5,37], ELAPSED_HOURS:[6,38], DAYS:[7,39], ELAPSED_DAYS:[8,40], WEEKS:[9,41], ELAPSED_WEEKS:[10,42], MONTHS:[11,43], ELAPSED_MONTHS:[12,44], PERCENT:[19,51], ELAPSED_PERCENT:[20,52] };
+function printUnitsFmt(u, est){ var f = FMT[u || "HOURS"] || FMT.HOURS; return est ? f[1] : f[0]; }
+function num(x){ if(x == null || isNaN(x)) return null; var r = Math.round(x * 10000) / 10000; return String(r); }
+
+function writeMSPDI(R){
+  var P = R.P, proj = R.proj, L = [], ind = "";
+  function el(tag, v){ if(v === null || v === undefined || v === "") return; L.push(ind + "<" + tag + ">" + xesc(v) + "</" + tag + ">"); }
+  function bool(tag, v){ L.push(ind + "<" + tag + ">" + (v ? 1 : 0) + "</" + tag + ">"); }
+  function open(tag){ L.push(ind + "<" + tag + ">"); ind += " "; }
+  function close(tag){ ind = ind.slice(1); L.push(ind + "</" + tag + ">"); }
+  L.push('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
+  L.push('<Project xmlns="http://schemas.microsoft.com/project">'); ind = " ";
+  el("SaveVersion", 14);
+  el("Name", P.title || "project");
+  el("Title", P.title); el("Subject", P.subject); el("Author", P.author); el("Company", P.company); el("Manager", P.manager);
+  el("ScheduleFromStart", P.scheduleFromStart ? 1 : 0);
+  var start = P.startDate, finish = P.finishDate;
+  if(start == null) proj.tasks.forEach(function(t){ if(t.START != null && (start == null || t.START < start)) start = t.START; });
+  if(finish == null) proj.tasks.forEach(function(t){ if(t.FINISH != null && (finish == null || t.FINISH > finish)) finish = t.FINISH; });
+  el("StartDate", fmtTs(start)); el("FinishDate", fmtTs(finish));
+  el("CalendarUID", R.defaultCalendar ? R.defaultCalendar.uid : 1);
+  if(P.defaultStartTime != null) el("DefaultStartTime", new Date(P.defaultStartTime * 1000).toISOString().slice(11, 19));
+  if(P.defaultEndTime != null) el("DefaultFinishTime", new Date(P.defaultEndTime * 1000).toISOString().slice(11, 19));
+  el("MinutesPerDay", P.minutesPerDay); el("MinutesPerWeek", P.minutesPerWeek); el("DaysPerMonth", P.daysPerMonth);
+  el("DurationFormat", printUnitsFmt(P.defaultDurationUnits, false));
+  el("StatusDate", fmtTs(P.statusDate));
+  el("CurrencySymbol", P.currencySymbol); el("CurrencyCode", P.currencyCode);
+  el("NewTasksAreManual", P.newTasksAreManual ? 1 : 0);
+  /* calendars */
+  var ext = {};
+  /* MSPDIWriter: a resource using a base calendar gets a temporary derived calendar; base calendars first, then derived, each by UID */
+  var cals = R.calendars.slice(), nextCal = cals.reduce(function(m, c){ return Math.max(m, c.uid || 0); }, 0);
+  proj.resources.forEach(function(r){ if(r._cal && !r._cal.derived){ var dc = newCalendar(); dc.uid = ++nextCal; dc.derived = true; dc.base = r._cal; dc.name = r.NAME || "Unnamed Resource"; for(var q = 0; q < 7; q++) dc.days[q] = "D"; cals.push(dc); r._calOut = dc; } });
+  cals = cals.filter(function(c){ return !c.derived; }).sort(function(x, y){ return x.uid - y.uid; }).concat(cals.filter(function(c){ return c.derived; }).sort(function(x, y){ return x.uid - y.uid; }));
+  open("Calendars");
+  cals.forEach(function(c){
+    open("Calendar");
+    el("UID", c.uid); el("GUID", c.guid); el("Name", c.name);
+    bool("IsBaseCalendar", !c.derived); bool("IsBaselineCalendar", false);
+    el("BaseCalendarUID", c.derived && c.base ? c.base.uid : -1);
+    open("WeekDays");
+    for(var i = 0; i < 7; i++){
+      var dt = c.days[i]; if(dt !== "W" && dt !== "N") continue;
+      open("WeekDay"); el("DayType", i + 1); bool("DayWorking", dt === "W");
+      if(dt === "W" && c.hours[i] && c.hours[i].length){ open("WorkingTimes"); c.hours[i].forEach(function(r){ open("WorkingTime"); el("FromTime", hms(r[0])); el("ToTime", hms(r[1])); close("WorkingTime"); }); close("WorkingTimes"); }
+      close("WeekDay");
+    }
+    close("WeekDays");
+    var items = [];
+    if(c.exceptions.length){
+      open("Exceptions");
+      c.exceptions.slice().sort(function(x, y){ return (x.from || 0) - (y.from || 0); }).forEach(function(x){
+        if(x.from == null) return;
+        var working = x.ranges.length > 0, dates = x.rd ? recurringDates(x.rd) : null;
+        open("Exception"); el("Name", x.name);
+        open("TimePeriod"); el("FromDate", fmtDay(x.from) + "T00:00:00"); el("ToDate", fmtDay(x.to == null ? x.from : x.to) + "T23:59:00"); close("TimePeriod");
+        el("Type", 1); bool("DayWorking", working);
+        close("Exception");
+        if(dates) dates.forEach(function(d0){ items.push([fmtDay(d0), fmtDay(d0), working ? 1 : 0, x.name || ""]); });
+        else items.push([fmtDay(x.from), fmtDay(x.to == null ? x.from : x.to), working ? 1 : 0, x.name || ""]);
+      });
+      close("Exceptions");
+    }
+    ext[c.uid] = items;
+    close("Calendar");
+  });
+  close("Calendars");
+  /* tasks */
+  open("Tasks");
+  proj.tasks.forEach(function(t){
+    open("Task");
+    el("UID", t.UNIQUE_ID); el("ID", t.ID);
+    if(t._null){ bool("IsNull", true); close("Task"); return; }
+    el("Name", t.NAME);
+    bool("Active", t.ACTIVE == null ? true : t.ACTIVE);
+    bool("Manual", t._manual);
+    el("Type", t.TYPE == null ? 0 : t.TYPE);
+    bool("IsNull", false);
+    el("CreateDate", fmtTs(t.CREATED));
+    el("WBS", t.WBS);
+    el("OutlineNumber", t._outline); el("OutlineLevel", t.OUTLINE_LEVEL);
+    el("Priority", t.PRIORITY == null ? 500 : t.PRIORITY);
+    el("Start", fmtTs(t.START)); el("Finish", fmtTs(t.FINISH));
+    el("Duration", printDurationMandatory(P, t.DURATION));
+    el("DurationFormat", printUnitsFmt(t.DURATION && t.DURATION.u ? t.DURATION.u : P.defaultDurationUnits, !!t._estimated));
+    if(t._manual){ el("ManualStart", fmtTs(t.START)); el("ManualFinish", fmtTs(t.FINISH)); el("ManualDuration", printDuration(P, t.DURATION)); }
+    el("ResumeValid", 0);
+    bool("EffortDriven", t.EFFORT_DRIVEN); bool("Estimated", t._estimated);
+    bool("Milestone", t.MILESTONE); bool("Summary", t._children.length > 0);
+    el("ActualStart", fmtTs(t.ACTUAL_START)); el("ActualFinish", fmtTs(t.ACTUAL_FINISH));
+    el("Deadline", fmtTs(t.DEADLINE));
+    el("PercentComplete", t.PERCENT_COMPLETE == null ? null : Math.round(t.PERCENT_COMPLETE));
+    el("PercentWorkComplete", t.PERCENT_WORK_COMPLETE == null ? null : Math.round(t.PERCENT_WORK_COMPLETE));
+    el("Work", printDuration(P, t.WORK)); el("ActualWork", printDuration(P, t.ACTUAL_WORK)); el("RemainingDuration", printDuration(P, t.REMAINING_DURATION));
+    el("Cost", t.COST ? num(t.COST * 100) : null); el("FixedCost", t.FIXED_COST ? num(t.FIXED_COST * 100) : null); el("ActualCost", t.ACTUAL_COST ? num(t.ACTUAL_COST * 100) : null);
+    el("ConstraintType", t.CONSTRAINT_TYPE == null ? 0 : t.CONSTRAINT_TYPE);
+    el("CalendarUID", t._cal ? t._cal.uid : -1);
+    el("ConstraintDate", fmtTs(t.CONSTRAINT_DATE));
+    bool("IgnoreResourceCalendar", t.IGNORE_RESOURCE_CALENDAR);
+    if(t.LEVELING_DELAY && typeof t.LEVELING_DELAY === "object"){ el("LevelingDelay", Math.trunc(10 * convertUnits(t.LEVELING_DELAY.v, t.LEVELING_DELAY.u, "ELAPSED_MINUTES", P))); el("LevelingDelayFormat", printUnitsFmt(t.LEVELING_DELAY.u, false)); }
+    else if(t.LEVELING_DELAY_UNITS){ el("LevelingDelay", 0); el("LevelingDelayFormat", printUnitsFmt(t.LEVELING_DELAY_UNITS, false)); }
+    el("Notes", t.NOTES);
+    el("Hyperlink", t.HYPERLINK); el("HyperlinkAddress", t.HYPERLINK_ADDRESS); el("HyperlinkSubAddress", t.HYPERLINK_SUBADDRESS);
+    [["TEXT1", 188743731], ["TEXT2", 188743734], ["TEXT3", 188743737], ["NUMBER1", 188743767], ["NUMBER2", 188743768], ["NUMBER3", 188743769]].forEach(function(x){
+      var v = t[x[0]]; if(v == null || v === "" || (typeof v === "number" && v === 0)) return;
+      open("ExtendedAttribute"); el("FieldID", x[1]); el("Value", typeof v === "number" ? String(v) : v); close("ExtendedAttribute");
+    });
+    t._preds.forEach(function(r){
+      open("PredecessorLink");
+      el("PredecessorUID", r.pred.UNIQUE_ID); el("Type", r.type); el("CrossProject", 0);
+      if(r.lag && r.lag.v !== 0){
+        var ll = r.lag.v; if(r.lag.u !== "PERCENT" && r.lag.u !== "ELAPSED_PERCENT") ll = 10 * convertUnits(ll, r.lag.u, "MINUTES", P);
+        el("LinkLag", Math.trunc(ll)); el("LagFormat", printUnitsFmt(r.lag.u, false));
+      } else { el("LinkLag", 0); el("LagFormat", printUnitsFmt(P.defaultDurationUnits, false)); }
+      close("PredecessorLink");
+    });
+    for(var n = 0; n <= 10; n++){
+      var p = n === 0 ? "BASELINE_" : "BASELINE" + n + "_";
+      var bd = t[p + "DURATION"] != null ? t[p + "DURATION"] : t[p + "ESTIMATED_DURATION"];
+      var bs = t[p + "START"] != null ? t[p + "START"] : t[p + "ESTIMATED_START"];
+      var bf = t[p + "FINISH"] != null ? t[p + "FINISH"] : t[p + "ESTIMATED_FINISH"];
+      var bc = t[p + "COST"], bw = t[p + "WORK"];
+      var pd = bd && typeof bd === "object" && bd.v !== 0, pc = bc != null && Math.trunc(bc) !== 0, pw = bw && typeof bw === "object" && bw.v !== 0;
+      if(!(pd || pc || pw || bs != null || bf != null)) continue;
+      open("Baseline"); el("Number", n);
+      if(pd){ el("Duration", printDuration(P, bd)); el("DurationFormat", printUnitsFmt(bd.u, false)); }
+      el("Start", fmtTs(bs)); el("Finish", fmtTs(bf));
+      if(pw) el("Work", printDuration(P, bw));
+      if(pc) el("Cost", num(bc * 100));
+      close("Baseline");
+    }
+    close("Task");
+  });
+  close("Tasks");
+  /* resources */
+  open("Resources");
+  proj.resources.forEach(function(r){
+    open("Resource");
+    el("UID", r.UNIQUE_ID); el("ID", r.ID); el("Name", r.NAME);
+    el("Type", r._type === 1 ? 1 : 0); if(r._type === 2) el("IsCostResource", 1);
+    el("Initials", r.INITIALS); el("Group", r.GROUP); el("MaterialLabel", r.MATERIAL_LABEL);
+    el("MaxUnits", r.MAX_UNITS == null ? null : num(r.MAX_UNITS / 100));
+    el("StandardRate", r._std ? num(r._std) : null);
+    el("OvertimeRate", r._ot ? num(r._ot) : null);
+    el("CostPerUse", r._cpu ? num(r._cpu * 100) : null);
+    el("AccrueAt", r.ACCRUE_AT == null ? 3 : r.ACCRUE_AT);
+    el("CalendarUID", r._calOut ? r._calOut.uid : r._cal ? r._cal.uid : null);
+    el("Notes", r.NOTES);
+    el("EmailAddress", r.EMAIL_ADDRESS);
+    if(r._rates && (r._rates.length > 1 || (r._rates.length === 1 && (r._rates[0].std !== (r._std || 0) || r._rates[0].ot !== (r._ot || 0) || r._rates[0].cpu !== (r._cpu || 0))))){
+      open("Rates");
+      r._rates.forEach(function(e){ open("Rate"); el("RatesFrom", fmtTs(e.start)); el("RatesTo", fmtTs(e.end)); el("RateTable", 0); el("StandardRate", num(e.std)); el("StandardRateFormat", 2); el("OvertimeRate", num(e.ot)); el("OvertimeRateFormat", 2); el("CostPerUse", num(e.cpu * 100)); close("Rate"); });
+      close("Rates");
+    }
+    close("Resource");
+  });
+  close("Resources");
+  open("Assignments");
+  proj.assignments.forEach(function(a){
+    open("Assignment");
+    el("UID", a.UNIQUE_ID); el("TaskUID", a._task.UNIQUE_ID);
+    el("ResourceUID", a._res ? a._res.UNIQUE_ID : -65535);
+    el("Units", a.ASSIGNMENT_UNITS == null ? 1 : num(a.ASSIGNMENT_UNITS / 100));
+    el("Work", printDuration(P, a.WORK));
+    close("Assignment");
+  });
+  close("Assignments");
+  var tail = "<!" + "--HarkCalendars " + JSON.stringify(ext).replace(/--/g, "- -") + "-->";
+  L.push(tail);
+  L.push("</Project>");
+  return L.join("\n");
+}
+function hms(sec){ sec = ((sec % 86400) + 86400) % 86400; return new Date(sec * 1000).toISOString().slice(11, 19); }
+
+/* ===================== driver ===================== */
+function parse(input){
+  var buf = input instanceof ArrayBuffer ? new Uint8Array(input) : (ArrayBuffer.isView(input) ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : null);
+  if(!buf) throw MPPError("NOT_CFB", "Expected an ArrayBuffer");
+  var root = CFB(buf);
+  var co = root.optStream("\u0001CompObj");
+  if(!co) throw MPPError("NOT_PROJECT", "Not a Microsoft Project file");
+  var is = IS(co); is.skip(28);
+  var len = is.int(), appName = "", format = "";
+  for(var i = 0; i < len - 1; i++) appName += String.fromCharCode(is.d[is.p + i]); is.skip(len);
+  if(appName !== "Microsoft Project 4.0"){ len = is.avail() >= 4 ? is.int() : 0; if(len > 0){ for(i = 0; i < len - 1; i++) format += String.fromCharCode(is.d[is.p + i]); is.skip(len); } }
+  var m = /^Microsoft.Project.(\d+)\.0$/.exec(appName);
+  var P = { appVersion: m ? +m[1] : 0, mppFileType: 0, format: format };
+  var v;
+  if(/^MSProject\.(MPP|MPT|GLOBAL)14$/.test(format)) v = 14;
+  else if(/^MSProject\.(MPP|MPT|GLOBAL)12$/.test(format)) v = 12;
+  else throw MPPError("UNSUPPORTED_VERSION", "Unsupported MPP format: " + (format || appName) + " (only Project 2007–2024 files are supported offline)");
+  P.mppFileType = v;
+  var R = { P: P, v14: v === 14, proj: new Project(), calendars: [], resourceCal: new Map(), nullOrder: new Map(), taskOrder: [] };
+  var props = Props(IS(root.stream(v === 14 ? "Props14" : "Props12")), v === 14);
+  var pf = props.byte(PK.PASSWORD_FLAG);
+  if((pf & 1) && (v === 12 || props.bytes(PK.PROTECTION_PASSWORD_HASH) != null)) throw MPPError("ENCRYPTED", "File is password protected");
+  var encrypted = pf !== 0, code = props.byte(PK.ENCRYPTION_CODE) & 0xFF, mask = code === 0 ? 0 : (0xFF - code) & 0xFF;
+  R.stream = function(dir, name){ return IS(dir.stream(name), encrypted ? mask : 0); };
+  R.projectDir = root.dir(v === 14 ? "   114" : "   112");
+  R.projectProps = Props(R.stream(R.projectDir, "Props"), v === 14);
+  var pp = R.projectProps;
+  P.startDate = pp.timestamp(PK.PROJECT_START_DATE); P.finishDate = pp.timestamp(PK.PROJECT_FINISH_DATE);
+  P.scheduleFromStart = (1 - pp.short(PK.SCHEDULE_FROM)) === 0;
+  P.defaultStartTime = pp.time(PK.START_TIME); P.defaultEndTime = pp.time(PK.END_TIME);
+  P.statusDate = pp.timestamp(PK.STATUS_DATE);
+  P.defaultDurationUnits = durationUnits(pp.short(PK.DURATION_UNITS));
+  P.minutesPerDay = pp.int(PK.MINUTES_PER_DAY); P.minutesPerWeek = pp.int(PK.MINUTES_PER_WEEK); P.daysPerMonth = pp.short(PK.DAYS_PER_MONTH);
+  P.currencySymbol = pp.ustr(PK.CURRENCY_SYMBOL); P.currencyCode = pp.ustr(PK.CURRENCY_CODE);
+  P.newTasksAreManual = pp.bool(PK.NEW_TASKS_ARE_MANUAL);
+  var si = propertySet(root.optStream("\u0005SummaryInformation")), dsi = propertySet(root.optStream("\u0005DocumentSummaryInformation"));
+  function pop(a, k){ var x = a; if(x == null || x === ""){ x = pp.ustr(k); if(x === "") x = null; } return x; }
+  P.title = pop(si[2], PK.TITLE); P.subject = pop(si[3], PK.SUBJECT); P.author = pop(si[4], PK.AUTHOR);
+  P.manager = pop(dsi[14], PK.MANAGER); P.company = pop(dsi[15], PK.COMPANY);
+
+  processCalendars(R);
+  processResources(R);
+  processTasks(R);
+  processRelations(R);
+  try{ processAssignments(R); }catch(eA){ if(eA && eA.code === "UNSUPPORTED_VERSION") throw eA; R.proj.assignments = []; R.proj.tasks.forEach(function(t){ t._asg = null; }); R.warnings = (R.warnings || []).concat(["assignments: " + eA.message]); }
+  postProcessTasks(R);
+  updateStructure(R.proj);
+  /* MPPReader.validationRelations: drop links from a summary task to its own descendants */
+  R.proj.tasks.forEach(function(t){
+    if(!t._preds.length) return;
+    var bad = t._preds.filter(function(r){ var so = t._outline, to = r.pred._outline; return so != null && to != null && so.indexOf(to + ".") === 0; });
+    bad.forEach(function(r){ var i2 = t._preds.indexOf(r); if(i2 >= 0) t._preds.splice(i2, 1); });
+  });
+  /* prune derived calendars not used by a resource; unnamed resource calendars take the resource name */
+  var used = new Map(); R.proj.resources.forEach(function(r){ if(r._cal) used.set(r._cal, (used.get(r._cal) || 0) + 1); });
+  R.calendars = R.calendars.filter(function(c){ return !(c.derived && !used.has(c)); });
+  R.proj.resources.forEach(function(r){ if(r._cal && (r._cal.name == null || r._cal.name === "")) r._cal.name = r.NAME ? r.NAME : "Unnamed Resource"; });
+  R.proj.tasks.forEach(function(t){ if(t._cal && R.calendars.indexOf(t._cal) < 0) t._cal = null; });
+  return writeMSPDI(R);
+}
+
+var api = { parse: parse, version: "1.0.0" };
+root.MPPLocal = api;
+if(typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this));
+
+</script>
 <script src="workcal.js"></script>
 <script>
 (function(){
@@ -4042,7 +5307,7 @@ zh:{ttype:"任务类型",ttFU:"固定单位",ttFW:"固定工时",ttFD:"固定工
  repInfo:"项目信息",repTitle:"项目名称",repMgr:"项目经理",repCo:"公司",repNotes:"备注",repPrint:"打印报表",
  repOverview:"项目概览",repStart:"开始",repFinish:"完成",repDur:"工期（工作日）",repWork:"总工时",repCost:"总成本",repBaseCost:"基线成本",repBaseFin:"基线完成",repVarFin:"完成差异",
  repTasks:"任务数",repDone:"已完成",repPro:"进行中",repNot:"未开始",repLate:"落后",repMs:"里程碑",repCrit:"关键任务",repLateT:"落后任务",repRes:"资源概况",repGrp:"成本按阶段",
- repNone:"无",mppBtn:"导入 MPP",mppBusy:"正在服务器上解析 MPP…",mppFail:"MPP 解析失败：",subBtn:"插入子项目",subOk:"已插入子项目",
+ repNone:"无",mppBtn:"导入 MPP",mppBusy:"正在服务器上解析 MPP…",mppFail:"MPP 解析失败：",mppXmlHint:"\n\n可在 MS Project 中「文件 → 另存为 → XML 格式 (*.xml)」，再导入该 XML 文件。",mppPwd:"该 .mpp 文件受密码保护，无法读取。",mppLocalErr:"本地解析：",mppSrvErr:"转换服务：",subBtn:"插入子项目",subOk:"已插入子项目",
  netLinkHint:"按住 Shift 从一个方框拖到另一个方框可建立完成-开始链接。",netLinked:"已建立链接",nameCol:"名称",typeCol:"类型",
  noRes:"没有工时资源",days:"天"},
 en:{ttype:"Task type",ttFU:"Fixed units",ttFW:"Fixed work",ttFD:"Fixed duration",effort:"Effort driven",priority:"Priority",text1:"Text1",text2:"Text2",text3:"Text3",num1:"Number1",num2:"Number2",num3:"Number3",
@@ -4056,7 +5321,7 @@ en:{ttype:"Task type",ttFU:"Fixed units",ttFW:"Fixed work",ttFD:"Fixed duration"
  repInfo:"Project information",repTitle:"Title",repMgr:"Manager",repCo:"Company",repNotes:"Notes",repPrint:"Print report",
  repOverview:"Project overview",repStart:"Start",repFinish:"Finish",repDur:"Duration (workdays)",repWork:"Work",repCost:"Cost",repBaseCost:"Baseline cost",repBaseFin:"Baseline finish",repVarFin:"Finish variance",
  repTasks:"Tasks",repDone:"Completed",repPro:"In progress",repNot:"Not started",repLate:"Late",repMs:"Milestones",repCrit:"Critical tasks",repLateT:"Late tasks",repRes:"Resources",repGrp:"Cost by phase",
- repNone:"None",mppBtn:"Import MPP",mppBusy:"Parsing MPP on server…",mppFail:"MPP import failed: ",subBtn:"Insert subproject",subOk:"Subproject inserted",
+ repNone:"None",mppBtn:"Import MPP",mppBusy:"Parsing MPP on server…",mppFail:"MPP import failed: ",mppXmlHint:"\n\nIn MS Project use File → Save As → XML Format (*.xml), then import that XML file.",mppPwd:"This .mpp file is password protected and cannot be read.",mppLocalErr:"Local parser: ",mppSrvErr:"Conversion service: ",subBtn:"Insert subproject",subOk:"Subproject inserted",
  netLinkHint:"Shift-drag from one box to another to create a finish-to-start link.",netLinked:"Link created",nameCol:"Name",typeCol:"Type",
  noRes:"No work resources",days:"d"},
 de:{ttype:"Vorgangsart",ttFU:"Feste Einheiten",ttFW:"Feste Arbeit",ttFD:"Feste Dauer",effort:"Leistungsgesteuert",priority:"Priorität",text1:"Text1",text2:"Text2",text3:"Text3",num1:"Zahl1",num2:"Zahl2",num3:"Zahl3",
@@ -4070,7 +5335,7 @@ de:{ttype:"Vorgangsart",ttFU:"Feste Einheiten",ttFW:"Feste Arbeit",ttFD:"Feste D
  repInfo:"Projektinfo",repTitle:"Titel",repMgr:"Projektleiter",repCo:"Firma",repNotes:"Notizen",repPrint:"Bericht drucken",
  repOverview:"Projektübersicht",repStart:"Anfang",repFinish:"Ende",repDur:"Dauer (AT)",repWork:"Arbeit",repCost:"Kosten",repBaseCost:"Basiskosten",repBaseFin:"Basisende",repVarFin:"Endabweichung",
  repTasks:"Vorgänge",repDone:"Abgeschlossen",repPro:"In Arbeit",repNot:"Nicht begonnen",repLate:"Verzögert",repMs:"Meilensteine",repCrit:"Kritische Vorgänge",repLateT:"Verzögerte Vorgänge",repRes:"Ressourcen",repGrp:"Kosten je Phase",
- repNone:"Keine",mppBtn:"MPP importieren",mppBusy:"MPP wird auf dem Server gelesen…",mppFail:"MPP-Import fehlgeschlagen: ",subBtn:"Teilprojekt einfügen",subOk:"Teilprojekt eingefügt",
+ repNone:"Keine",mppBtn:"MPP importieren",mppBusy:"MPP wird auf dem Server gelesen…",mppFail:"MPP-Import fehlgeschlagen: ",mppXmlHint:"\n\nIn MS Project: Datei → Speichern unter → XML-Format (*.xml), dann diese XML-Datei importieren.",mppPwd:"Diese .mpp-Datei ist kennwortgeschützt und kann nicht gelesen werden.",mppLocalErr:"Lokaler Parser: ",mppSrvErr:"Konvertierungsdienst: ",subBtn:"Teilprojekt einfügen",subOk:"Teilprojekt eingefügt",
  netLinkHint:"Mit Umschalt von einem Kasten zum anderen ziehen = EA-Verknüpfung.",netLinked:"Verknüpft",nameCol:"Name",typeCol:"Art",
  noRes:"Keine Arbeitsressourcen",days:"T"}};
 Object.keys(P6T).forEach(function(l){ if(I18N[l]) Object.assign(I18N[l], P6T[l]); });
@@ -4372,15 +5637,42 @@ function progLineSvg(vis, Xf, pxDay, y0, rowH, W){
   return '<svg class="g-progline" width="' + W + '" height="' + (y0 + vis.length * rowH) + '"><polyline points="' + pts.map(function(p){ return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") + '" fill="none" stroke="#dc2626" stroke-width="1.6"/></svg>';
 }
 
-/* ---------- MPP 在线导入（服务器 MPXJ → MSPDI XML → 现有 XML 导入） ---------- */
-function importMPPFile(f){
-  if(!f) return;
+/* ---------- MPP 导入：先本地离线解析（MPPLocal）→ MSPDI XML → 现有 XML 导入；失败再用在线转换服务（MPXJ） ---------- */
+/* .mpp/.mpt (Project 2007–2024) are parsed offline in the browser by MPPLocal (#mppLocal) → MSPDI XML → existing XML import;
+   if that fails (older MPP 98–2003, password, other formats), fall back to the online MPXJ converter. */
+function mppLocalXML(f){
+  return new Promise(function(resolve, reject){
+    if(!window.MPPLocal || !window.FileReader) return reject(new Error("MPPLocal unavailable"));
+    var rd = new FileReader();
+    rd.onload = function(){ try{ resolve(window.MPPLocal.parse(rd.result)); }catch(e){ reject(e); } };
+    rd.onerror = function(){ reject(rd.error || new Error("read error")); };
+    rd.readAsArrayBuffer(f);
+  });
+}
+function mppServerXML(f){
   toast(tr("mppBusy"));
   var fd = new FormData(); fd.append("file", f, f.name || "project.mpp");
-  fetch(state.mppUrl || MPP_URL, { method:"POST", body:fd }).then(function(r){
+  return fetch(state.mppUrl || MPP_URL, { method:"POST", body:fd }).then(function(r){
     return r.text().then(function(tx){ if(!r.ok){ var m = tx; try{ var j = JSON.parse(tx); m = j.error + (j.detail ? " · " + j.detail : ""); }catch(e){} throw new Error(m || ("HTTP " + r.status)); } return tx; });
-  }).then(function(xml){ importXMLFile(new Blob([xml], { type:"application/xml" })); })
-    .catch(function(e){ alert(tr("mppFail") + (e && e.message || e)); });
+  });
+}
+function mppToXML(f){
+  return mppLocalXML(f).catch(function(eL){
+    return mppServerXML(f).catch(function(eS){ var err = new Error(""); err.local = eL; err.server = eS; throw err; });
+  });
+}
+function mppFailMsg(e){
+  var L = e && e.local, S = e && e.server, parts = [];
+  if(L && L.code === "ENCRYPTED") return tr("mppFail") + tr("mppPwd") + tr("mppXmlHint");
+  if(L && L.code && L.code !== "NOT_CFB" && L.code !== "NOT_PROJECT") parts.push(tr("mppLocalErr") + (L.message || L));
+  if(S) parts.push(tr("mppSrvErr") + (S.message || S));
+  if(!L && !S && e) parts.push(e.message || e);
+  return tr("mppFail") + parts.join("\n") + tr("mppXmlHint");
+}
+function importMPPFile(f){
+  if(!f) return;
+  mppToXML(f).then(function(xml){ importXMLFile(new Blob([xml], { type:"application/xml" })); })
+    .catch(function(e){ alert(mppFailMsg(e)); });
 }
 
 /* ---------- 插入子项目：把另一个 JSON/XML/MPP 项目作为分组插入当前项目末尾 ---------- */
@@ -4410,9 +5702,7 @@ function insertSubproject(f){
   var ext = String(f.name || "").toLowerCase();
   if(/\.json$/.test(ext)){ var r = new FileReader(); r.onload = function(){ try{ var j = JSON.parse(r.result); var s = j.exec || j.state || j; if(typeof s === "string") s = JSON.parse(s); if(j.app === "gantt-project" && j.data){ s = j.data["gantt-exec-v1"]; if(typeof s === "string") s = JSON.parse(s); } merge({ tasks:(s && s.tasks) || [], resources:(s && s.resources) || [] }); }catch(e){ alert("JSON: " + e.message); } }; r.readAsText(f); return; }
   if(/\.xml$/.test(ext)){ var r2 = new FileReader(); r2.onload = function(){ viaXML(String(r2.result)); }; r2.readAsText(f); return; }
-  toast(tr("mppBusy"));
-  var fd = new FormData(); fd.append("file", f, f.name);
-  fetch(state.mppUrl || MPP_URL, { method:"POST", body:fd }).then(function(r){ return r.text().then(function(tx){ if(!r.ok) throw new Error(tx); return tx; }); }).then(viaXML).catch(function(e){ alert(tr("mppFail") + (e && e.message || e)); });
+  mppToXML(f).then(viaXML).catch(function(e){ alert(mppFailMsg(e)); });
 }
 
 /* ---------- 任务信息对话框补充：任务类型 / 投入比导向 / 优先级 / 忽略资源日历 / 自定义字段 ---------- */
