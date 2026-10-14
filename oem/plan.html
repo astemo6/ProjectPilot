@@ -1512,13 +1512,13 @@ function curProjName(){ /* 以界面上当前显示的项目名为准，避免�
   return state.projectName || '';
 }
 function fileBase(){
-  var nm = curProjName().trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
-  if(!nm) nm = tr('brand').replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
+  var nm = curProjName().trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 150);
+  if(!nm) nm = tr('brand').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 150);
   return nm + '_' + fmtD(new Date());
 }
 /* JSON 导出沿用旧文件名格式：{project}-gantt-YYYYMMDD */
 function fileBaseJSON(){
-  var nm = (state.projectName || '').trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
+  var nm = (state.projectName || '').trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 150);
   return fileBase();
 }
 function downloadURL(url, filename){
