@@ -174,6 +174,8 @@ input.flash{outline:2px solid #2563eb;outline-offset:1px}
   .subbar{gap:6px}
   /* 侧边栏默认收起（移动端默认“查看甘特图”标签页，aside 隐藏），切“填写数据”标签页即可展开 */
 }
+input.date{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 5px center!important;padding-right:22px!important}
+input.date.dp-hot{cursor:pointer}
 </style>
 <style id="embedCss">
 html.embed aside > section:first-child, html.embed .langbtns, html.embed #btnExec, html.embed #btnJSON, html.embed #btnImport, html.embed #btnClearCache{display:none!important}
@@ -1503,8 +1505,14 @@ function setTab(which){
 
 /* ---------- 导出：甘特图 → JPG / PDF ---------- */
 var CHART_CSS = '.axis{fill:#9ca3af;font-size:11px}.mlabel{font-size:11px;fill:#1f2937}.mdate{font-size:10px;fill:#9ca3af}.glabel{font-size:12px;fill:#6b7280;font-weight:600}.tlabel{font-size:11.5px;fill:#374151}.plabel{font-size:11px;fill:#1e40af}text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}';
+function curProjName(){ /* 以界面上当前显示的项目名为准，避免状态未同步时用旧名 */
+  var el = $('projectName'), v = el ? el.value : null;
+  try{ var pe = window.parent && window.parent !== window && window.parent.document.getElementById('projName'); if(pe) v = pe.value; }catch(e){}
+  if(typeof v === 'string' && v !== state.projectName){ state.projectName = v; if(el) el.value = v; save(); }
+  return state.projectName || '';
+}
 function fileBase(){
-  var nm = (state.projectName || '').trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
+  var nm = curProjName().trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
   if(!nm) nm = tr('brand').replace(/[\\/:*?"<>|]/g, '').slice(0, 40);
   return nm + '_' + fmtD(new Date());
 }
@@ -1603,7 +1611,7 @@ function renderExportCanvas(cb){
   var img = new Image();
   var url = URL.createObjectURL(new Blob([info.str], {type:'image/svg+xml;charset=utf-8'}));
   img.onload = function(){
-    var title = (state.projectName || '').trim() || tr('brand');
+    var title = curProjName().trim() || tr('brand');
     var showCreator = $('ckShowCreator').checked;
     var showDate = $('ckShowDate').checked;
     var creator = ($('creatorName').value || '').trim();
@@ -1665,9 +1673,9 @@ function buildPdf(jpeg, w, h, dispW, dispH){
   var offsets = [0];
   function obj(n, dict, streamU8){
     offsets[n] = out.length;
-    bs(n + ' 0 obj\n' + dict + '\nstream\n');
-    if(streamU8) bb(streamU8);
-    bs('\nendstream\nendobj\n');
+    bs(n + ' 0 obj\n' + dict + '\n');
+    if(streamU8){ bs('stream\n'); bb(streamU8); bs('\nendstream\n'); } /* 只有图像/内容对象带 stream，否则 Acrobat 报 root object invalid */
+    bs('endobj\n');
   }
   bs('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n');
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
@@ -2023,6 +2031,24 @@ function init(){
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
 })();
+</script>
+<script>
+/* 日期输入框：右侧日历图标点开系统日期选择器，仍可手动输入 */
+(function(){
+  var dp = document.createElement('input'); dp.type = 'date'; dp.tabIndex = -1;
+  dp.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;border:0;padding:0';
+  document.body.appendChild(dp); var target = null;
+  function hot(e){ var el = e.target; if(!el || !el.matches || !el.matches('input.date')) return false; var r = el.getBoundingClientRect(); return e.clientX >= r.right - 26; }
+  document.addEventListener('mousemove', function(e){ if(e.target && e.target.matches && e.target.matches('input.date')) e.target.classList.toggle('dp-hot', hot(e)); }, true);
+  document.addEventListener('click', function(e){
+    if(!hot(e)) return; var el = e.target; target = el;
+    var r = el.getBoundingClientRect(); dp.style.left = (r.right - 20) + 'px'; dp.style.top = r.bottom + 'px';
+    var v = (el.value || '').trim().replace(/[./]/g, '-'); dp.value = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+    try{ dp.showPicker(); }catch(err){ dp.focus(); dp.click(); }
+  }, true);
+  dp.addEventListener('change', function(){ if(!target || !dp.value) return; target.value = dp.value;
+    target.dispatchEvent(new Event('input', { bubbles:true })); target.dispatchEvent(new Event('change', { bubbles:true })); });
+}());
 </script>
 </body>
 </html>
