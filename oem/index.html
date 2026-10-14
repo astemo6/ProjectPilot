@@ -120,6 +120,7 @@ html[data-theme=dark] #top .seg button,html[data-theme=dark] #top .tabs.lang but
 html[data-theme=dark] #top .seg button.on,html[data-theme=dark] #top .tabs.lang button.on{background:#636366;color:#fff}
 html[data-theme=dark] #stage iframe{background:#1c1c1e}
 html[data-theme=dark] #hint{background:rgba(10,132,255,.14);color:#64b5ff;border-bottom-color:rgba(10,132,255,.25)}
+#top .tb:disabled{opacity:.4;cursor:default}
 </style>
 </head>
 <body>
@@ -136,6 +137,9 @@ html[data-theme=dark] #hint{background:rgba(10,132,255,.14);color:#64b5ff;border
   </div>
   <span class="sp"></span>
   <a class="tb" id="lnkV4" href="../" data-t="toV4">ProjectPilot ↗</a>
+  <span class="tsep"></span>
+  <button class="tb" id="btnUndo" title="撤销 (Ctrl+Z)" disabled>↶ <span data-t="undo">撤销</span></button>
+  <button class="tb" id="btnRedo" title="重做 (Ctrl+Y)" disabled>↷ <span data-t="redo">重做</span></button>
   <span class="tsep"></span>
   <button class="tb" id="btnPv" data-t="pv">预览</button>
   <div class="dd" id="ddExp"><button class="tb" id="btnExpDd"><span data-t="expDd">导出</span> ▾</button>
@@ -169,15 +173,15 @@ html[data-theme=dark] #hint{background:rgba(10,132,255,.14);color:#64b5ff;border
    两个视图实时联动：改客户节点 → 项目甘特图里的里程碑和推荐任务自动更新；在项目甘特图里拖动客户里程碑 → 节点日期自动回写。 */
 var KEYS = ["gantt-tool-v1", "gantt-exec-v1", "gantt-workcal-v1"];
 var T = {
-  zh:{title:"OEM-Gantt", toV4:"ProjectPilot ↗", pnPh:"项目名称（例如：XX车型项目）", stepOem:"客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
+  zh:{title:"OEM-Gantt", undo:"撤销", redo:"重做", undoTip:"撤销 (Ctrl+Z)", redoTip:"重做 (Ctrl+Y)", undoNone:"没有可撤销的操作", toV4:"ProjectPilot ↗", pnPh:"项目名称（例如：XX车型项目）", stepOem:"客户", tabExec:"③ 开发任务", tabPlan:"② 客户节点", hintOem:"第一步：在左上角选择客户（主机厂），再填客户节点日期。", oemAsk:"切换客户会清空已填的客户节点日期（开发任务里你自己加的任务保留），继续？", exp:"导出项目", imp:"导入项目", clr:"清空",
       hintPlan:"在这里选择客户（主机厂）并填写客户节点日期；本页导出即给主机厂的节点报告。",
       hintExec:"还没有客户节点日期：先到「② 客户节点」填日期，或者直接在这里加任务、载入模板。",
       clrAsk:"清空整个项目（客户节点、任务、工作日历）？", impOk:"项目已导入", impBad:"不是有效的项目文件", expOk:"项目已导出"},
-  en:{title:"OEM-Gantt", toV4:"ProjectPilot ↗", pnPh:"Project name (e.g. XX model project)", stepOem:"Customer", tabExec:"③ Development Tasks", tabPlan:"② Customer Milestones", hintOem:"Step 1: pick the customer (OEM) at top left, then enter customer milestone dates, then plan development tasks.", oemAsk:"Switching customer clears the milestone dates entered (your own tasks are kept). Continue?", exp:"Export project", imp:"Import project", clr:"Clear",
+  en:{title:"OEM-Gantt", undo:"Undo", redo:"Redo", undoTip:"Undo (Ctrl+Z)", redoTip:"Redo (Ctrl+Y)", undoNone:"Nothing to undo", toV4:"ProjectPilot ↗", pnPh:"Project name (e.g. XX model project)", stepOem:"Customer", tabExec:"③ Development Tasks", tabPlan:"② Customer Milestones", hintOem:"Step 1: pick the customer (OEM) at top left, then enter customer milestone dates, then plan development tasks.", oemAsk:"Switching customer clears the milestone dates entered (your own tasks are kept). Continue?", exp:"Export project", imp:"Import project", clr:"Clear",
       hintPlan:"Pick the customer (OEM) and enter customer milestone dates; this page exports the milestone report for the OEM.",
       hintExec:"No customer milestone dates yet: fill them in under ② Customer Milestones, or add tasks / load a template here.",
       clrAsk:"Clear the whole project (milestones, tasks, calendar)?", impOk:"Project imported", impBad:"Not a valid project file", expOk:"Project exported"},
-  de:{title:"OEM-Gantt", toV4:"ProjectPilot ↗", pnPh:"Projektname (z. B. Projekt Modell XX)", stepOem:"Kunde", tabExec:"③ Entwicklungsaufgaben", tabPlan:"② Kundenmeilensteine", hintOem:"Schritt 1: oben links den Kunden (OEM) wählen, dann Kundenmeilensteine eintragen, dann Entwicklungsaufgaben planen.", oemAsk:"Kundenwechsel löscht die eingetragenen Meilensteindaten (eigene Aufgaben bleiben). Fortfahren?", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
+  de:{title:"OEM-Gantt", undo:"Rückgängig", redo:"Wiederholen", undoTip:"Rückgängig (Strg+Z)", redoTip:"Wiederholen (Strg+Y)", undoNone:"Nichts rückgängig zu machen", toV4:"ProjectPilot ↗", pnPh:"Projektname (z. B. Projekt Modell XX)", stepOem:"Kunde", tabExec:"③ Entwicklungsaufgaben", tabPlan:"② Kundenmeilensteine", hintOem:"Schritt 1: oben links den Kunden (OEM) wählen, dann Kundenmeilensteine eintragen, dann Entwicklungsaufgaben planen.", oemAsk:"Kundenwechsel löscht die eingetragenen Meilensteindaten (eigene Aufgaben bleiben). Fortfahren?", exp:"Projekt exportieren", imp:"Projekt importieren", clr:"Leeren",
       hintPlan:"Kunden (OEM) wählen und Meilensteintermine eintragen; dieser Export ist der Meilensteinbericht für den OEM.",
       hintExec:"Noch keine Meilensteindaten: unter ② Kundenmeilensteine eintragen oder hier Aufgaben anlegen / Vorlage laden.",
       clrAsk:"Gesamtes Projekt leeren (Meilensteine, Aufgaben, Kalender)?", impOk:"Projekt importiert", impBad:"Keine gültige Projektdatei", expOk:"Projekt exportiert"}
@@ -223,6 +227,7 @@ function applyLang(){
   var _pn = document.getElementById("projName"); if(_pn) _pn.placeholder = tr("pnPh");
   document.querySelectorAll(".lang button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-lang") === lang); });
   document.title = tr("title");
+  var _bu = document.getElementById("btnUndo"), _br = document.getElementById("btnRedo"); if(_bu){ _bu.title = tr("undoTip"); _br.title = tr("redoTip"); }
   updateHint();
 }
 function updateHint(){
@@ -230,7 +235,7 @@ function updateHint(){
   if(!curOem) txt = ""; /* 2026-10-14：用户要求去掉「第一步」提示 */
   else if(view === "plan") txt = ""; /* 2026-10-11：用户要求去掉本页提示条 */
   else if(!hasNodes()) txt = tr("hintExec");
-  $("oemWrap").classList.toggle("need", !curOem);
+  $("oemWrap").classList.remove("need"); /* 2026-10-14：用户要求去掉未选客户时的高亮 */
   h.textContent = txt; h.classList.toggle("show", !!txt);
 }
 function show(v){
@@ -343,7 +348,46 @@ $("btnClr").addEventListener("click", function(){
   loadFrames(); show("plan");
 });
 
-window.__shell = { mem:mem, srcdocFor:srcdocFor, show:show }; /* 调试/测试用 */
+
+/* ---- 撤销 / 重做（2026-10-14）：监视本地项目数据快照，任何修改都可撤销；连续快速修改（如打字）合并为一步 ---- */
+var undoSt = [], redoSt = [], UNDO_MAX = 100, lastPush = 0, holdUntil = 0;
+function snap(){ var o = {}; KEYS.forEach(function(k){ o[k] = getK(k); }); return o; }
+function snapKey(o){ try{ var p = o["gantt-tool-v1"] ? JSON.parse(o["gantt-tool-v1"]) : null; if(p){ delete p.lang; delete p.execSyncSeen; delete p.recComputed; } return JSON.stringify([p, o["gantt-exec-v1"], o["gantt-workcal-v1"]]); }catch(e){ return JSON.stringify(o); } }
+var lastSnap = snap(), lastKey = snapKey(lastSnap);
+function undoBtns(){ $("btnUndo").disabled = !undoSt.length; $("btnRedo").disabled = !redoSt.length; }
+function undoTick(){
+  if(Date.now() < holdUntil) return;
+  var cur = snap(), key = snapKey(cur);
+  if(key === lastKey){ lastSnap = cur; return; }
+  var now = Date.now();
+  if(!(undoSt.length && now - lastPush < 900)){ undoSt.push(lastSnap); if(undoSt.length > UNDO_MAX) undoSt.shift(); }
+  lastPush = now; redoSt = []; lastSnap = cur; lastKey = key; undoBtns();
+}
+setInterval(undoTick, 400);
+function restoreSnap(o){
+  KEYS.forEach(function(k){
+    var v = o[k];
+    if(k === "gantt-tool-v1" && v){ try{ var p = JSON.parse(v); p.lang = lang; v = JSON.stringify(p); }catch(e){} }
+    setK(k, v);
+  });
+  lastSnap = snap(); lastKey = snapKey(lastSnap); lastPush = 0; holdUntil = Date.now() + 1500;
+  curOem = curOemFromStore(); renderOems(); loadFrames(); undoBtns();
+}
+function doUndo(){ undoTick(); if(!undoSt.length){ toast(tr("undoNone")); return; } redoSt.push(snap()); restoreSnap(undoSt.pop()); }
+function doRedo(){ if(!redoSt.length) return; undoSt.push(snap()); restoreSnap(redoSt.pop()); }
+$("btnUndo").addEventListener("click", doUndo);
+$("btnRedo").addEventListener("click", doRedo);
+function undoKeys(e){
+  if(!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  var t = e.target, tag = t && t.tagName;
+  if(tag === "INPUT" && /^(text|number|date|search|)$/i.test(t.type || "") || tag === "TEXTAREA" || (t && t.isContentEditable)) return; /* 输入框内保留浏览器自带撤销 */
+  var k = (e.key || "").toLowerCase();
+  if(k === "z" && !e.shiftKey){ e.preventDefault(); doUndo(); }
+  else if(k === "y" || (k === "z" && e.shiftKey)){ e.preventDefault(); doRedo(); }
+}
+document.addEventListener("keydown", undoKeys);
+fPlan.addEventListener("load", function(){ try{ fPlan.contentDocument.addEventListener("keydown", undoKeys); }catch(e){} });
+window.__shell = { mem:mem, undo:doUndo, redo:doRedo, srcdocFor:srcdocFor, show:show }; /* 调试/测试用 */
 applyLang();
 loadFrames();
 show(hasNodes() ? "exec" : "plan");
