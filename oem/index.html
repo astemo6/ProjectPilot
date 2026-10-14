@@ -265,7 +265,8 @@ function mergePlanHeader(){
   if(!d.getElementById("v3merge")){ var st = d.createElement("style"); st.id = "v3merge"; st.textContent = ".toprow,.subbar{display:none!important}"; d.head.appendChild(st); }
   var src = d.getElementById("projectName"); if(src && document.activeElement !== pn) pn.value = src.value || "";
 }
-pn.addEventListener("input", function(){ var d = pdoc(), src = d && d.getElementById("projectName"); if(src){ src.value = pn.value; src.dispatchEvent(new Event("input", { bubbles:true })); src.dispatchEvent(new Event("change", { bubbles:true })); } });
+function pushName(){ var d = pdoc(), src = d && d.getElementById("projectName"); if(src){ src.value = pn.value; src.dispatchEvent(new Event("input", { bubbles:true })); src.dispatchEvent(new Event("change", { bubbles:true })); } }
+["input","change","compositionend","blur"].forEach(function(ev){ pn.addEventListener(ev, pushName); });
 pn.addEventListener("keydown", function(e){ if(e.key === "Enter") pn.blur(); });
 /* v3.8：焦点在外层时按 Esc 也能关闭页内预览/弹窗 */
 document.addEventListener("keydown", function(e){ if(e.key !== "Escape") return; try{ var w = $("fPlan").contentWindow; w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key:"Escape", bubbles:true })); }catch(err){} });
@@ -306,7 +307,7 @@ document.querySelectorAll(".lang button").forEach(function(b){
     post(fExec, { t:"lang", v:lang }); post(fPlan, { t:"lang", v:lang });
   });
 });
-function projName(){ try{ var p = JSON.parse(getK("gantt-tool-v1") || "null"); return ((p && p.projectName) || "").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 40); }catch(e){ return ""; } }
+function projName(){ try{ pushName(); var p = JSON.parse(getK("gantt-tool-v1") || "null"); return ((pn.value || (p && p.projectName)) || "").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 40); }catch(e){ return ""; } }
 $("btnExp").addEventListener("click", function(){
   var data = { app:"gantt-project", version:3, savedAt:new Date().toISOString() };
   KEYS.forEach(function(k){ var v = getK(k); data[k] = v ? JSON.parse(v) : null; });
