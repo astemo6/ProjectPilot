@@ -2,6 +2,62 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<script id="ppSaveJs">/* 用户 2026-10-15：导出时先确认并选择保存位置（Chrome/Edge 弹出「另存为」选择文件夹），不再直接下载 */
+(function(){
+  if(window.__ppSave) return; window.__ppSave = 1;
+  var nativeClick = HTMLAnchorElement.prototype.click;
+  var TX = { zh:["导出文件", "选择位置保存…", "直接下载", "取消", "已保存"],
+             en:["Export file", "Save to folder…", "Download", "Cancel", "Saved"],
+             de:["Datei exportieren", "Speicherort wählen…", "Herunterladen", "Abbrechen", "Gespeichert"] };
+  function T(){ var l = (document.documentElement.lang || "zh").slice(0, 2); return TX[l] || TX.zh; }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); }
+  function plain(a){ a.__ppOk = true; if(!a.isConnected){ a.style.display = "none"; document.body.appendChild(a); setTimeout(function(){ a.remove(); }, 4000); } nativeClick.call(a); }
+  function note(msg){ var n = document.createElement("div"); n.textContent = msg;
+    n.style.cssText = "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:8px 16px;border-radius:8px;font:13px system-ui,sans-serif;z-index:100001";
+    document.body.appendChild(n); setTimeout(function(){ n.remove(); }, 1800); }
+  function ask(a, blob){
+    var t = T(), name = a.download || "export", dark = document.documentElement.getAttribute("data-theme") === "dark" || (document.documentElement.getAttribute("data-theme") === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+    var bg = document.createElement("div");
+    bg.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:100000;display:flex;align-items:center;justify-content:center;font:13px -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif";
+    var fg = dark ? "#f5f5f7" : "#1d1d1f", bx = dark ? "#2c2c2e" : "#fff", ln = dark ? "#48484a" : "#d2d2d7";
+    var can = !!window.showSaveFilePicker;
+    bg.innerHTML = '<div style="background:' + bx + ';color:' + fg + ';border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:18px 20px;min-width:300px;max-width:min(520px,90vw)">'
+      + '<div style="font-weight:600;font-size:14px;margin-bottom:8px">' + esc(t[0]) + '</div>'
+      + '<div style="word-break:break-all;opacity:.85;margin-bottom:16px">' + esc(name) + '</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
+      + '<button data-b="x" style="font:inherit;padding:5px 14px;border-radius:6px;border:1px solid ' + ln + ';background:transparent;color:' + fg + ';cursor:pointer">' + esc(t[3]) + '</button>'
+      + (can ? '<button data-b="d" style="font:inherit;padding:5px 14px;border-radius:6px;border:1px solid ' + ln + ';background:transparent;color:' + fg + ';cursor:pointer">' + esc(t[2]) + '</button>' : '')
+      + '<button data-b="s" style="font:inherit;padding:5px 14px;border-radius:6px;border:0;background:#0a84ff;color:#fff;cursor:pointer">' + esc(can ? t[1] : t[2]) + '</button>'
+      + '</div></div>';
+    document.body.appendChild(bg);
+    function close(){ bg.remove(); document.removeEventListener("keydown", key, true); }
+    function key(e){ if(e.key === "Escape"){ e.stopPropagation(); close(); } else if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); bg.querySelector('[data-b="s"]').click(); } }
+    document.addEventListener("keydown", key, true);
+    bg.addEventListener("click", function(e){
+      var b = e.target.getAttribute && e.target.getAttribute("data-b");
+      if(e.target === bg || b === "x"){ close(); return; }
+      if(b === "d"){ close(); plain(a); return; }
+      if(b !== "s") return;
+      close();
+      if(!can || !blob){ plain(a); return; }
+      var ext = (name.match(/\.([A-Za-z0-9]+)$/) || [, ""])[1].toLowerCase();
+      var mime = blob.type && /^[a-z]+\/[a-z0-9.+-]+$/i.test(blob.type.split(";")[0]) ? blob.type.split(";")[0] : "application/octet-stream";
+      var opts = { suggestedName:name };
+      if(ext){ var acc = {}; acc[mime] = ["." + ext]; opts.types = [{ description:ext.toUpperCase(), accept:acc }]; }
+      window.showSaveFilePicker(opts).then(function(h){ return h.createWritable(); })
+        .then(function(w){ return w.write(blob).then(function(){ return w.close(); }); })
+        .then(function(){ note(t[4] + " · " + name); })
+        .catch(function(err){ if(!err || err.name !== "AbortError") plain(a); });
+    });
+    setTimeout(function(){ var s = bg.querySelector('[data-b="s"]'); if(s) s.focus(); }, 0);
+  }
+  HTMLAnchorElement.prototype.click = function(){
+    if(this.__ppOk || !this.hasAttribute("download") || !this.href) return nativeClick.apply(this, arguments);
+    var a = this;
+    fetch(a.href).then(function(r){ return r.blob(); }).then(function(b){ ask(a, b); }, function(){ ask(a, null); });
+  };
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>汽车零部件开发计划</title>
 <script>(function(){try{var p=localStorage.getItem("gantt-theme-v4")||"system";document.documentElement.dataset.theme=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"}catch(e){}})()</script>
@@ -107,7 +163,7 @@ section.collapsed > :not(h3){display:none}
 .logo-prev.show{display:block}
 .exp-form .ck input{accent-color:#2563eb}
 input.flash{outline:2px solid #2563eb;outline-offset:1px}
-#chart g[data-mnode], #chart g[data-clane]{cursor:pointer}
+#chart g[data-mnode], #chart g[data-clane]{cursor:ew-resize;touch-action:none}
 .cm-gen{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e5e7eb;font-size:12px;color:#6b7280}
 .cm-gen input{margin-bottom:0}
 .cm-gen input.date{padding:4px 6px;font-size:12px}
@@ -1153,7 +1209,63 @@ function initChartLaneDrag(){
 }
 /* 点击甘特图上的节点/文字，跳到左侧对应输入框进行编辑 */
 function initChartEdit(){
+  /* 用户 2026-10-15：在甘特图上左右拖动菱形（客户节点 / 供应商节点）直接改日期，拖动时实时显示日期 */
+  var dragTip = document.createElement('div');
+  dragTip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;background:#1f2937;color:#fff;font-size:12px;padding:3px 7px;border-radius:5px;display:none;white-space:nowrap';
+  document.body.appendChild(dragTip);
+  var swallowClick = false;
+  $('chart').addEventListener('pointerdown', function(e){
+    if(e.button !== 0) return;
+    var el = e.target, g = null;
+    while(el && el !== this){
+      if(el.getAttribute && (el.getAttribute('data-mnode') || el.getAttribute('data-clane'))){ g = el; break; }
+      el = el.parentNode;
+    }
+    if(!g || !window._chartMap) return;
+    var isM = !!g.getAttribute('data-mnode'), nm = g.getAttribute('data-mnode'), li = +g.getAttribute('data-clane'), lj = +g.getAttribute('data-cj');
+    var d0 = isM ? parseD(state.dates[nm]) : parseD(cmDate(((state.customMs[li] || {}).dates || [])[lj]));
+    if(!d0) return;
+    var svg = this.querySelector('svg'), sc = 1;
+    try{ var bb = svg.getBoundingClientRect(); sc = bb.width / (+svg.getAttribute('width') || bb.width) || 1; }catch(er){}
+    var x0 = e.clientX, moved = false, nd = d0, pxDay = window._chartMap.pxDay * sc;
+    var inp = isM ? $('nodeList').querySelector('.date[data-node="' + (window.CSS && CSS.escape ? CSS.escape(nm) : nm) + '"]')
+                  : $('cmList').querySelector('.cmd[data-i="' + li + '"][data-j="' + lj + '"]');
+    e.preventDefault();
+    function mv(ev){
+      var dx = ev.clientX - x0;
+      if(!moved && Math.abs(dx) < 3) return;
+      moved = true;
+      var days = Math.round(dx / pxDay);
+      nd = addDays(d0, days);
+      g.setAttribute('transform', 'translate(' + (days * window._chartMap.pxDay).toFixed(1) + ',0)');
+      g.style.opacity = '.75';
+      dragTip.textContent = fmtD(nd) + (days ? '  (' + (days > 0 ? '+' : '') + days + 'd)' : '');
+      dragTip.style.left = (ev.clientX + 12) + 'px'; dragTip.style.top = (ev.clientY - 30) + 'px'; dragTip.style.display = 'block';
+      if(inp) inp.value = fmtD(nd);
+      document.body.style.cursor = 'ew-resize';
+    }
+    function up(){
+      document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      dragTip.style.display = 'none'; document.body.style.cursor = '';
+      if(!moved) return;
+      swallowClick = true; setTimeout(function(){ swallowClick = false; }, 300);
+      var iso = fmtD(nd);
+      if(isM){ state.dates[nm] = iso; }
+      else {
+        var arr = state.customMs[li].dates, it = arr[lj];
+        if(typeof it !== 'object' || !it){ it = cmItem(); arr[lj] = it; }
+        it.d = iso;
+        arr.splice(lj, 1);
+        var pos = arr.length;
+        for(var q = 0; q < arr.length; q++){ var od = cmDate(arr[q]); if(od && od > iso){ pos = q; break; } }
+        arr.splice(pos, 0, it);
+      }
+      save(); renderAll();
+    }
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+  });
   $('chart').addEventListener('click', function(e){
+    if(swallowClick){ swallowClick = false; e.stopPropagation(); return; }
     var el = e.target, g = null;
     while(el && el !== this){
       if(el.getAttribute && (el.getAttribute('data-mnode') || el.getAttribute('data-clane'))){ g = el; break; }
@@ -1490,7 +1602,7 @@ function renderChart(){
   /* 手动调整：左列宽（竖线）与里程碑行高（横线）拖动手柄；导出时移除 */
   s += '<rect class="rz-h rz-ms" data-noexp="1" x="0" y="' + (MS_Y + MS_H - 4) + '" width="' + W + '" height="8" fill="transparent" style="cursor:row-resize"><title>' + esc(tr('rzMsTip')) + '</title></rect>';
   s += '<rect class="rz-h rz-gut" data-noexp="1" x="' + (GUT - 4) + '" y="0" width="8" height="' + H + '" fill="transparent" style="cursor:col-resize"><title>' + esc(tr('rzGutTip')) + '</title></rect>';
-  window._curGut = GUT; window._curMsH = MS_H;
+  window._curGut = GUT; window._curMsH = MS_H; window._chartMap = { min:min, pxDay:pxDay };
   chart.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" data-cm-y="' + CM_Y + '" data-cm-h="' + CM_H + '" data-cm-n="' + cmLanes.length + '">' + s + '</svg>';
   if(window.syncSizeInputs) syncSizeInputs();
 }
