@@ -19,16 +19,16 @@
 - **客户里程碑**：选主机厂，勾选节点并填日期，插入为固定里程碑
 - **默认模板**：客户里程碑占位 + APQP 五大过程（计划和确定项目 / 产品设计和开发 / 过程设计和开发 / 产品和过程确认 / 反馈、评定和纠正措施）
 - **导入**：MS Project XML、MPP（Project 2007–2024 的 .mpp 在浏览器内离线解析；更早版本经转换服务）、GanttProject .gan / CSV、JSON
-- **导出**：PDF / JPG（MS Project 打印样式）、XML、GanttProject .gan、CSV、Excel、JSON
+- **导出**：PDF / JPG（MS Project 打印样式）、XML、GanttProject .gan、CSV、Excel（.xlsx，甘特色块随日期自动变化）、JSON
 - **操作**：Ribbon 功能区（可切回旧版布局）、快速访问工具栏、右键菜单、撤销/重做、快捷键（F1 查看）
 
 ### 最近更新
 
+- 2026-10-16（1.2.0）：导出 Excel 改为 .xlsx，甘特色块用条件格式生成，在 Excel 里改开始/结束日期，色块和分组起止自动跟着变
 - 2026-10-15（1.1.0）：功能区重排——文件页加入新建/打开/保存，常用导入导出平铺；字体移到格式页；显示选项直接勾选；视图页不再重复资源/报表按钮；图标按钮加文字。可在「文件 › 帮助 › 旧版功能区」一键切回，旧版在线地址 /v1.0/
 - 2026-10-15：导出前弹出确认框，可选择保存到哪个文件夹（Chrome/Edge）
 - 2026-10-15：客户里程碑选 BMW 时，节点 2、3、7、8、9、11、12 默认不勾选
 - 2026-10-14：默认模板改为 APQP 五大过程（35 项任务与里程碑，已连好依赖），未改名的阶段和任务随语言切换
-- 2026-10-14：.mpp 可离线直接导入（浏览器内解析，无需联网）
 
 数据只保存在本机浏览器，与 OEM-Gantt 互不影响。
 
@@ -46,7 +46,7 @@ A project scheduling tool (tasks, resources, progress tracking) modelled on MS P
 - **Customer milestones**: pick an OEM, tick its milestones and enter dates; inserted as fixed milestones
 - **Default template**: customer-milestone placeholders + APQP 5 phases (Plan & Define / Product Design / Process Design / Validation / Feedback & Corrective Action)
 - **Import**: MS Project XML, MPP (Project 2007–2024 .mpp files are parsed offline in the browser; older versions via conversion service), GanttProject .gan / CSV, JSON
-- **Export**: PDF / JPG (MS Project print style), XML, GanttProject .gan, CSV, Excel, JSON
+- **Export**: PDF / JPG (MS Project print style), XML, GanttProject .gan, CSV, Excel (.xlsx, Gantt bars update automatically when dates change), JSON
 - **Usability**: ribbon (classic layout switchable), Quick Access Toolbar, context menu, undo/redo, keyboard shortcuts (press F1)
 
 Data is stored only in your browser and is separate from OEM-Gantt.
@@ -65,7 +65,7 @@ Ein Projektplanungswerkzeug (Vorgänge, Ressourcen, Fortschrittsverfolgung) nach
 - **Kundenmeilensteine**: OEM wählen, Meilensteine ankreuzen und Termine eintragen; werden als feste Meilensteine eingefügt
 - **Standardvorlage**: Platzhalter für Kundenmeilensteine + APQP mit 5 Phasen (Planung / Produktentwicklung / Prozessentwicklung / Validierung / Rückmeldung)
 - **Import**: MS Project XML, MPP (.mpp aus Project 2007–2024 wird offline im Browser gelesen; ältere Versionen über Konvertierungsdienst), GanttProject .gan / CSV, JSON
-- **Export**: PDF / JPG (MS-Project-Druckstil), XML, GanttProject .gan, CSV, Excel, JSON
+- **Export**: PDF / JPG (MS-Project-Druckstil), XML, GanttProject .gan, CSV, Excel (.xlsx, Balken passen sich bei Datumsänderung automatisch an), JSON
 - **Bedienung**: Menüband (klassisches Layout umschaltbar), Symbolleiste für den Schnellzugriff, Kontextmenü, Rückgängig/Wiederholen, Tastenkürzel (F1)
 
 Daten werden nur im Browser gespeichert und sind von OEM-Gantt getrennt.
