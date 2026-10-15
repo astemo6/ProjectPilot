@@ -1296,6 +1296,7 @@ function initChartEdit(){
 }
 
 /* 标签防重叠：同一行内按 x 排序，贪心分配垂直层级 */
+function fitLab(t, w){ if(textW(t) <= w) return t; while(t.length > 1 && textW(t + '…') > w) t = t.slice(0, -1); return t + '…'; }
 function textW(s){
   var w = 0;
   s = String(s);
@@ -1404,6 +1405,14 @@ function renderChart(){
   var AXIS_H = 44, PH_Y = 44, PH_H = showPH ? 48 : 0, MS_Y = PH_Y + PH_H, MS_H = Math.round(Math.max(72, Math.min(170, _labH + 58)));
   window._autoMsH = MS_H;
   if(state.msRowH > 0){ MS_H = Math.round(Math.max(40, Math.min(400, state.msRowH))); MS_Y = PH_Y + PH_H; }
+  /* 用户 2026-10-15：手动调里程碑行高时，标签倾角随行高自动变化；任何情况下标签都不伸进顶部年份/月份刻度 */
+  var _rad = function(a){ return a * Math.PI / 180; }, _labTop = MS_H - 52, MS_LABMAX = 1e9;
+  if(state.msRowH > 0 && _msMaxW > 0){
+    var _a = Math.asin(Math.max(0, Math.min(1, (_labTop - 8) / _msMaxW))) * 180 / Math.PI;
+    MS_ANG = Math.round(Math.max(25, Math.min(75, _a))); /* 行太矮时保持 25°，过长的名字截断加「…」 */
+    MS_NEED = Math.ceil(12 / Math.sin(_rad(MS_ANG)));
+  }
+  MS_LABMAX = Math.max(14, (_labTop - 9 * Math.cos(_rad(MS_ANG))) / Math.sin(_rad(MS_ANG)));
   var CM_Y = MS_Y + MS_H, CM_H = 58;
   var TK_Y = CM_Y + cmLanes.length * CM_H, TK_H = 36;
   var H = TK_Y + laneTasks.length * TK_H + 10;
@@ -1529,7 +1538,7 @@ function renderChart(){
       + '<rect x="' + (cx-r).toFixed(1) + '" y="' + (msCY-r).toFixed(1) + '" width="' + (r*2) + '" height="' + (r*2)
       + '" transform="rotate(45 ' + cx.toFixed(1) + ' ' + msCY + ')" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"/>'
       + ((msLabelLane[idx] || msLabelDx[idx] > 4) ? '<line x1="' + cx.toFixed(1) + '" y1="' + (msCY-9) + '" x2="' + (lx+2).toFixed(1) + '" y2="' + (ly+2) + '" stroke="#6b7280" stroke-width="0.8"/>' : '')
-      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-' + MS_ANG + ' ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="start" class="mlabel">' + esc(abbr(m.name)) + '</text>'
+      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-' + MS_ANG + ' ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="start" class="mlabel">' + esc(fitLab(abbr(m.name), MS_LABMAX)) + '</text>'
       + '<text x="' + cx.toFixed(1) + '" y="' + (msCY+21+(msDateRow[idx]?11:0)) + '" text-anchor="middle" fill="#1f2937" font-size="10">' + (m.d.getMonth()+1) + '/' + m.d.getDate() + '</text>'
       + '</g>';
   });
