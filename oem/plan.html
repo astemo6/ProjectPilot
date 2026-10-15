@@ -1331,7 +1331,15 @@ function deoverlapX(items){
 }
 
 /* ---------- 甘特图 ---------- */
+/* 用户 2026-10-15：里程碑名字任何时候都完整显示、不伸出图表；最右侧名字放不下时给时间轴右侧留白后重画 */
 function renderChart(){
+  /* 先给右侧留白；节点太密、名字连成一串仍放不下时，再加大倾角（行高随之自动抬高） */
+  var pad = 0, ang = 10, over = _renderChart(0, 10);
+  for(var k = 0; k < 2 && over > 0.5; k++){ pad += Math.ceil(over) + 2; over = _renderChart(pad, ang); }
+  while(over > 0.5 && ang < 75){ ang = Math.min(75, ang + 10); over = _renderChart(pad, ang); }
+}
+function _renderChart(_padR, _minAng){
+  _padR = _padR || 0; _minAng = _minAng || 10;
   var chart = $('chart'), empty = $('emptyHint');
   var wrap = chart.parentElement;
   var ms = nodes().map(function(n){
@@ -1390,8 +1398,8 @@ function renderChart(){
   var GUT = Math.min(340, Math.max(wrapW < 560 ? 108 : 150, Math.ceil(_gutMax) + 28));
   window._autoGut = GUT;
   if(state.gutW > 0) GUT = Math.round(Math.max(60, Math.min(800, state.gutW)));
-  var pxDay = Math.max((wrapW - GUT - 24) / totalDays, 0.6);
-  var W = Math.ceil(GUT + 24 + totalDays * pxDay);
+  var pxDay = Math.max((wrapW - GUT - 24 - _padR) / totalDays, 0.6);
+  var W = Math.ceil(GUT + 24 + _padR + totalDays * pxDay), _labOver = 0;
   function X(d){ return GUT + diffDays(min, d) * pxDay; }
 
   var showPH = state.showPhase !== false;
@@ -1405,15 +1413,16 @@ function renderChart(){
   var AXIS_H = 44, PH_Y = 44, PH_H = showPH ? 48 : 0, MS_Y = PH_Y + PH_H, MS_H = Math.round(Math.max(72, Math.min(170, _labH + 58)));
   window._autoMsH = MS_H;
   if(state.msRowH > 0){ MS_H = Math.round(Math.max(40, Math.min(400, state.msRowH))); MS_Y = PH_Y + PH_H; }
-  /* 用户 2026-10-15：手动调里程碑行高时，标签倾角随行高自动变化；任何情况下标签都不伸进顶部年份/月份刻度 */
-  var _rad = function(a){ return a * Math.PI / 180; }, _labTop = MS_H - 52, MS_LABMAX = 1e9;
-  if(state.msRowH > 0 && _msMaxW > 0){
-    /* 取能放下最长名字的最陡角度：高度 = 宽·sinθ + 字高·cosθ */
-    var _a = 10; for(var _t = 75; _t >= 10; _t--){ if(_msMaxW * Math.sin(_rad(_t)) + 9 * Math.cos(_rad(_t)) <= _labTop){ _a = _t; break; } }
-    MS_ANG = _a; /* 行太矮时保持 10°，过长的名字截断加「…」 */
+  /* 用户 2026-10-15：标签倾角随行高自动变化（10°–75°）；名字永远完整显示，不伸进顶部年份/月份——行高不够放下全名时，行高自动抬到最低所需值 */
+  var _rad = function(a){ return a * Math.PI / 180; }, _labH2 = function(a){ return _msMaxW * Math.sin(_rad(a)) + 9 * Math.cos(_rad(a)); };
+  if(_msMaxW > 0){
+    var _needMin = Math.ceil(_labH2(_minAng)) + 52;
+    if(MS_H < _needMin) MS_H = _needMin;
+    var _a = _minAng; for(var _t = 75; _t >= _minAng; _t--){ if(_labH2(_t) <= MS_H - 52){ _a = _t; break; } }
+    MS_ANG = state.msRowH > 0 ? _a : Math.max(_minAng, Math.min(MS_ANG, _a));
     MS_NEED = Math.ceil(12 / Math.sin(_rad(MS_ANG)));
   }
-  MS_LABMAX = Math.max(14, (_labTop - 9 * Math.cos(_rad(MS_ANG))) / Math.sin(_rad(MS_ANG)));
+  var _labTop = MS_H - 52;
   var CM_Y = MS_Y + MS_H, CM_H = 58;
   var TK_Y = CM_Y + cmLanes.length * CM_H, TK_H = 36;
   var H = TK_Y + laneTasks.length * TK_H + 10;
@@ -1540,12 +1549,13 @@ function renderChart(){
     if(_lw * Math.cos(_rad(_ang)) > _room){
       for(var _t2 = _ang; _t2 <= 80; _t2++){ _ang = _t2; if(_lw * Math.cos(_rad(_t2)) <= _room || _lw * Math.sin(_rad(_t2 + 1)) + 9 * Math.cos(_rad(_t2 + 1)) > _vmax) break; }
     }
-    var _lmax = Math.min((_ang === MS_ANG ? MS_LABMAX : Math.max(14, (_vmax - 9 * Math.cos(_rad(_ang))) / Math.sin(_rad(_ang)))), Math.max(14, _room / Math.cos(_rad(_ang))));
+    if(_lw * Math.sin(_rad(_ang)) + 9 * Math.cos(_rad(_ang)) > _vmax) _ang = Math.max(MS_ANG, _ang - 1);
+    _labOver = Math.max(_labOver, _lw * Math.cos(_rad(_ang)) + 9 * Math.sin(_rad(_ang)) - _room);
     s += '<g data-mnode="' + esc(m.name) + '"><title>' + esc(label + '\n' + fmtD(m.d)) + '</title>'
       + '<rect x="' + (cx-r).toFixed(1) + '" y="' + (msCY-r).toFixed(1) + '" width="' + (r*2) + '" height="' + (r*2)
       + '" transform="rotate(45 ' + cx.toFixed(1) + ' ' + msCY + ')" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"/>'
       + ((msLabelLane[idx] || msLabelDx[idx] > 4) ? '<line x1="' + cx.toFixed(1) + '" y1="' + (msCY-9) + '" x2="' + (lx+2).toFixed(1) + '" y2="' + (ly+2) + '" stroke="#6b7280" stroke-width="0.8"/>' : '')
-      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-' + _ang + ' ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="start" class="mlabel">' + esc(_room < 16 ? '' : fitLab(_lab, _lmax)) + '</text>'
+      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-' + _ang + ' ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="start" class="mlabel">' + esc(_lab) + '</text>'
       + '<text x="' + cx.toFixed(1) + '" y="' + (msCY+21+(msDateRow[idx]?11:0)) + '" text-anchor="middle" fill="#1f2937" font-size="10">' + (m.d.getMonth()+1) + '/' + m.d.getDate() + '</text>'
       + '</g>';
   });
@@ -1621,6 +1631,7 @@ function renderChart(){
   window._curGut = GUT; window._curMsH = MS_H; window._chartMap = { min:min, pxDay:pxDay };
   chart.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" data-cm-y="' + CM_Y + '" data-cm-h="' + CM_H + '" data-cm-n="' + cmLanes.length + '">' + s + '</svg>';
   if(window.syncSizeInputs) syncSizeInputs();
+  return _labOver;
 }
 
 /* ---------- 右侧：客户节点说明表（甘特图下方） ---------- */
