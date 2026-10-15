@@ -598,7 +598,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">2026-10-12b</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.1.0</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -7766,7 +7766,7 @@ document.addEventListener("keydown", function(e){
     function close(){ bg.remove(); }
     q(".st-x").onclick = close; q(".st-c").onclick = close;
     q(".st-n").onclick = function(){ close(); if(window.__v4NewProj) window.__v4NewProj(); };
-    q(".st-i").onclick = function(){ close(); try{ if(window.__v4Ribbon && window.__v4Ribbon.show) window.__v4Ribbon.show("file"); }catch(e){} setTimeout(function(){ var b = document.querySelector("#ddImp .dd-b"); if(b) b.click(); }, 50); };
+    q(".st-i").onclick = function(){ close(); try{ if(window.__v4Ribbon && window.__v4Ribbon.show) window.__v4Ribbon.show("file"); }catch(e){} setTimeout(function(){ var r = document.querySelector('.rb-tab[data-tab="file"]'); if(r) r.click(); var b = document.querySelector(".rb-pane #ddImp .dd-b, .rb-pane .dd-b"); if(b) b.click(); }, 50); };
     bg.addEventListener("keydown", function(e){ if(e.key === "Escape" || e.key === "Enter"){ e.stopPropagation(); close(); } });
     setTimeout(function(){ q(".st-c").focus(); }, 0);
   }
@@ -7803,8 +7803,118 @@ document.addEventListener("keydown", function(e){
 })();
 if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
+/* ===== 功能区 1.1 重排（用户 2026-10-15）：任务页减负、文件/格式/项目页平铺常用功能、视图页去重；可在「文件 › 帮助」切回旧版布局 ===== */
+(function(){
+  var TX = {
+    zh:{ gProjF:"项目", nw:"新建", op:"打开", sv:"保存", more:"更多 ▾", gImp:"导入", gExp:"导出", gPrint:"打印", gHelp:"帮助", classic:"旧版功能区", modern:"新版功能区", classicTip:"切换回 1.0 版功能区布局（随时可切回）",
+      gIns:"插入", gSched:"日程", gPlan:"计划", gProp:"属性", gFont:"字体", gTxt:"格式", gCols:"列", gShow:"显示", gCal:"属性", gLevel:"排程", gBase:"基线", gRV:"视图", gRS:"显示", gRep:"报表与分析",
+      gViews:"任务视图", gData:"数据", gZoom:"缩放", gPane:"显示", other:"其他视图…", ot:"按日程", inact:"停用", tl:"日程表", fill:"填充", link:"链接", unlink:"取消链接" },
+    en:{ gProjF:"Project", nw:"New", op:"Open", sv:"Save", more:"More ▾", gImp:"Import", gExp:"Export", gPrint:"Print", gHelp:"Help", classic:"Classic ribbon", modern:"New ribbon", classicTip:"Switch back to the 1.0 ribbon layout (switch again anytime)",
+      gIns:"Insert", gSched:"Schedule", gPlan:"Tasks", gProp:"Properties", gFont:"Font", gTxt:"Format", gCols:"Columns", gShow:"Show/Hide", gCal:"Properties", gLevel:"Scheduling", gBase:"Baseline", gRV:"Views", gRS:"Show", gRep:"Reports & analysis",
+      gViews:"Task views", gData:"Data", gZoom:"Zoom", gPane:"Show", other:"Other views…", ot:"On track", inact:"Inactivate", tl:"Timeline", fill:"Fill", link:"Link", unlink:"Unlink" },
+    de:{ gProjF:"Projekt", nw:"Neu", op:"Öffnen", sv:"Speichern", more:"Mehr ▾", gImp:"Import", gExp:"Export", gPrint:"Drucken", gHelp:"Hilfe", classic:"Klassisch", modern:"Neues Menüband", classicTip:"Zum Menüband-Layout 1.0 zurückwechseln (jederzeit umkehrbar)",
+      gIns:"Einfügen", gSched:"Terminplan", gPlan:"Vorgänge", gProp:"Eigenschaften", gFont:"Schriftart", gTxt:"Format", gCols:"Spalten", gShow:"Anzeigen", gCal:"Eigenschaften", gLevel:"Planung", gBase:"Basisplan", gRV:"Ansichten", gRS:"Anzeigen", gRep:"Berichte & Analyse",
+      gViews:"Vorgangsansichten", gData:"Daten", gZoom:"Zoom", gPane:"Anzeigen", other:"Weitere Ansichten…", ot:"Planmäßig", inact:"Inaktiv", tl:"Zeitachse", fill:"Füllen", link:"Verknüpfen", unlink:"Lösen" } };
+  function L(k){ var lg = lang; var t = TX[lg] || TX.zh; return t[k] != null ? t[k] : TX.zh[k]; }
+  var CK = "pp-ribbon-classic";
+  function classic(){ try { return localStorage.getItem(CK) === "1"; } catch(e){ return false; } }
+  function $(s){ return document.querySelector(s); }
+  function byId(id){ return document.getElementById(id); }
+  function lab(id){ var e = byId(id); return e && e.closest("label"); }
+  function btn(txt, fn, title){ var b = document.createElement("button"); b.type = "button"; b.textContent = txt; if(title) b.title = title; b.onclick = fn; return b; }
+  function clickId(id){ return function(){ var e = byId(id); if(e) e.click(); }; }
+  function addTxt(el, t){ if(!el || el.querySelector(".rb-t")) return; var s = document.createElement("span"); s.className = "rb-t"; s.textContent = t; el.appendChild(s); }
+  function moreDd(items){ var d = document.createElement("div"), b = document.createElement("button"), m = document.createElement("div"); d.className = "dd"; b.className = "dd-b"; b.type = "button"; b.textContent = L("more"); m.className = "dd-m";
+    items.forEach(function(x){ if(x) m.appendChild(x); }); d.appendChild(b); d.appendChild(m); return m.children.length ? d : null; }
+  function toggleBtn(){ var c = classic(); var b = btn(c ? L("modern") : L("classic"), function(){ try { localStorage.setItem(CK, c ? "0" : "1"); } catch(e){} location.reload(); }, c ? "" : L("classicTip")); b.id = "btnRbClassic"; return b; }
+  function run(){
+    var tb = $(".toolbar.ribbon"); if(!tb || tb.dataset.rb11) return; tb.dataset.rb11 = "1";
+    var stash = tb.querySelector(".rb-stash");
+    var panes = {}; tb.querySelectorAll(".rb-pane").forEach(function(p){ panes[p.dataset.tab] = p; });
+    var placed = [];
+    function G(tab, key, els, cls){ var p = panes[tab]; if(!p) return; var grp = document.createElement("div"), box = document.createElement("div"), lb = document.createElement("div"); grp.className = "rb-grp"; box.className = "rb-box" + (cls ? " " + cls : ""); lb.className = "rb-lab"; lb.textContent = L(key);
+      els.forEach(function(e){ if(Array.isArray(e)){ var r = document.createElement("div"); r.className = "rb-row"; e.forEach(function(x){ if(!x) return; placed.push(x); r.appendChild(x); }); if(r.children.length) box.appendChild(r); return; } if(!e) return; placed.push(e); box.appendChild(e); }); if(!box.children.length) return; grp.appendChild(box); grp.appendChild(lb); p.appendChild(grp); }
+    if(classic()){ G("file", "gHelp", [toggleBtn()]); return; }
+    tb.classList.add("rb11");
+    var orig = []; tb.querySelectorAll(".rb-pane").forEach(function(p){ p.querySelectorAll(".rb-box > *").forEach(function(e){ orig.push([p.dataset.tab, e]); }); });
+    var m2 = byId("msp2Bar"), msp = byId("mspView");
+    var q2 = function(c){ return m2 ? m2.querySelector(c) : null; };
+    var pct = $(".rb-pane .ms-pct"), lk = $(".rb-pane .ms-link"), ulk = $(".rb-pane .ms-unlink");
+    var ot = q2(".m2-ot"), mv = q2(".m2-mv"), ina = q2(".m2-in"), tlb = q2(".m2-tl"), fill = q2(".m3-fill");
+    addTxt(lk, L("link")); addTxt(ulk, L("unlink")); addTxt(ot, L("ot")); addTxt(ina, L("inact")); addTxt(tlb, L("tl")); addTxt(fill, L("fill"));
+    var keep = [byId("ddImp"), byId("ddExp"), byId("ddShow"), byId("ddSched"), byId("ddBase"), byId("ddFlt"), m2];
+    var pb = byId("paneBtns"), other = null;
+    if(pb){ other = document.createElement("select"); other.className = "rb-other"; other.title = L("other");
+      var o0 = document.createElement("option"); o0.value = ""; o0.textContent = L("other"); other.appendChild(o0);
+      pb.querySelectorAll("button[data-pane]").forEach(function(b){ if(/^(gantt|cal|net)$/.test(b.dataset.pane)) return; b.classList.add("rb-hide"); var o = document.createElement("option"); o.value = b.dataset.pane; o.textContent = b.textContent; other.appendChild(o); });
+      other.onchange = function(){ var b = pb.querySelector('[data-pane="' + this.value + '"]'); if(b) b.click(); this.value = ""; if(window.__v4Ribbon && window.__v4Ribbon.syncPx) setTimeout(window.__v4Ribbon.syncPx, 0); }; }
+    var zoom = ($('[data-view="fit"]') || {}).parentNode;
+    var pxs = {}; tb.querySelectorAll(".rb-px").forEach(function(b){ pxs[b.dataset.px] = b; });
+    var hl = byId("hlSel"), hlLab = hl && hl.previousElementSibling && hl.previousElementSibling.classList.contains("tb-lab") ? hl.previousElementSibling : null, hlWrap = null;
+    if(hl && hlLab && !hl.title) hl.title = hlLab.textContent; if(gbL){ var gs = gbL.querySelector("select"), gt = gbL.querySelector("span"); if(gs && gt) gs.title = gt.textContent; }
+    if(hl){ hlWrap = document.createElement("label"); hlWrap.className = "ck"; if(hlLab) hlWrap.appendChild(hlLab); hlWrap.appendChild(hl); }
+    var unitLab = byId("unitSel") && byId("unitSel").closest("label");
+    var baseRow = byId("baseSel") && byId("baseSel").parentNode;
+    var barLab = byId("selBarLbl") && byId("selBarLbl").closest("label");
+    var showLabs = Array.prototype.slice.call(document.querySelectorAll("#ddShow .dd-m > label.ck")), gbL = $("#ddShow .v4gb"), gi = showLabs.indexOf(gbL);
+    var late = gi >= 0 ? showLabs[gi + 1] : null, slack = gi >= 0 ? showLabs[gi + 2] : null, tline = gi >= 0 ? showLabs[gi + 3] : null;
+    var hold = document.createElement("div"); hold.style.display = "none"; tb.appendChild(hold); tb.querySelectorAll(".rb-pane").forEach(function(p){ while(p.firstChild) hold.appendChild(p.firstChild); });
+    G("file", "gProjF", [btn("＋ " + L("nw"), function(){ if(window.__v4NewProj) window.__v4NewProj(); }), btn(L("op"), clickId("btnImport")), btn(L("sv"), clickId("btnExport"))]);
+    G("file", "gImp", [byId("btnMPP"), byId("btnImpXML"), moreDd([byId("btnImport"), byId("btnSubProj"), byId("btnImpGan"), byId("btnImpCsv")])]);
+    G("file", "gExp", [byId("btnPDF"), byId("btnJPG"), byId("btnXls"), moreDd([byId("btnExpInfo"), byId("btnExport"), byId("btnCSV"), byId("btnExpXML"), byId("btnExpGan")])]);
+    G("file", "gPrint", [byId("btnPreview")]);
+    G("file", "gHelp", [byId("btnKeys"), toggleBtn()]);
+    G("task", "gIns", [[byId("btnAdd"), byId("btnAddGroup"), byId("btnAddMs")], [byId("btnOemMs"), byId("btnDelSel")]], "rb-rows");
+    G("task", "gSched", [[pct, byId("btnOutdent"), byId("btnIndent")], [lk, ulk]], "rb-rows");
+    G("task", "gPlan", [[byId("modeBtns")], [ot, ina, mv]], "rb-rows");
+    G("task", "gProp", [[byId("btnNote"), byId("btnLink")], [tlb, fill]], "rb-rows");
+    G("fmt", "gFont", [byId("fmtBar")]);
+    G("fmt", "gTxt", [byId("btnTxtStyle"), byId("btnColors"), barLab]);
+    G("fmt", "gCols", [byId("btnCols")]);
+    G("fmt", "gShow", [lab("ckPhase"), lab("ckCrit"), lab("ckProgLine"), lab("ckOnum"), lab("ckPsum"), late, slack], "rb-cks");
+    G("proj", "gCal", [byId("btnCal"), unitLab]);
+    G("proj", "gLevel", [byId("btnLevel"), byId("btnUnlevel"), byId("btnRecur")]);
+    G("proj", "gBase", [baseRow, lab("ckBaseline")]);
+    G("res", "gRV", [pxs.res, pxs.use, pxs.tuse, pxs.hist]);
+    G("res", "gRS", [lab("ckResWarn")]);
+    G("rep", "gRep", [pxs.rep, pxs.evm, pxs.wbs, pxs.net]);
+    G("view", "gViews", [[pb, other], [tline, lab("v4FormCk")]], "rb-rows");
+    G("view", "gData", [[byId("fltTxt"), byId("fltSel"), byId("sortSel")], [hlWrap, gbL, msp]], "rb-rows");
+    G("view", "gZoom", [zoom]);
+    /* 兜底：没被重新放置的元素放回原页签末尾，保证不丢功能 */
+    var left = {}; orig.forEach(function(x){ var e = x[1]; if(placed.indexOf(e) >= 0 || keep.indexOf(e) >= 0 || e === hlLab || e === hl) return; (left[x[0]] = left[x[0]] || []).push(e); });
+    Object.keys(left).forEach(function(t){ G(t, "gHelp", left[t]); });
+    keep.forEach(function(e){ if(e && stash) stash.appendChild(e); });
+    var os = byId("oemSelect"); if(os && stash) stash.appendChild(os);
+    hold.remove(); window.__rb11Left = left;
+  }
+  window.__rb11 = run;
+  window.addEventListener("load", function(){ setTimeout(run, 0); });
+})();
 })();
 
 </script>
+<style id="rb11Css">
+.ribbon.rb11 .rb-box.rb-cks{display:grid;grid-template-rows:repeat(2,auto);grid-auto-flow:column;gap:2px 12px;align-items:center}
+.ribbon.rb11 .rb-box .ck{font-size:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.ribbon.rb11 #paneBtns .rb-hide{display:none}
+.ribbon.rb11 .rb-t{margin-left:3px}
+.ribbon.rb11 .rb-box .dd{position:relative}
+.ribbon.rb11 .rb-box #mspView{display:inline-flex;gap:4px;align-items:center}
+.ribbon.rb11 .rb-box.rb-g2{display:grid;grid-template-rows:repeat(2,auto);grid-auto-flow:column;gap:3px 5px;align-items:center;justify-items:start}
+.ribbon.rb11 .rb-box.rb-rows{flex-direction:column;align-items:flex-start;gap:3px}
+.ribbon.rb11 .rb-rows>.rb-row{display:flex;gap:5px;align-items:center}
+.ribbon.rb11 .rb-rows>.rb-row>button,.ribbon.rb11 .rb-rows>.rb-row>span>button,.ribbon.rb11 .rb-rows>.rb-row>div>button{height:24px!important;padding:3px 9px!important}
+.ribbon.rb11 .rb-rows select,.ribbon.rb11 .rb-rows input{height:24px!important}
+.ribbon.rb11 .rb-rows .ms-pct button{height:24px!important}
+.ribbon.rb11 .rb-rows .tb-lab,.ribbon.rb11 .rb-rows .v4gb>span{display:none}
+.ribbon.rb11 .rb-rows select{max-width:150px}
+.ribbon.rb11 .rb-rows .rb-t{display:inline!important}
+.ribbon.rb11 .rb-pane.on{min-height:77px}
+.ribbon.rb11 .rb-box.rb-g2>button{height:24px!important;padding:3px 9px!important}
+.ribbon.rb11 .rb-box.rb-g2 select,.ribbon.rb11 .rb-box.rb-g2 input{height:24px!important}
+.ribbon.rb11 .ms-pct button{padding:4px 7px!important;min-width:0}
+@media (max-width:1600px){.ribbon.rb11 .rb-t{display:none}}
+</style>
 </body>
 </html>
