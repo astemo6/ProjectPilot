@@ -88,8 +88,6 @@ svg text{font-size:11px;fill:#4b5563}
 .cm-head input[type=text]{flex:1;min-width:0;margin-bottom:0}
 .cm-dates{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .cm-date{display:flex;align-items:center;gap:2px}
-.cmd-drag{cursor:grab;user-select:none;-webkit-user-select:none;color:#9ca3af;font-size:13px;letter-spacing:-2px;padding:0 3px 0 0;flex:none}
-.cm-date.drop-before{box-shadow:0 -2px 0 #0a84ff}.cm-date.drop-after{box-shadow:0 2px 0 #0a84ff}.cm-date.dragging{opacity:.4}
 .cm-date input{margin-bottom:0;padding:5px 6px;font-size:12.5px}
 .cmnd{width:84px}
 .cmx{border:none;background:#f3f4f6;border-radius:50%;width:20px;height:20px;cursor:pointer;color:#6b7280;font-size:12px;line-height:1;padding:0}
@@ -909,7 +907,7 @@ function renderCustomMs(){
   var lanes = state.customMs || [];
   var html = lanes.map(function(l, i){
     var dates = (l.dates || []).map(function(x, j){
-      return '<span class="cm-date" data-i="' + i + '" data-j="' + j + '"><span class="cmd-drag" draggable="true" data-i="' + i + '" data-j="' + j + '" title="' + esc(tr('dragTip')) + '">⋮⋮</span><input type="text" class="cmd date" placeholder="YYYY-MM-DD" inputmode="numeric" data-i="' + i + '" data-j="' + j + '" value="' + esc(cmDate(x)) + '">'
+      return '<span class="cm-date" data-i="' + i + '" data-j="' + j + '"><input type="text" class="cmd date" placeholder="YYYY-MM-DD" inputmode="numeric" data-i="' + i + '" data-j="' + j + '" value="' + esc(cmDate(x)) + '">'
         + '<input type="text" class="cmnd" data-i="' + i + '" data-j="' + j + '" value="' + esc(cmName(x)) + '" placeholder="' + esc(tr('cmDateNamePh')) + '">'
         + '<button class="cmx" data-i="' + i + '" data-j="' + j + '">×</button></span>';
     }).join('');
@@ -1029,7 +1027,6 @@ function renderCustomMs(){
     (function(laneEl){
       laneEl.addEventListener('dragover', function(e){
         e.preventDefault();
-        if(window._cmDateDrag) return;
         if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
         laneEl.classList.add('drop-target');
       });
@@ -1037,7 +1034,6 @@ function renderCustomMs(){
       laneEl.addEventListener('drop', function(e){
         e.preventDefault();
         laneEl.classList.remove('drop-target');
-        if(window._cmDateDrag) return; /* 节点行拖动由下方处理 */
         var from = +(e.dataTransfer ? e.dataTransfer.getData('text/plain') : '');
         var to = +laneEl.getAttribute('data-i');
         if(!isNaN(from) && from !== to && from >= 0 && to >= 0 && from < state.customMs.length && to < state.customMs.length){
@@ -1065,36 +1061,6 @@ function renderCustomMs(){
       for(var ti = 0; ti < ts.length; ti++) ts[ti].classList.remove('drop-target');
     });
   }
-  /* 节点行手动调整顺序：拖动每行左侧 ⋮⋮（同一节点排内） */
-  Array.prototype.forEach.call(list.querySelectorAll('.cmd-drag'), function(h){
-    h.addEventListener('dragstart', function(e){
-      e.stopPropagation();
-      window._cmDateDrag = { i:+h.dataset.i, j:+h.dataset.j };
-      if(e.dataTransfer){ e.dataTransfer.setData('text/plain', 'cmdate'); e.dataTransfer.effectAllowed = 'move'; }
-      h.parentNode.classList.add('dragging');
-    });
-    h.addEventListener('dragend', function(){
-      window._cmDateDrag = null;
-      Array.prototype.forEach.call(list.querySelectorAll('.cm-date'), function(r){ r.classList.remove('dragging', 'drop-before', 'drop-after'); });
-    });
-  });
-  Array.prototype.forEach.call(list.querySelectorAll('.cm-date'), function(row){
-    function after(e){ var r = row.getBoundingClientRect(); return e.clientY > r.top + r.height / 2; }
-    row.addEventListener('dragover', function(e){
-      var g = window._cmDateDrag; if(!g || g.i !== +row.dataset.i) return;
-      e.preventDefault(); e.stopPropagation();
-      var a = after(e); row.classList.toggle('drop-after', a); row.classList.toggle('drop-before', !a);
-    });
-    row.addEventListener('dragleave', function(){ row.classList.remove('drop-before', 'drop-after'); });
-    row.addEventListener('drop', function(e){
-      var g = window._cmDateDrag; if(!g || g.i !== +row.dataset.i) return;
-      e.preventDefault(); e.stopPropagation();
-      var arr = state.customMs[g.i].dates, to = +row.dataset.j + (after(e) ? 1 : 0);
-      var it = arr.splice(g.j, 1)[0]; if(g.j < to) to--;
-      arr.splice(to, 0, it); window._cmDateDrag = null;
-      save(); renderAll();
-    });
-  });
   var gos = list.querySelectorAll('.cggo');
   for(var f = 0; f < gos.length; f++){
     gos[f].addEventListener('click', function(){
