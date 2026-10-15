@@ -598,7 +598,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.1.0</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.0</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -4021,10 +4021,26 @@ function exportCSV(){
 var XLS_DAY_LIMIT = 180; /* 甘特跨度超过该天数自动切换为按周显示 */
 function xlsHeadKey(k){ return k === "id" ? "ID" : ({name:"cName",owner:"cOwner",dur:"cDur",start:"cStart",end:"cEnd",pred:"cPred",cons:"cCons",float:"floatCol"})[k]; }
 function exportXLS(){
-  var vis = visibleTasks();
-  /* 甘特日期范围：所有任务起止的最小/最大日期 */
+  /* 导出真正的 .xlsx：甘特色块用「条件格式」实现，在 Excel 里改开始/结束日期后色块自动跟着变 */
+  var vis = visibleTasks(), all = flatTasks();
+  /* 分组的起止 = 子任务（任意层级）的最小开始/最大结束 */
+  var gSpan = {};
+  function spanOf(gid){
+    if(gSpan[gid]) return gSpan[gid];
+    var mn = null, mx = null;
+    all.forEach(function(x){
+      if((x.group || "") !== gid) return;
+      var s, e;
+      if(x.type === "group"){ var sp = spanOf(x.id); s = sp.s; e = sp.e; }
+      else { s = parseD(x.start); e = parseD(taskEnd(x)); }
+      if(s && (!mn || s < mn)) mn = s;
+      if(e && (!mx || e > mx)) mx = e;
+    });
+    return (gSpan[gid] = { s:mn, e:mx });
+  }
   var min = null, max = null;
-  flatTasks().forEach(function(t){
+  all.forEach(function(t){
+    if(t.type === "group") return;
     var s = parseD(t.start), e = parseD(taskEnd(t));
     if(s && (!min || s < min)) min = s;
     if(e && (!max || e > max)) max = e;
@@ -4032,75 +4048,148 @@ function exportXLS(){
   if(!min){ min = new Date(); min.setHours(0,0,0,0); }
   if(!max) max = addDays(min, 30);
   var weekly = diffDays(min, max) + 1 > XLS_DAY_LIMIT;
-  /* 任务信息列：ID/任务名称常显，其余仅取 state.colVis 中可见的列 */
+  /* 信息列：ID/名称常显；开始/结束必出（条件格式依赖它们）；其余随可见列 */
   var infoKeys = ["id","name","owner","dur","start","end","pred","cons","float"];
-  var keys = infoKeys.filter(function(k){ return colVis(k); });
-  /* 甘特列：按天展开；跨度超限则按周（一周一列，任务覆盖该周即着色） */
+  var keys = infoKeys.filter(function(k){ return k === "id" || k === "name" || k === "start" || k === "end" || colVis(k); });
   var cols = [], c = new Date(min);
-  if(weekly) c.setDate(c.getDate() - ((c.getDay() + 6) % 7)); /* 对齐到周一 */
-  while(c <= max){ cols.push(new Date(c)); c = addDays(c, weekly ? 7 : 1); }
-  function md(d){ return (d.getMonth() + 1) + "/" + d.getDate(); }
-  var L = [];
-  L.push('<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">');
-  L.push('<head><meta charset="UTF-8">');
-  L.push('<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>' + esc(planProjectName().slice(0, 31)) + '</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->');
-  L.push('<style>');
-  L.push('table{border-collapse:collapse}');
-  L.push('td{border:1px solid #9ca3af;padding:1px 4px;font-size:10pt;white-space:nowrap;mso-number-format:"\\@"}');
-  L.push('.ttl{font-size:14pt;font-weight:bold;text-align:center;background:#1e3a52;color:#ffffff}');
-  L.push('.hd{font-weight:bold;text-align:center;background:#1e3a52;color:#ffffff}');
-  L.push('.hdg{font-weight:bold;text-align:center;background:#e8eef5;color:#1e3a52}');
-  L.push('.grp{background:#e8eef5;font-weight:bold}');
-  L.push('.bar{background:#2563eb;font-weight:bold}');
-  L.push('.ms{background:#dc2626;font-weight:bold}');
-  L.push('.c{text-align:center}');
-  L.push('</style></head><body><table>');
-  /* 第一行：项目标题；第二行：列头（信息列 + 日期 M/D） */
-  L.push('<tr><td class="ttl" colspan="' + (keys.length + cols.length) + '">' + esc(planProjectName()) + '</td></tr>');
-  var h = keys.map(function(k){
-    var center = k !== "name" && k !== "owner";
-    return '<td class="hd' + (center ? ' c' : '') + '">' + esc(tr(xlsHeadKey(k))) + '</td>';
-  });
-  cols.forEach(function(d){ h.push('<td class="hdg c">' + esc(md(d)) + '</td>'); });
-  L.push('<tr>' + h.join("") + '</tr>');
-  /* 数据行：任务起止区间内的日期单元格填充任务条颜色（里程碑日红色），其余留白 */
-  vis.forEach(function(t){
-    var isG = t.type === "group", isMs = t.type === "milestone";
-    var s = isG ? null : parseD(t.start), e = isG ? null : parseD(taskEnd(t));
-    var r = keys.map(function(k){
-      var v = "", center = true;
-      if(k === "id") v = isG ? "" : rowNo(t.id);
-      else if(k === "name"){
-        v = isG ? (state.collapsed[t.id] ? "▶ " : "▼ ") + t.name : (isMs ? "◆ " : "") + t.name;
-        center = false;
+  if(weekly) c.setDate(c.getDate() - ((c.getDay() + 6) % 7));
+  /* 多留一段空白列，方便在 Excel 里把任务往后延 */
+  var tail = weekly ? addDays(max, 28) : addDays(max, 14);
+  while(c <= tail){ cols.push(new Date(c)); c = addDays(c, weekly ? 7 : 1); }
+  function colL(n){ var s = ""; n++; while(n > 0){ var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+  function serial(d){ return Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 864e5); }
+  function x(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ""); }
+  function sc(ref, v, st){ return v === "" || v == null ? '<c r="' + ref + '" s="' + st + '"/>' : '<c r="' + ref + '" s="' + st + '" t="inlineStr"><is><t xml:space="preserve">' + x(v) + '</t></is></c>'; }
+  function nc(ref, v, st){ return '<c r="' + ref + '" s="' + st + '"><v>' + v + '</v></c>'; }
+  /* 列布局：A = 隐藏的类型列（G/T/M），随后信息列，再后甘特列 */
+  var ci = { type:0 }; keys.forEach(function(k, i){ ci[k] = i + 1; });
+  var g0 = keys.length + 1, nCols = g0 + cols.length, last = colL(nCols - 1);
+  var S = colL(ci.start), E = colL(ci.end), G0 = colL(g0);
+  var firstRow = 3, lastRow = Math.max(firstRow, firstRow + vis.length - 1);
+  var rows = [];
+  rows.push('<row r="1" ht="24" customHeight="1">' + sc("A1", "", 5) + sc("B1", planProjectName(), 5) + '</row>');
+  var h = [sc("A2", "Type", 3)];
+  keys.forEach(function(k){ h.push(sc(colL(ci[k]) + "2", tr(xlsHeadKey(k)), 3)); });
+  cols.forEach(function(d, i){ h.push(nc(colL(g0 + i) + "2", serial(d), 4)); });
+  rows.push('<row r="2" ht="36" customHeight="1">' + h.join("") + '</row>');
+  /* 分组在可见行中紧随其后的后代行数（折叠则为 0） */
+  function under(t, gid){ var g = t.group || "", n = 0; while(g && n++ < 50){ if(g === gid) return true; var p = all.filter(function(y){ return y.id === g; })[0]; g = p ? (p.group || "") : ""; } return false; }
+  var kidN = {};
+  function kidRows(ri){
+    if(kidN[ri] !== undefined) return kidN[ri];
+    var gid = vis[ri].id, n = 0;
+    while(ri + n + 1 < vis.length && under(vis[ri + n + 1], gid)) n++;
+    return (kidN[ri] = n);
+  }
+  vis.forEach(function(t, ri){
+    var r = firstRow + ri, isG = t.type === "group", isMs = t.type === "milestone";
+    var s, e;
+    if(isG){ var sp = spanOf(t.id); s = sp.s; e = sp.e; }
+    else { s = parseD(t.start); e = parseD(taskEnd(t)); }
+    var cells = [sc("A" + r, isG ? "G" : (isMs ? "M" : "T"), 1)];
+    keys.forEach(function(k){
+      var ref = colL(ci[k]) + r, txt = isG ? 7 : 1, cen = isG ? 8 : 2, dt = isG ? 9 : 6;
+      if(k === "id") cells.push(sc(ref, isG ? "" : rowNo(t.id), cen));
+      else if(k === "name") cells.push(sc(ref, isG ? (state.collapsed[t.id] ? "▶ " : "▼ ") + t.name : (isMs ? "◆ " : "") + t.name, txt));
+      else if(k === "owner") cells.push(sc(ref, isG ? "" : (t.owner || ""), txt));
+      else if(k === "dur"){
+        if(isG) cells.push(sc(ref, "", cen));
+        else if(isMs) cells.push(nc(ref, 0, cen));
+        else if(t.dur == null) cells.push(sc(ref, "", cen));
+        else cells.push(nc(ref, +t.dur, cen));
       }
-      else if(k === "owner") v = isG ? "" : (t.owner || "");
-      else if(k === "dur") v = isG ? "" : (isMs ? "◆" : (t.dur == null ? "" : String(t.dur)));
-      else if(k === "start") v = t.start || "";
-      else if(k === "end") v = isG ? "" : taskEnd(t);
-      else if(k === "pred") v = isG ? "" : depsToText(t.deps);
-      else if(k === "cons") v = isG ? "" : (t.manual ? tr("manualSched") : tr("cons" + (t.cons || "ASAP")) + (consNeedsDate(t.cons) && t.consDate ? " " + t.consDate : ""));
-      else if(k === "float") v = isG ? "" : (floatMap[t.id] === undefined ? "—" : String(floatMap[t.id]));
-      return '<td class="' + (center ? 'c ' : '') + (isG ? 'grp' : '') + '">' + esc(v) + '</td>';
-    });
-    cols.forEach(function(d){
-      var hit = false, red = false;
-      if(s && e){
-        if(weekly){
-          var we = addDays(d, 6);
-          hit = s <= we && e >= d;          /* 任务覆盖该周即着色 */
-          red = isMs && s >= d && s <= we;  /* 里程碑落在该周 */
-        } else {
-          hit = s <= d && e >= d;
-          red = isMs && fmtD(s) === fmtD(d);/* 里程碑日单元格红色 */
-        }
+      else if((k === "start" || k === "end") && isG && kidRows(ri)){
+        /* 分组起止写成公式，改子任务日期后分组条也跟着变 */
+        var kr = kidRows(ri), col = colL(ci[k]), v = k === "start" ? s : e, rg = col + (r + 1) + ':' + col + (r + kr);
+        cells.push('<c r="' + ref + '" s="' + dt + '"><f>' + x('IF(COUNT(' + rg + ')=0,"",' + (k === "start" ? "MIN" : "MAX") + '(' + rg + '))') + '</f>' + (v ? '<v>' + serial(v) + '</v>' : '') + '</c>');
       }
-      r.push(red ? '<td class="ms">&nbsp;</td>' : (hit ? '<td class="bar">&nbsp;</td>' : '<td>&nbsp;</td>'));
+      else if(k === "start") cells.push(s ? nc(ref, serial(s), dt) : sc(ref, "", dt));
+      else if(k === "end") cells.push(e ? nc(ref, serial(e), dt) : sc(ref, "", dt));
+      else if(k === "pred") cells.push(sc(ref, isG ? "" : depsToText(t.deps), cen));
+      else if(k === "cons") cells.push(sc(ref, isG ? "" : (t.manual ? tr("manualSched") : tr("cons" + (t.cons || "ASAP")) + (consNeedsDate(t.cons) && t.consDate ? " " + t.consDate : "")), cen));
+      else if(k === "float") cells.push(sc(ref, isG ? "" : (floatMap[t.id] === undefined ? "—" : String(floatMap[t.id])), cen));
     });
-    L.push('<tr>' + r.join("") + '</tr>');
+    cols.forEach(function(d, i){ cells.push('<c r="' + colL(g0 + i) + r + '" s="1"/>'); });
+    rows.push('<row r="' + r + '">' + cells.join("") + '</row>');
   });
-  L.push('</table></body></html>');
-  dlURL(URL.createObjectURL(new Blob(["\ufeff" + L.join("\n")], { type:"application/vnd.ms-excel" })), exportFileBase() + ".xls");
+  /* 条件格式：以甘特区左上角 G0+firstRow 为相对基准 */
+  var a = G0 + "$2", k = weekly ? "+6" : "", rS = "$" + S + firstRow, rE = "$" + E + firstRow, rT = "$A" + firstRow;
+  function cf(f, dxf, pri, stop){ return '<cfRule type="expression" dxfId="' + dxf + '" priority="' + pri + '"' + (stop ? ' stopIfTrue="1"' : '') + '><formula>' + x(f) + '</formula></cfRule>'; }
+  var span = 'ISNUMBER(' + rS + '),ISNUMBER(' + rE + '),' + rS + '<=' + a + k + ',' + rE + '>=' + a;
+  var rules = cf('AND(' + rT + '="M",ISNUMBER(' + rS + '),' + rS + '>=' + a + ',' + rS + '<=' + a + k + ')', 0, 1, true)
+            + cf('AND(' + rT + '="G",' + span + ')', 1, 2, true)
+            + cf('AND(' + rT + '="T",' + span + ')', 2, 3, true)
+            + (weekly ? '' : cf('WEEKDAY(' + a + ',2)>5', 3, 4, false));
+  var widths = { id:5, name:38, owner:10, dur:7, start:11, end:11, pred:13, cons:14, float:6 };
+  var colXml = '<col min="1" max="1" width="4" hidden="1" customWidth="1"/>';
+  keys.forEach(function(kk){ colXml += '<col min="' + (ci[kk] + 1) + '" max="' + (ci[kk] + 1) + '" width="' + widths[kk] + '" customWidth="1"/>'; });
+  colXml += '<col min="' + (g0 + 1) + '" max="' + nCols + '" width="' + (weekly ? 5.5 : 4.2) + '" customWidth="1"/>';
+  var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+    + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+    + '<sheetViews><sheetView workbookViewId="0" zoomScale="100"><pane xSplit="' + g0 + '" ySplit="2" topLeftCell="' + G0 + '3" activePane="bottomRight" state="frozen"/></sheetView></sheetViews>'
+    + '<sheetFormatPr defaultRowHeight="16"/><cols>' + colXml + '</cols><sheetData>' + rows.join("") + '</sheetData>'
+    + '<mergeCells count="1"><mergeCell ref="B1:' + last + '1"/></mergeCells>'
+    + '<conditionalFormatting sqref="' + G0 + firstRow + ':' + last + lastRow + '">' + rules + '</conditionalFormatting>'
+    + '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'
+    + '<pageSetup orientation="landscape" paperSize="9"/></worksheet>';
+  var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+    + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    + '<numFmts count="2"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="m/d"/></numFmts>'
+    + '<fonts count="4"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FF1E3A52"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>'
+    + '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1E3A52"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF5"/></patternFill></fill></fills>'
+    + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC8CDD3"/></left><right style="thin"><color rgb="FFC8CDD3"/></right><top style="thin"><color rgb="FFC8CDD3"/></top><bottom style="thin"><color rgb="FFC8CDD3"/></bottom><diagonal/></border></borders>'
+    + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    + '<cellXfs count="10">'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
+    + '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="165" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" textRotation="90"/></xf>'
+    + '<xf numFmtId="0" fontId="3" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf>'
+    + '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
+    + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>'
+    + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
+    + '<xf numFmtId="164" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
+    + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+    + '<dxfs count="4">'
+    + '<dxf><fill><patternFill patternType="solid"><fgColor rgb="FFDC2626"/><bgColor rgb="FFDC2626"/></patternFill></fill></dxf>'
+    + '<dxf><fill><patternFill patternType="solid"><fgColor rgb="FF475569"/><bgColor rgb="FF475569"/></patternFill></fill></dxf>'
+    + '<dxf><fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor rgb="FF2563EB"/></patternFill></fill></dxf>'
+    + '<dxf><fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/><bgColor rgb="FFF1F5F9"/></patternFill></fill></dxf>'
+    + '</dxfs></styleSheet>';
+  var sheetName = x(planProjectName().replace(/[\[\]:*?\/\\]/g, "-").slice(0, 31) || "Plan");
+  var files = [
+    ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ["xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + sheetName + '" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+    ["xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ["xl/styles.xml", styles],
+    ["xl/worksheets/sheet1.xml", sheet]
+  ];
+  var blob = new Blob([zipStore(files)], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  dlURL(URL.createObjectURL(blob), exportFileBase() + ".xlsx");
+}
+/* 极简 ZIP（store，不压缩）：[[name, string]] → Uint8Array */
+function zipStore(files){
+  var T = zipStore.T;
+  if(!T){ T = zipStore.T = []; for(var n = 0; n < 256; n++){ var c = n; for(var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; } }
+  function crc(b){ var c = 0xFFFFFFFF; for(var i = 0; i < b.length; i++) c = T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  var enc = new TextEncoder(), parts = [], central = [], off = 0;
+  function u16(v){ return [v & 255, (v >>> 8) & 255]; }
+  function u32(v){ return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+  files.forEach(function(f){
+    var nm = enc.encode(f[0]), data = enc.encode(f[1]), cr = crc(data);
+    var common = [].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(cr), u32(data.length), u32(data.length), u16(nm.length), u16(0));
+    var lh = new Uint8Array([].concat(u32(0x04034b50), common));
+    parts.push(lh, nm, data);
+    central.push(new Uint8Array([].concat(u32(0x02014b50), u16(20), common, u16(0), u16(0), u16(0), u32(0), u32(off))), nm);
+    off += lh.length + nm.length + data.length;
+  });
+  var cdLen = 0; central.forEach(function(p){ cdLen += p.length; });
+  var end = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cdLen), u32(off), u16(0)));
+  var all = parts.concat(central, [end]), tot = 0; all.forEach(function(p){ tot += p.length; });
+  var out = new Uint8Array(tot), p = 0; all.forEach(function(b){ out.set(b, p); p += b.length; });
+  return out;
 }
 /* ============ MS Project XML（MSPDI）导入/导出 ============ */
 /* 依赖类型 ↔ MSPDI PredecessorLink/Type 映射（约定：0=FF, 1=FS, 2=SF, 3=SS） */
