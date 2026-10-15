@@ -1408,8 +1408,9 @@ function renderChart(){
   /* 用户 2026-10-15：手动调里程碑行高时，标签倾角随行高自动变化；任何情况下标签都不伸进顶部年份/月份刻度 */
   var _rad = function(a){ return a * Math.PI / 180; }, _labTop = MS_H - 52, MS_LABMAX = 1e9;
   if(state.msRowH > 0 && _msMaxW > 0){
-    var _a = Math.asin(Math.max(0, Math.min(1, (_labTop - 8) / _msMaxW))) * 180 / Math.PI;
-    MS_ANG = Math.round(Math.max(10, Math.min(75, _a))); /* 行太矮时保持 10°，过长的名字截断加「…」 */
+    /* 取能放下最长名字的最陡角度：高度 = 宽·sinθ + 字高·cosθ */
+    var _a = 10; for(var _t = 75; _t >= 10; _t--){ if(_msMaxW * Math.sin(_rad(_t)) + 9 * Math.cos(_rad(_t)) <= _labTop){ _a = _t; break; } }
+    MS_ANG = _a; /* 行太矮时保持 10°，过长的名字截断加「…」 */
     MS_NEED = Math.ceil(12 / Math.sin(_rad(MS_ANG)));
   }
   MS_LABMAX = Math.max(14, (_labTop - 9 * Math.cos(_rad(MS_ANG))) / Math.sin(_rad(MS_ANG)));
@@ -1534,11 +1535,17 @@ function renderChart(){
     var stroke = m.bad ? '#450a0a' : '#991b1b';
     var label = m.alias ? m.name + '（' + m.alias + '）' : m.name;
     var lx = (cx + 2) + (msLabelDx[idx]||0), ly = msCY - 12;
+    /* 右端放不下时，这个名字单独变陡；仍放不下才截断（不伸出图表右边） */
+    var _lab = abbr(m.name), _ang = MS_ANG, _lw = textW(_lab), _room = W - 2 - lx, _vmax = _labTop;
+    if(_lw * Math.cos(_rad(_ang)) > _room){
+      for(var _t2 = _ang; _t2 <= 80; _t2++){ _ang = _t2; if(_lw * Math.cos(_rad(_t2)) <= _room || _lw * Math.sin(_rad(_t2 + 1)) + 9 * Math.cos(_rad(_t2 + 1)) > _vmax) break; }
+    }
+    var _lmax = Math.min((_ang === MS_ANG ? MS_LABMAX : Math.max(14, (_vmax - 9 * Math.cos(_rad(_ang))) / Math.sin(_rad(_ang)))), Math.max(14, _room / Math.cos(_rad(_ang))));
     s += '<g data-mnode="' + esc(m.name) + '"><title>' + esc(label + '\n' + fmtD(m.d)) + '</title>'
       + '<rect x="' + (cx-r).toFixed(1) + '" y="' + (msCY-r).toFixed(1) + '" width="' + (r*2) + '" height="' + (r*2)
       + '" transform="rotate(45 ' + cx.toFixed(1) + ' ' + msCY + ')" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"/>'
       + ((msLabelLane[idx] || msLabelDx[idx] > 4) ? '<line x1="' + cx.toFixed(1) + '" y1="' + (msCY-9) + '" x2="' + (lx+2).toFixed(1) + '" y2="' + (ly+2) + '" stroke="#6b7280" stroke-width="0.8"/>' : '')
-      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-' + MS_ANG + ' ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="start" class="mlabel">' + esc(fitLab(abbr(m.name), MS_LABMAX)) + '</text>'
+      + '<text x="' + lx.toFixed(1) + '" y="' + ly + '" transform="rotate(-' + _ang + ' ' + lx.toFixed(1) + ' ' + ly + ')" text-anchor="start" class="mlabel">' + esc(_room < 16 ? '' : fitLab(_lab, _lmax)) + '</text>'
       + '<text x="' + cx.toFixed(1) + '" y="' + (msCY+21+(msDateRow[idx]?11:0)) + '" text-anchor="middle" fill="#1f2937" font-size="10">' + (m.d.getMonth()+1) + '/' + m.d.getDate() + '</text>'
       + '</g>';
   });
