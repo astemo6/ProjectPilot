@@ -1943,6 +1943,7 @@ function init(){
     state.excluded = {};
     (OEM_DEF_OFF[state.oem] || []).forEach(function(i){ var n = (OEM_NODES[state.oem] || [])[i - 1]; if(n) state.excluded[n[0]] = true; });
     _sampleFlag = false; save(); syncUrl(); renderAll();
+    var _sr = $('secRec'); if(_sr){ _sr.classList.add('collapsed'); refreshSecToggles(); } /* 用户 2026-10-15：任何 OEM 下推荐任务模板默认折叠 */
   });
   $('projectName').addEventListener('input', function(){
     state.projectName = this.value; save();
