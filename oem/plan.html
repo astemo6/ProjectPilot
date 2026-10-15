@@ -1409,7 +1409,7 @@ function renderChart(){
   var _rad = function(a){ return a * Math.PI / 180; }, _labTop = MS_H - 52, MS_LABMAX = 1e9;
   if(state.msRowH > 0 && _msMaxW > 0){
     var _a = Math.asin(Math.max(0, Math.min(1, (_labTop - 8) / _msMaxW))) * 180 / Math.PI;
-    MS_ANG = Math.round(Math.max(25, Math.min(75, _a))); /* 行太矮时保持 25°，过长的名字截断加「…」 */
+    MS_ANG = Math.round(Math.max(10, Math.min(75, _a))); /* 行太矮时保持 10°，过长的名字截断加「…」 */
     MS_NEED = Math.ceil(12 / Math.sin(_rad(MS_ANG)));
   }
   MS_LABMAX = Math.max(14, (_labTop - 9 * Math.cos(_rad(MS_ANG))) / Math.sin(_rad(MS_ANG)));
