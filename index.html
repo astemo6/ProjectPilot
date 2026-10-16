@@ -598,7 +598,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.6</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.7</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -2107,8 +2107,9 @@ function fmtDur(t){ if(t.type === "milestone") return "◆"; var d = +t.dur || 0
 function parseDur(v){ /* "4h" "1.5d" "2d 4h" "3"（按天模式=天，按小时模式=小时）→ 工作日（小数） */
   v = String(v || "").trim().toLowerCase(); if(!v) return null;
   var tot = 0, hit = false;
-  v.replace(/(\d+(?:\.\d+)?)\s*(d|day|days|天|日|h|hr|hrs|hour|hours|小时|时|w|wk|周|m|min|分钟?)/g, function(_, n, u){ hit = true; n = +n;
-    if(/^(h|hr|hrs|hour|hours|小时|时)$/.test(u)) tot += n / HOURS_PER_DAY; else if(/^(w|wk|周)$/.test(u)) tot += n * 5; else if(/^(m|min|分钟?)$/.test(u)) tot += n / 60 / HOURS_PER_DAY; else tot += n; return ""; });
+  /* 单位（同 MS Project）：天 d / 周 w = 5 天 / 月 mo = 20 天 / 小时 h / 分钟 min */
+  v.replace(/(\d+(?:\.\d+)?)\s*(months?|mons?|mo|个月|月|weeks?|wks?|w|个星期|星期|个周|周|wochen?|monate?|days?|d|个工作日|工作日|天|日|tage?|t|hours?|hrs?|h|小时|时|stunden?|std|min|m|分钟?)/g, function(_, n, u){ hit = true; n = +n;
+    if(/^(hours?|hrs?|h|小时|时|stunden?|std)$/.test(u)) tot += n / HOURS_PER_DAY; else if(/^(weeks?|wks?|w|个星期|星期|个周|周|wochen?)$/.test(u)) tot += n * 5; else if(/^(months?|mons?|mo|个月|月|monate?)$/.test(u)) tot += n * 20; else if(/^(min|m|分钟?)$/.test(u)) tot += n / 60 / HOURS_PER_DAY; else tot += n; return ""; });
   if(!hit){ var n = parseFloat(v); if(isNaN(n)) return null; tot = HM() ? n / HOURS_PER_DAY : n; }
   return Math.max(0, Math.round(tot * 1000) / 1000);
 }
@@ -2362,7 +2363,7 @@ var COLS = [
   {key:'wbs',   cls:'c-wbs',   defW:56, i18n:'cWbs', hide:true},
   {key:'mode',  cls:'c-mode',  defW:100, i18n:'cMode', hide:true},
   {key:'owner', cls:'c-owner', defW:110, i18n:'cOwner', hide:true},
-  {key:'dur',   cls:'c-dur',   defW:52, i18n:'cDur', hide:true},
+  {key:'dur',   cls:'c-dur',   defW:60, i18n:'cDur'},
   {key:'work',  cls:'c-work',  defW:60, i18n:'cWork', hide:true},
   {key:'cost',  cls:'c-cost',  defW:84, i18n:'evCost', hide:true},
   {key:'prog',  cls:'c-prog',  defW:72, i18n:'cProg', hide:true},
@@ -8038,7 +8039,8 @@ function v4ExpPlan(){
     var BAD = /%|百分比|比例|进度|complete|progress/;
     var KN = ["任务名称","任务名","名称","任务","taskname","name","task","activity","item","vorgangsname","vorgang","aufgabe","活动","工作项","项目","事项","内容"],
         KS = ["开始日期","开始时间","计划开始","开始","start","startdate","plannedstart","begin","begindate","anfang","beginn","起始"],
-        KE = ["结束日期","结束时间","完成日期","完成时间","计划完成","计划结束","结束","完成","finish","end","enddate","finishdate","plannedfinish","due","duedate","ende","截止"];
+        KE = ["结束日期","结束时间","完成日期","完成时间","计划完成","计划结束","结束","完成","finish","end","enddate","finishdate","plannedfinish","due","duedate","ende","截止"],
+        KD = ["周期","工期","持续时间","天数","时长","duration","dur","period","dauer"];
     function find(row, keys, skip){ var i, a, h;
       for(a = 0; a < keys.length; a++) for(i = 0; i < row.length; i++){ if(skip.indexOf(i) >= 0) continue; h = norm(row[i]); if(h && !BAD.test(h) && h === keys[a]) return i; }
       for(a = 0; a < keys.length; a++) for(i = 0; i < row.length; i++){ if(skip.indexOf(i) >= 0) continue; h = norm(row[i]); if(!h || BAD.test(h) || h.length > 14) continue; if(h.indexOf(keys[a]) >= 0) return i; }
@@ -8046,7 +8048,7 @@ function v4ExpPlan(){
     for(var k = 0; k < Math.min(rows.length, 20); k++){
       var row = rows[k].cells || [], cs = find(row, KS, []), ce = find(row, KE, [cs]);
       if(cs < 0 && ce < 0) continue;
-      var cn = find(row, KN, [cs, ce]), body = rows.slice(k + 1);
+      var cd = find(row, KD, [cs, ce]), cn = find(row, KN, [cs, ce, cd]), body = rows.slice(k + 1);
       if(cn < 0){ /* 名称列没有表头（如「Updated date: …」）：取日期列左侧文字最多的一列 */
         var lim = Math.min(cs >= 0 ? cs : ce, ce >= 0 ? ce : cs), best = -1, bc = 0;
         for(var c = 0; c < lim; c++){ var cnt = 0; body.forEach(function(r){ var t = xlsCellText(r.cells[c]).trim(); if(t && !/^[\d.\-\/]+$/.test(t)) cnt++; }); if(cnt > bc){ bc = cnt; best = c; } }
@@ -8055,7 +8057,7 @@ function v4ExpPlan(){
       var named = 0, dated = 0;
       body.forEach(function(r){ if(xlsCellText(r.cells[cn]).trim()){ named++; if(xlsDateOf(cs >= 0 ? r.cells[cs] : null) || xlsDateOf(ce >= 0 ? r.cells[ce] : null)) dated++; } });
       if(!named) continue;
-      return { hr:k, n:cn, s:cs, e:ce, score:dated * 1000 + named };
+      return { hr:k, n:cn, s:cs, e:ce, d:cd, score:dated * 1000 + named };
     }
     return null;
   }
@@ -8067,8 +8069,9 @@ function v4ExpPlan(){
       if(r[3] !== "task") return;
       var key = r[5] ? r[5].split(".").slice(0, -1).join(".") : "g:" + r[4], p = last[key]; last[key] = i;
       if(p == null) return;
-      var pr = out[p], lag = 0;
-      if(pr[2] && r[1]){ lag = workdaysBetween(parseD(pr[2]), parseD(r[1])) - 1; if(parseD(r[1]) <= parseD(pr[2])) return; }
+      var pr = out[p], lag = 0, pe = pr[2];
+      if(!pe && pr[1] && pr[7] && +pr[7] >= 1) pe = fmtD(addWorkdays(snapWorkday(parseD(pr[1])), Math.ceil(+pr[7]) - 1));
+      if(pe && r[1]){ lag = workdaysBetween(parseD(pe), parseD(r[1])) - 1; if(parseD(r[1]) <= parseD(pe)) return; }
       r[6] = (p + 1) + "FS" + (lag > 0 ? "+" + lag + "d" : ""); });
     return out; }
   function xlsTableToRows(sheets){
@@ -8083,8 +8086,11 @@ function v4ExpPlan(){
       var mk = name.match(/^([▼▽▶►▸◆◇♦])\s*/), isG = !!(mk && /[▼▽▶►▸]/.test(mk[1])), isM = !!(mk && /[◆◇♦]/.test(mk[1]));
       if(mk) name = name.slice(mk[0].length).trim(); if(!name) return;
       var s = C.s >= 0 ? xlsDateOf(row.cells[C.s]) : null, e = C.e >= 0 ? xlsDateOf(row.cells[C.e]) : null;
+      /* 周期列（天/周/月，同 MS Project）：有周期时结束日期按周期推算 */
+      var du = C.d >= 0 ? parseDur(xlsCellText(row.cells[C.d]).replace(/,/g, ".")) : null;
+      if(du != null && !(du > 0) && !isM) du = null;
       if(!s) s = e; if(s && (!e || e < s)) e = s;
-      items.push({ name:name, s:s, e:e, g:isG, m:isM, lvl:row.lvl });
+      items.push({ name:name, s:s, e:e, g:isG, m:isM, lvl:row.lvl, du:du });
     });
     var useOutline = items.some(function(it){ return it.lvl > 0; });
     if(useOutline){
@@ -8098,14 +8104,14 @@ function v4ExpPlan(){
       items.forEach(function(it, i){ var L = it.lvl - base; cnt.length = L + 1; cnt[L] = (cnt[L] || 0) + 1; for(var q = 0; q < L; q++) if(!cnt[q]) cnt[q] = 1;
         var nx = items[i + 1], sum = !!(nx && nx.lvl > it.lvl);
         if(!sum && !it.s && it.m) return;
-        out.push([it.name, it.s ? fmtD(it.s) : "", it.e ? fmtD(it.e) : "", sum ? "group" : (it.m ? "milestone" : "task"), "", cnt.join(".")]); });
+        out.push([it.name, it.s ? fmtD(it.s) : "", it.du != null && !sum ? "" : (it.e ? fmtD(it.e) : ""), sum ? "group" : (it.m ? "milestone" : "task"), "", cnt.join("."), "", it.du != null && !sum ? String(it.du) : ""]); });
       return xlsAutoDeps(out);
     }
     var out2 = [], grp = "";
     items.forEach(function(it){
-      if(it.g || (!it.s && !it.m)){ grp = it.name; out2.push([it.name, "", "", "group", "", ""]); return; }
-      if(!it.s) return;
-      out2.push([it.name, fmtD(it.s), fmtD(it.e), it.m ? "milestone" : "task", grp, ""]); });
+      if(it.g || (!it.s && !it.m && it.du == null)){ grp = it.name; out2.push([it.name, "", "", "group", "", ""]); return; }
+      if(!it.s && it.du == null) return;
+      out2.push([it.name, it.s ? fmtD(it.s) : "", it.du != null ? "" : fmtD(it.e), it.m ? "milestone" : "task", grp, "", "", it.du != null ? String(it.du) : ""]); });
     /* 全部都没有日期：不当作分组，按普通任务导入（日期待填） */
     if(out2.length && out2.every(function(r){ return r[3] === "group"; })) out2 = out2.map(function(r){ return [r[0], "", "", "task", "", ""]; });
     return xlsAutoDeps(out2);
@@ -8115,7 +8121,7 @@ function v4ExpPlan(){
     if(u[0] !== 0x50 || u[1] !== 0x4b){ toast(L("xlsOld")); return; }
     xlsxToTable(buf).then(function(sheets){
       var rows = xlsTableToRows(sheets); if(!rows){ toast(L("xlsNoHdr")); return; } if(!rows.length){ toast(L("noTask")); return; }
-      var csvRows = csvToRows([["name", "start", "end", "type", "group", "outline", "deps"]].concat(rows));
+      var csvRows = csvToRows([["name", "start", "end", "type", "group", "outline", "deps", "duration"]].concat(rows));
       if(!csvRows || !csvRows.length){ toast(L("noTask")); return; }
       importXMLText(toMspdi((state.info && state.info.title) || "", csvRows), false);
     }).catch(function(e){ console.error(e); toast(L("bad")); });
