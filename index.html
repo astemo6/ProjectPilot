@@ -598,7 +598,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.4</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.5</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -7998,20 +7998,21 @@ function v4ExpPlan(){
     if(ent.meth === 0) return Promise.resolve(new TextDecoder().decode(ent.data));
     return new Response(new Blob([ent.data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
   }
-  function xlsxToTable(buf){
+  function xlsxToTable(buf){ /* → [{ name, hidden, below, rows:[{ lvl, cells }] }]，按工作簿顺序 */
     var ents = unzipEntries(buf);
     return Promise.all([unzipText(ents["xl/workbook.xml"]), unzipText(ents["xl/_rels/workbook.xml.rels"]), unzipText(ents["xl/sharedStrings.xml"])]).then(function(r){
-      var dp = new DOMParser(), wb = dp.parseFromString(r[0], "application/xml"), rels = dp.parseFromString(r[1] || "<r/>", "application/xml");
-      var sh = wb.getElementsByTagName("sheet")[0], path = "xl/worksheets/sheet1.xml";
-      if(sh){ var rid = sh.getAttribute("r:id") || sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
-        Array.prototype.forEach.call(rels.getElementsByTagName("Relationship"), function(x){ if(x.getAttribute("Id") === rid){ var t = x.getAttribute("Target"); path = t.charAt(0) === "/" ? t.slice(1) : "xl/" + t.replace(/^\.\//, ""); } }); }
-      if(!ents[path]){ var ks = Object.keys(ents).filter(function(k){ return /^xl\/worksheets\/[^\/]+\.xml$/.test(k); }).sort(); path = ks[0]; }
+      var dp = new DOMParser(), wb = dp.parseFromString(r[0], "application/xml"), rels = dp.parseFromString(r[1] || "<r/>", "application/xml"), relMap = {};
+      Array.prototype.forEach.call(rels.getElementsByTagName("Relationship"), function(x){ var t = x.getAttribute("Target") || ""; relMap[x.getAttribute("Id")] = t.charAt(0) === "/" ? t.slice(1) : "xl/" + t.replace(/^\.\//, ""); });
+      var list = Array.prototype.map.call(wb.getElementsByTagName("sheet"), function(sh){ var rid = sh.getAttribute("r:id") || sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+        return { name:sh.getAttribute("name") || "", hidden:/hidden/i.test(sh.getAttribute("state") || ""), path:relMap[rid] }; }).filter(function(s){ return s.path && ents[s.path]; });
+      if(!list.length) list = Object.keys(ents).filter(function(k){ return /^xl\/worksheets\/[^\/]+\.xml$/.test(k); }).sort().map(function(k){ return { name:k, hidden:false, path:k }; });
       var ss = [];
       if(r[2]){ var sd = dp.parseFromString(r[2], "application/xml"); Array.prototype.forEach.call(sd.getElementsByTagName("si"), function(si){ var t = ""; Array.prototype.forEach.call(si.getElementsByTagName("t"), function(x){ var par = x.parentNode; if(par && par.nodeName === "rPh") return; t += x.textContent; }); ss.push(t); }); }
-      return unzipText(ents[path]).then(function(xml){
-        var doc = dp.parseFromString(xml, "application/xml"), tab = [];
+      return Promise.all(list.map(function(sh){ return unzipText(ents[sh.path]).then(function(xml){
+        var doc = dp.parseFromString(xml, "application/xml"), rows = [], op = doc.getElementsByTagName("outlinePr")[0], sb = op && op.getAttribute("summaryBelow");
+        sh.below = !(sb === "0" || sb === "false");
         Array.prototype.forEach.call(doc.getElementsByTagName("row"), function(row){
-          var cells = [], seq = 0;
+          var cells = [], seq = 0, rn = +row.getAttribute("r") || 0;
           Array.prototype.forEach.call(row.getElementsByTagName("c"), function(c){
             var ref = c.getAttribute("r"), ci = seq;
             if(ref){ var L = ref.match(/^[A-Z]+/)[0]; ci = 0; for(var q = 0; q < L.length; q++) ci = ci * 26 + L.charCodeAt(q) - 64; ci--; }
@@ -8022,46 +8023,87 @@ function v4ExpPlan(){
             else if(v) val = { num:t == null || t === "n", text:v.textContent };
             cells[ci] = val;
           });
-          tab.push(cells);
+          rows.push({ r:rn, lvl:+row.getAttribute("outlineLevel") || 0, cells:cells });
         });
-        return tab;
-      });
+        sh.rows = rows; return sh; }); }));
     });
   }
-  function xlsTableToRows(tab){
-    function norm(x){ return String(x == null ? "" : (typeof x === "object" ? x.text : x)).replace(/\s+/g, "").toLowerCase(); }
-    var KN = ["任务名称","任务名","名称","任务","taskname","name","task","vorgangsname","vorgang","aufgabe","活动","工作项"],
-        KS = ["开始日期","开始时间","开始","计划开始","start","startdate","begin","begindate","anfang","beginn"],
-        KE = ["结束日期","结束时间","完成日期","完成时间","计划完成","结束","完成","finish","end","enddate","finishdate","ende"];
-    function find(row, keys){ for(var a = 0; a < keys.length; a++) for(var i = 0; i < row.length; i++){ var h = norm(row[i]); if(!h || /%|百分比|比例|进度|complete/.test(h)) continue; if(h === keys[a]) return i; }
-      for(var b = 0; b < keys.length; b++) for(var j = 0; j < row.length; j++){ var h2 = norm(row[j]); if(!h2 || /%|百分比|比例|进度|complete/.test(h2) || h2.length > 12) continue; if(h2.indexOf(keys[b]) >= 0) return j; } return -1; }
-    var hr = -1, C = null;
-    for(var r = 0; r < Math.min(tab.length, 15); r++){ var row = tab[r] || [], cn = find(row, KN), cs = find(row, KS), ce = find(row, KE);
-      if(cn >= 0 && (cs >= 0 || ce >= 0) && cn !== cs && cn !== ce){ hr = r; C = { n:cn, s:cs, e:ce }; break; } }
-    if(hr < 0) return null;
-    function dateOf(x){ if(x == null || x === "") return null;
-      if(typeof x === "object"){ var f = parseFloat(x.text); if(x.num && !isNaN(f) && f > 20000 && f < 80000){ var d = new Date(1899, 11, 30); d.setDate(d.getDate() + Math.floor(f)); return d; } x = x.text; }
-      return anyDate(String(x)); }
-    var out = [], grp = "";
-    tab.slice(hr + 1).forEach(function(row){ row = row || [];
-      var name = String(row[C.n] == null ? "" : (typeof row[C.n] === "object" ? row[C.n].text : row[C.n])).trim(); if(!name) return;
+  function xlsCellText(x){ return String(x == null ? "" : (typeof x === "object" ? x.text : x)); }
+  function xlsDateOf(x){ if(x == null || x === "") return null;
+    if(typeof x === "object"){ var f = parseFloat(x.text); if(x.num && !isNaN(f) && f > 20000 && f < 80000){ var d = new Date(1899, 11, 30); d.setDate(d.getDate() + Math.floor(f)); return d; } x = x.text; }
+    return anyDate(String(x)); }
+  /* 在一个工作表里找表头：返回 { hr, n, s, e, score } 或 null */
+  function xlsFindHeader(rows){
+    function norm(x){ return xlsCellText(x).replace(/\s+/g, "").toLowerCase(); }
+    var BAD = /%|百分比|比例|进度|complete|progress/;
+    var KN = ["任务名称","任务名","名称","任务","taskname","name","task","activity","item","vorgangsname","vorgang","aufgabe","活动","工作项","项目","事项","内容"],
+        KS = ["开始日期","开始时间","计划开始","开始","start","startdate","plannedstart","begin","begindate","anfang","beginn","起始"],
+        KE = ["结束日期","结束时间","完成日期","完成时间","计划完成","计划结束","结束","完成","finish","end","enddate","finishdate","plannedfinish","due","duedate","ende","截止"];
+    function find(row, keys, skip){ var i, a, h;
+      for(a = 0; a < keys.length; a++) for(i = 0; i < row.length; i++){ if(skip.indexOf(i) >= 0) continue; h = norm(row[i]); if(h && !BAD.test(h) && h === keys[a]) return i; }
+      for(a = 0; a < keys.length; a++) for(i = 0; i < row.length; i++){ if(skip.indexOf(i) >= 0) continue; h = norm(row[i]); if(!h || BAD.test(h) || h.length > 14) continue; if(h.indexOf(keys[a]) >= 0) return i; }
+      return -1; }
+    for(var k = 0; k < Math.min(rows.length, 20); k++){
+      var row = rows[k].cells || [], cs = find(row, KS, []), ce = find(row, KE, [cs]);
+      if(cs < 0 && ce < 0) continue;
+      var cn = find(row, KN, [cs, ce]), body = rows.slice(k + 1);
+      if(cn < 0){ /* 名称列没有表头（如「Updated date: …」）：取日期列左侧文字最多的一列 */
+        var lim = Math.min(cs >= 0 ? cs : ce, ce >= 0 ? ce : cs), best = -1, bc = 0;
+        for(var c = 0; c < lim; c++){ var cnt = 0; body.forEach(function(r){ var t = xlsCellText(r.cells[c]).trim(); if(t && !/^[\d.\-\/]+$/.test(t)) cnt++; }); if(cnt > bc){ bc = cnt; best = c; } }
+        cn = best; }
+      if(cn < 0) continue;
+      var named = 0, dated = 0;
+      body.forEach(function(r){ if(xlsCellText(r.cells[cn]).trim()){ named++; if(xlsDateOf(cs >= 0 ? r.cells[cs] : null) || xlsDateOf(ce >= 0 ? r.cells[ce] : null)) dated++; } });
+      if(!named) continue;
+      return { hr:k, n:cn, s:cs, e:ce, score:dated * 1000 + named };
+    }
+    return null;
+  }
+  function xlsTableToRows(sheets){
+    var pick = null;
+    sheets.forEach(function(sh){ var h = xlsFindHeader(sh.rows); if(!h) return; h.sh = sh; h.score += sh.hidden ? 0 : 500000;
+      if(!pick || h.score > pick.score) pick = h; });
+    if(!pick) return null;
+    var C = pick, sh = pick.sh, items = [];
+    sh.rows.slice(C.hr + 1).forEach(function(row){
+      var name = xlsCellText(row.cells[C.n]).trim(); if(!name) return;
       /* 本工具 / 常见导出的前缀符号：▼▶ = 分组，◆◇ = 里程碑 */
-      var mk = name.match(/^([▼▽▶►▸◆◇♦])\s*/), isG = mk && /[▼▽▶►▸]/.test(mk[1]), isM = mk && /[◆◇♦]/.test(mk[1]);
+      var mk = name.match(/^([▼▽▶►▸◆◇♦])\s*/), isG = !!(mk && /[▼▽▶►▸]/.test(mk[1])), isM = !!(mk && /[◆◇♦]/.test(mk[1]));
       if(mk) name = name.slice(mk[0].length).trim(); if(!name) return;
-      var s = C.s >= 0 ? dateOf(row[C.s]) : null, e = C.e >= 0 ? dateOf(row[C.e]) : null;
-      if(isG || (!s && !e && !isM)){ grp = name; out.push([name, "", "", "group", ""]); return; }
-      if(!s && !e) return;
-      if(!s) s = e; if(!e || e < s) e = s;
-      out.push([name, fmtD(s), fmtD(e), isM ? "milestone" : "task", grp]);
+      var s = C.s >= 0 ? xlsDateOf(row.cells[C.s]) : null, e = C.e >= 0 ? xlsDateOf(row.cells[C.e]) : null;
+      if(!s) s = e; if(s && (!e || e < s)) e = s;
+      items.push({ name:name, s:s, e:e, g:isG, m:isM, lvl:row.lvl });
     });
-    return out;
+    var useOutline = items.some(function(it){ return it.lvl > 0; });
+    if(useOutline){
+      /* Excel 分级显示：汇总行在明细下方时，把汇总行移到其明细之前 */
+      if(sh.below && items.some(function(it, i){ return i > 0 && items[i - 1].lvl > it.lvl; }) && !items.some(function(it, i){ return i + 1 < items.length && items[i + 1].lvl > it.lvl && !(i > 0 && items[i - 1].lvl > it.lvl); })){
+        var ord = [];
+        items.forEach(function(it){ var j = ord.length; while(j > 0 && ord[j - 1].lvl > it.lvl) j--; ord.splice(j, 0, it); });
+        items = ord; }
+      var cnt = [], base = Math.min.apply(null, items.map(function(it){ return it.lvl; }));
+      var out = [];
+      items.forEach(function(it, i){ var L = it.lvl - base; cnt.length = L + 1; cnt[L] = (cnt[L] || 0) + 1; for(var q = 0; q < L; q++) if(!cnt[q]) cnt[q] = 1;
+        var nx = items[i + 1], sum = !!(nx && nx.lvl > it.lvl);
+        if(!sum && !it.s && it.m) return;
+        out.push([it.name, it.s ? fmtD(it.s) : "", it.e ? fmtD(it.e) : "", sum ? "group" : (it.m ? "milestone" : "task"), "", cnt.join(".")]); });
+      return out;
+    }
+    var out2 = [], grp = "";
+    items.forEach(function(it){
+      if(it.g || (!it.s && !it.m)){ grp = it.name; out2.push([it.name, "", "", "group", "", ""]); return; }
+      if(!it.s) return;
+      out2.push([it.name, fmtD(it.s), fmtD(it.e), it.m ? "milestone" : "task", grp, ""]); });
+    /* 全部都没有日期：不当作分组，按普通任务导入（日期待填） */
+    if(out2.length && out2.every(function(r){ return r[3] === "group"; })) out2 = out2.map(function(r){ return [r[0], "", "", "task", "", ""]; });
+    return out2;
   }
   function importXlsxBuf(buf){
     var u = new Uint8Array(buf);
     if(u[0] !== 0x50 || u[1] !== 0x4b){ toast(L("xlsOld")); return; }
-    xlsxToTable(buf).then(function(tab){
-      var rows = xlsTableToRows(tab); if(!rows){ toast(L("xlsNoHdr")); return; } if(!rows.length){ toast(L("noTask")); return; }
-      var csvRows = csvToRows([["name", "start", "end", "type", "group"]].concat(rows));
+    xlsxToTable(buf).then(function(sheets){
+      var rows = xlsTableToRows(sheets); if(!rows){ toast(L("xlsNoHdr")); return; } if(!rows.length){ toast(L("noTask")); return; }
+      var csvRows = csvToRows([["name", "start", "end", "type", "group", "outline"]].concat(rows));
       if(!csvRows || !csvRows.length){ toast(L("noTask")); return; }
       importXMLText(toMspdi((state.info && state.info.title) || "", csvRows), false);
     }).catch(function(e){ console.error(e); toast(L("bad")); });
