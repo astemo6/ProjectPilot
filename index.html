@@ -598,7 +598,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.5</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.6</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -8059,6 +8059,18 @@ function v4ExpPlan(){
     }
     return null;
   }
+  /* 默认前置（用户 2026-10-16）：除里程碑外，每个任务以同一父级下的上一个任务为 FS 前置；
+     两者都有日期时用延隔保留 Excel 里的日期，重叠则不加 */
+  function xlsAutoDeps(out){
+    var last = {};
+    out.forEach(function(r, i){ r[6] = "";
+      if(r[3] !== "task") return;
+      var key = r[5] ? r[5].split(".").slice(0, -1).join(".") : "g:" + r[4], p = last[key]; last[key] = i;
+      if(p == null) return;
+      var pr = out[p], lag = 0;
+      if(pr[2] && r[1]){ lag = workdaysBetween(parseD(pr[2]), parseD(r[1])) - 1; if(parseD(r[1]) <= parseD(pr[2])) return; }
+      r[6] = (p + 1) + "FS" + (lag > 0 ? "+" + lag + "d" : ""); });
+    return out; }
   function xlsTableToRows(sheets){
     var pick = null;
     sheets.forEach(function(sh){ var h = xlsFindHeader(sh.rows); if(!h) return; h.sh = sh; h.score += sh.hidden ? 0 : 500000;
@@ -8087,7 +8099,7 @@ function v4ExpPlan(){
         var nx = items[i + 1], sum = !!(nx && nx.lvl > it.lvl);
         if(!sum && !it.s && it.m) return;
         out.push([it.name, it.s ? fmtD(it.s) : "", it.e ? fmtD(it.e) : "", sum ? "group" : (it.m ? "milestone" : "task"), "", cnt.join(".")]); });
-      return out;
+      return xlsAutoDeps(out);
     }
     var out2 = [], grp = "";
     items.forEach(function(it){
@@ -8096,14 +8108,14 @@ function v4ExpPlan(){
       out2.push([it.name, fmtD(it.s), fmtD(it.e), it.m ? "milestone" : "task", grp, ""]); });
     /* 全部都没有日期：不当作分组，按普通任务导入（日期待填） */
     if(out2.length && out2.every(function(r){ return r[3] === "group"; })) out2 = out2.map(function(r){ return [r[0], "", "", "task", "", ""]; });
-    return out2;
+    return xlsAutoDeps(out2);
   }
   function importXlsxBuf(buf){
     var u = new Uint8Array(buf);
     if(u[0] !== 0x50 || u[1] !== 0x4b){ toast(L("xlsOld")); return; }
     xlsxToTable(buf).then(function(sheets){
       var rows = xlsTableToRows(sheets); if(!rows){ toast(L("xlsNoHdr")); return; } if(!rows.length){ toast(L("noTask")); return; }
-      var csvRows = csvToRows([["name", "start", "end", "type", "group", "outline"]].concat(rows));
+      var csvRows = csvToRows([["name", "start", "end", "type", "group", "outline", "deps"]].concat(rows));
       if(!csvRows || !csvRows.length){ toast(L("noTask")); return; }
       importXMLText(toMspdi((state.info && state.info.title) || "", csvRows), false);
     }).catch(function(e){ console.error(e); toast(L("bad")); });
