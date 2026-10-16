@@ -599,7 +599,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.10</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.11</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -2374,7 +2374,7 @@ function tsFont(t, sz, defBold, fixedSize){ var e = tsEff(t), b = e.b == null ? 
 function tsCol(t, def){ return tsEff(t).c || def; }
 function tColor(t){ return t.color || CC()[t.type === "milestone" ? "ms" : t.type === "group" ? "sum" : "task"]; }
 var COLORS = ["#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#dc2626","#4f46e5","#0d9488"];
-var state = { tasks:[], seq:1, view:"fit", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{}, colDefV4:true, colModeOff:true };
+var state = { tasks:[], seq:1, view:"fit", collapsed:{}, planOem:"", showPhase:true, showCrit:false, baseline:null, showBaseline:false, resWarn:true, colVis:{}, colW:{}, colDefV4:true, colModeOff:true, colDurOn:true };
 /* 列模型：ID 与任务名称为冻结固定列（常显不可隐藏），其余列可显隐、可拖拽调宽 */
 var COLS = [
   {key:'id',    cls:'c-id',    defW:36, fixed:true},
@@ -2446,7 +2446,7 @@ function undo(){ histApply(HIST.u, HIST.r); }
 function redo(){ histApply(HIST.r, HIST.u); }
 function save(){ histRecord(); try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} WORKCAL.save(cal); }
 function load(){
-  try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; if(!state.colDefV4){ state.colVis = {}; state.colDefV4 = true; } if(!state.colModeOff){ state.colVis.mode = false; state.colModeOff = true; } COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
+  try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); if(d && d.tasks){ state = d; if(!state.colVis || typeof state.colVis !== "object") state.colVis = {}; if(!state.colW || typeof state.colW !== "object") state.colW = {}; if(!state.colDefV4){ state.colVis = {}; state.colDefV4 = true; } if(!state.colModeOff){ state.colVis.mode = false; state.colModeOff = true; } if(!state.colDurOn){ state.colVis.dur = true; state.colDurOn = true; } /* 1.2.11：旧数据里「工期」列被存成隐藏，升级后显示一次（用户 2026-10-16） */ COLS.forEach(function(c){ if(!c.fixed && typeof state.colVis[c.key] !== "boolean") state.colVis[c.key] = !c.hide; }); if(typeof state.showPhase !== "boolean") state.showPhase = true; if(typeof state.showCrit !== "boolean") state.showCrit = false; if(typeof state.showBaseline !== "boolean") state.showBaseline = false; if(typeof state.resWarn !== "boolean") state.resWarn = true; normalizeState(); return; } }catch(e){}
   seedSample();
 }
 /* 默认模板：APQP 五大过程（计划和确定项目 / 产品设计和开发 / 过程设计和开发 / 产品和过程确认 / 反馈、评定和纠正措施），任务按依赖自动排程 */
