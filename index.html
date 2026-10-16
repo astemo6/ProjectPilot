@@ -598,7 +598,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.1</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.2</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -2879,7 +2879,7 @@ function renderBaseSel(){
   var us = document.getElementById("unitSel"); if(us) us.value = HM() ? "hour" : "day";
   var fs = document.getElementById("fltSel"); if(fs) fs.innerHTML = ["all","crit","ms","inc","done","pro","late","un","over"].map(function(k){ return '<option value="' + k + '"' + ((state.flt || "all") === k ? " selected" : "") + ">" + esc(tr("flt" + k.charAt(0).toUpperCase() + k.slice(1))) + "</option>"; }).join("");
   var so = document.getElementById("sortSel"); if(so) so.innerHTML = ["outline","start","end","dur","name","pri","cost"].map(function(k){ return '<option value="' + k + '"' + ((state.sortBy || "outline") === k ? " selected" : "") + ">" + esc(tr("sort" + k.charAt(0).toUpperCase() + k.slice(1))) + "</option>"; }).join("");
-  var pl = document.getElementById("ckProgLine"); if(pl) pl.checked = !!state.progLine;
+  var pl = document.getElementById("ckProgLine"); if(pl) pl.checked = !!state.progLine; if(window.__ppSyncStatus) window.__ppSyncStatus();
   var sel = document.getElementById("baseSel"); if(!sel) return;
   var bi = +state.baseIdx || 0, h = "";
   for(var i = 0; i <= 10; i++){ var has = i ? !!(state.baselines || {})[i] : !!state.baseline; h += '<option value="' + i + '"' + (i === bi ? " selected" : "") + ">" + esc(tr("baseN").replace("{0}", i)) + (has ? " ✓" + ((state.baseDates || {})[i] ? " " + state.baseDates[i] : "") : "") + "</option>"; }
@@ -4101,7 +4101,7 @@ function exportXLS(){
     keys.forEach(function(k){
       var ref = colL(ci[k]) + r, txt = isG ? 7 : 1, cen = isG ? 8 : 2, dt = isG ? 9 : 6;
       if(k === "id") cells.push(sc(ref, isG ? "" : rowNo(t.id), cen));
-      else if(k === "name") cells.push(sc(ref, isG ? (state.collapsed[t.id] ? "▶ " : "▼ ") + t.name : (isMs ? "◆ " : "") + t.name, txt));
+      else if(k === "name") cells.push(sc(ref, isG ? (state.collapsed[t.id] ? "▶ " : "▼ ") + t.name : (isMs ? "◆ " : "") + t.name, isG ? 13 : 12)); /* 名称自动换行 */
       else if(k === "owner") cells.push(sc(ref, isG ? "" : (t.owner || ""), txt));
       else if(k === "dur"){
         if(isG) cells.push(sc(ref, "", cen));
@@ -4150,19 +4150,21 @@ function exportXLS(){
     + '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1E3A52"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF5"/></patternFill></fill></fills>'
     + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC8CDD3"/></left><right style="thin"><color rgb="FFC8CDD3"/></right><top style="thin"><color rgb="FFC8CDD3"/></top><bottom style="thin"><color rgb="FFC8CDD3"/></bottom><diagonal/></border></borders>'
     + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    + '<cellXfs count="12">'
+    + '<cellXfs count="14">'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'
-    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
     + '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
     + '<xf numFmtId="165" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" textRotation="90"/></xf>'
     + '<xf numFmtId="0" fontId="3" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf>'
-    + '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
-    + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>'
-    + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
-    + '<xf numFmtId="164" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
+    + '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="164" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
     + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
     + '<xf numFmtId="166" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'
+    + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'
     + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     + '<dxfs count="4">'
     + '<dxf><fill><patternFill patternType="solid"><fgColor rgb="FFDC2626"/><bgColor rgb="FFDC2626"/></patternFill></fill></dxf>'
@@ -4571,15 +4573,35 @@ function drawMspExport(cb, plan, imgL){
   var TBW = cols.reduce(function(a, c){ return a + c[1]; }, 0);
   var H0 = Math.round(W / 1.414), bodyAvail = H0 - PAD * 2 - HEAD - THEAD - FOOT;
   var ROW = Math.max(16, Math.min(24, Math.floor(bodyAvail / Math.max(vis.length, 1))));
-  var H = Math.max(H0, PAD * 2 + HEAD + THEAD + FOOT + ROW * vis.length);
+  /* 任务名自动换行（用户 2026-10-16）：名称列内按宽度折行，行高随行数增加 */
+  var NLH = FS + 3;
+  function wrapLines(text, maxW, f){
+    mc.font = f; text = String(text == null ? "" : text);
+    if(!text || mc.measureText(text).width <= maxW) return [text];
+    var out = [], cur = "", toks = text.match(/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]|[^\s\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]+|\s+/g) || [text];
+    toks.forEach(function(tk){
+      if(mc.measureText(cur + tk).width <= maxW || !cur){
+        if(!cur && mc.measureText(tk).width > maxW){ /* 超长单词逐字断开 */
+          for(var q = 0; q < tk.length; q++){ if(cur && mc.measureText(cur + tk[q]).width > maxW){ out.push(cur); cur = ""; } cur += tk[q]; }
+        } else cur += tk;
+      } else { out.push(cur.replace(/\s+$/, "")); cur = /^\s+$/.test(tk) ? "" : tk; }
+    });
+    if(cur) out.push(cur);
+    return out.slice(0, 8);
+  }
+  var nameLines = [], rowH = [], rowY = [], bodyH = 0;
+  vis.forEach(function(t, i){
+    var ls = wrapLines(t.name, nameW - (5 + depthOf(t) * 12) - 4, tsFont(t, FS, t.type === "group"));
+    nameLines[i] = ls; rowH[i] = Math.max(ROW, ls.length * NLH + 6); rowY[i] = bodyH; bodyH += rowH[i];
+  });
+  var H = Math.max(H0, PAD * 2 + HEAD + THEAD + FOOT + bodyH);
   var X0 = PAD, Y0 = PAD, IW = W - PAD * 2;
-  var CX = X0 + TBW, CW = X0 + IW - CX, TY = Y0 + HEAD, BY = TY + THEAD, FY = BY + ROW * vis.length;
+  var CX = X0 + TBW, CW = X0 + IW - CX, TY = Y0 + HEAD, BY = TY + THEAD, FY = BY + bodyH;
   if(FY < H - PAD - FOOT) FY = H - PAD - FOOT;
   var days = Math.max(diffDays(min, max), 1), pxDay = CW / days;
   function X(d){ return CX + diffDays(min, d) * pxDay; }
-  var scale = exportScale(W, H), c = document.createElement("canvas");
-  c.width = Math.round(W * scale); c.height = Math.round(H * scale);
-  var ctx = c.getContext("2d"); ctx.scale(scale, scale);
+  var ctx;
+  function paint(){
   ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
   function line(x1, y1, x2, y2, col, w){ ctx.strokeStyle = col; ctx.lineWidth = w || 1; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
   function txt(s, x, y, f, col, al){ ctx.font = f; ctx.fillStyle = col || "#111"; ctx.textAlign = al || "left"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y); }
@@ -4620,17 +4642,23 @@ function drawMspExport(cb, plan, imgL){
   }
   /* ---- 表体 ---- */
   vis.forEach(function(t, i){
-    var y = BY + i * ROW, cy = y + ROW / 2, grp = t.type === "group", f = tsFont(t, FS, grp), sp = span(t); _stk = !!tsEff(t).k;
+    var RH = rowH[i], y = BY + rowY[i], cy = y + RH / 2, grp = t.type === "group", f = tsFont(t, FS, grp), sp = span(t); _stk = !!tsEff(t).k;
     var vals = { id:grp ? "" : (rn[t.id] || ""), name:t.name, dur:durTxt(t), start:sp.s ? fmtD(sp.s) : "", fin:sp.e ? fmtD(sp.e) : "" };
     var x = X0;
     cols.forEach(function(cl){
       var pad = cl[0] === "name" ? 5 + depthOf(t) * 12 : 5;
+      if(cl[0] === "name"){
+        var nl = nameLines[i], _nc = tsCol(t, grp ? "#111" : "#1f2937");
+        nl.forEach(function(ln, j){ var ly = cy - (nl.length - 1) * NLH / 2 + j * NLH; txt(ln, x + pad, ly, f, _nc, "left");
+          if(_stk && ln){ ctx.font = f; line(x + pad, ly, x + pad + ctx.measureText(ln).width, ly, _nc); } });
+        x += cl[1]; return;
+      }
       var _cs = clip(vals[cl[0]], cl[1] - pad - 4, f), _cc = tsCol(t, grp ? "#111" : "#1f2937");
       txt(_cs, cl[2] === "center" ? x + cl[1] / 2 : x + pad, cy, f, _cc, cl[2]);
       if(_stk && cl[0] === "name" && _cs){ ctx.font = f; line(x + pad, cy, x + pad + ctx.measureText(_cs).width, cy, _cc); }
       x += cl[1];
     });
-    line(X0, y + ROW, CX, y + ROW, "#e5e7eb");
+    line(X0, y + RH, CX, y + RH, "#e5e7eb");
     if(!sp.s) return;
     var bx = X(sp.s), bx2 = X(addDays(sp.e, 1)), lf = tsFont(t, 10, true, true), lc = tsCol(t, "#111");
     if(grp){ /* 摘要：黑色细条 + 两端下勾 */
@@ -4673,6 +4701,25 @@ function drawMspExport(cb, plan, imgL){
     ["today", function(x, y){ ctx.setLineDash([4, 3]); line(x + 20, y - 8, x + 20, y + 8, "#16a34a", 1.2); ctx.setLineDash([]); }] ];
   lg.forEach(function(it, k){ var col = k % 3, row = Math.floor(k / 3), x = lx + 20 + col * 200, y = fy + 14 + row * 22; txt(L[it[0]], x, y, expFont(11, false), "#111"); it[1](x + 90, y); });
   ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  }
+  /* 单张画布（JPG/预览）：超出浏览器上限时降档 */
+  var scale = exportScale(W, H), c = document.createElement("canvas");
+  c.width = Math.round(W * scale); c.height = Math.round(H * scale);
+  ctx = c.getContext("2d"); ctx.scale(scale, scale); paint();
+  /* PDF：整页满 EXPORT_DPI，超大时分条渲染，不受画布上限影响 */
+  var full = EXPORT_DPI / 96;
+  if(scale < full - 1e-6){
+    c.ppStrips = function(){
+      var STRIP_PX = 48000000, sh = Math.max(64, Math.floor(STRIP_PX / (W * full * full) / 4) * 4), out = [];
+      for(var y0 = 0; y0 < H; y0 += sh){
+        var hh = Math.min(sh, H - y0), sc = document.createElement("canvas");
+        sc.width = Math.round(W * full); sc.height = Math.round(hh * full);
+        ctx = sc.getContext("2d"); ctx.scale(full, full); ctx.translate(0, -y0); paint();
+        out.push({ canvas:sc, y:y0, h:hh });
+      }
+      return out;
+    };
+  }
   cb(c, W, H);
 }
 function drawPlanStyleExport(cb, plan, imgL, imgR){
@@ -4914,16 +4961,48 @@ function buildPdf(jpeg, w, h, dispW, dispH){
 }
 function exportPDF(){
   renderExportCanvas(function(canvas, cssW, cssH){
-    canvas.toBlob(function(blob){
-      if(!blob) return;
-      var fr = new FileReader();
-      fr.onload = function(){
-        var pdf = buildPdf(new Uint8Array(fr.result), canvas.width, canvas.height, cssW, cssH);
+    var parts = canvas.ppStrips ? canvas.ppStrips() : [{ canvas:canvas, y:0, h:cssH }], imgs = [];
+    (function next(k){
+      if(k >= parts.length){
+        var pdf = buildPdfMulti(imgs, cssW, cssH);
         dlURL(URL.createObjectURL(new Blob([pdf], { type:'application/pdf' })), exportFileBase() + '.pdf');
-      };
-      fr.readAsArrayBuffer(blob);
-    }, 'image/jpeg', 0.95);
+        return;
+      }
+      var pc = parts[k].canvas;
+      pc.toBlob(function(blob){
+        if(!blob) return;
+        var fr = new FileReader();
+        fr.onload = function(){ imgs.push({ jpeg:new Uint8Array(fr.result), w:pc.width, h:pc.height, y:parts[k].y, hh:parts[k].h }); if(pc !== canvas){ pc.width = pc.height = 0; } next(k + 1); };
+        fr.readAsArrayBuffer(blob);
+      }, 'image/jpeg', 0.95);
+    })(0);
   });
+}
+/* 多图 PDF：单页，按纵向条带拼接 */
+function buildPdfMulti(imgs, dispW, dispH){
+  var pw = (dispW * 0.75).toFixed(2), ph = (dispH * 0.75).toFixed(2);
+  var chunks = [], len = 0, offsets = [0], out = { get length(){ return len; } };
+  function bs(s){ var u = new Uint8Array(s.length); for(var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i) & 255; chunks.push(u); len += u.length; }
+  function bb(u8){ chunks.push(u8); len += u8.length; }
+  function obj(n, dict, st){ offsets[n] = out.length; if(st){ bs(n + ' 0 obj\n' + dict + '\nstream\n'); bb(st); bs('\nendstream\nendobj\n'); } else bs(n + ' 0 obj\n' + dict + '\nendobj\n'); }
+  bs('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n');
+  var nImg = imgs.length, contentN = 4 + nImg, xo = [], content = '';
+  imgs.forEach(function(im, k){
+    xo.push('/Im' + k + ' ' + (4 + k) + ' 0 R');
+    var hh = (im.hh * 0.75).toFixed(4), yy = ((dispH - im.y - im.hh) * 0.75).toFixed(4);
+    content += 'q\n' + pw + ' 0 0 ' + hh + ' 0 ' + yy + ' cm\n/Im' + k + ' Do\nQ\n';
+  });
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pw + ' ' + ph + '] /Resources << /XObject << ' + xo.join(' ') + ' >> /ProcSet [/PDF /ImageC] >> /Contents ' + contentN + ' 0 R >>');
+  imgs.forEach(function(im, k){ obj(4 + k, '<< /Type /XObject /Subtype /Image /Width ' + im.w + ' /Height ' + im.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + im.jpeg.length + ' >>', im.jpeg); });
+  var cb = new Uint8Array(content.length); for(var i = 0; i < content.length; i++) cb[i] = content.charCodeAt(i);
+  obj(contentN, '<< /Length ' + content.length + ' >>', cb);
+  var n = contentN + 1, xrefAt = out.length;
+  bs('xref\n0 ' + n + '\n0000000000 65535 f \n');
+  for(var k = 1; k < n; k++){ var o = String(offsets[k]); while(o.length < 10) o = '0' + o; bs(o + ' 00000 n \n'); }
+  bs('trailer\n<< /Size ' + n + ' /Root 1 0 R >>\nstartxref\n' + xrefAt + '\n%%EOF');
+  var res = new Uint8Array(len), p = 0; chunks.forEach(function(u){ res.set(u, p); p += u.length; }); return res;
 }
 function exportJPG(){
   renderExportCanvas(function(canvas){
@@ -7972,7 +8051,14 @@ else init();
     G("fmt", "gFont", [byId("fmtBar")]);
     G("fmt", "gTxt", [byId("btnTxtStyle"), byId("btnColors"), barLab]);
     G("fmt", "gCols", [byId("btnCols")]);
-    G("fmt", "gShow", [lab("ckPhase"), lab("ckCrit"), lab("ckProgLine"), lab("ckOnum"), lab("ckPsum"), late, slack], "rb-cks");
+    /* 进度线旁的状态日期（同 MS Project「项目 › 状态日期」；未设置时用今天）（用户 2026-10-16） */
+    var sdLab = document.createElement("label"); sdLab.className = "ck rb-sd"; sdLab.title = tr("statusDate");
+    var sdIn = document.createElement("input"); sdIn.type = "date"; sdIn.id = "rbStatus"; sdIn.value = state.statusDate || "";
+    var sdT = document.createElement("span"); sdT.textContent = tr("statusDate");
+    sdIn.addEventListener("change", function(){ if(this.value) state.statusDate = this.value; else delete state.statusDate; save(); render(); });
+    sdLab.appendChild(sdT); sdLab.appendChild(sdIn);
+    window.__ppSyncStatus = function(){ if(document.activeElement !== sdIn) sdIn.value = state.statusDate || ""; };
+    G("fmt", "gShow", [lab("ckPhase"), lab("ckCrit"), lab("ckProgLine"), lab("ckOnum"), lab("ckPsum"), late, slack, sdLab], "rb-cks");
     G("proj", "gCal", [byId("btnCal"), unitLab]);
     G("proj", "gLevel", [byId("btnLevel"), byId("btnUnlevel"), byId("btnRecur")]);
     G("proj", "gBase", [baseRow, lab("ckBaseline")]);
@@ -7996,6 +8082,7 @@ else init();
 
 </script>
 <style id="rb11Css">
+.rb-sd{white-space:nowrap}.rb-sd input[type=date]{font-size:12px;height:22px;margin-left:4px;padding:0 4px}
 .ribbon.rb11 .rb-box.rb-cks{display:grid;grid-template-rows:repeat(2,auto);grid-auto-flow:column;gap:2px 12px;align-items:center}
 .ribbon.rb11 .rb-box .ck{font-size:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .ribbon.rb11 #paneBtns .rb-hide{display:none}
