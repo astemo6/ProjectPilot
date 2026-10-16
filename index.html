@@ -599,7 +599,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.9</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.10</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -4071,7 +4071,7 @@ function exportXLS(){
   /* 信息列：ID/名称常显；开始/结束必出（条件格式依赖它们）；其余随可见列 */
   /* 前置任务列不导出（用户 2026-10-16） */
   var infoKeys = ["id","name","owner","dur","start","end","cons","float"];
-  var keys = infoKeys.filter(function(k){ return k === "id" || k === "name" || k === "start" || k === "end" || colVis(k); });
+  var keys = infoKeys.filter(function(k){ return k === "id" || k === "name" || k === "dur" || k === "start" || k === "end" || colVis(k); });
   var cols = [], c = new Date(min);
   if(weekly) c.setDate(c.getDate() - ((c.getDay() + 6) % 7));
   /* 多留一段空白列，方便在 Excel 里把任务往后延 */
@@ -4085,7 +4085,17 @@ function exportXLS(){
   /* 列布局：A = 隐藏的类型列（G/T/M），随后信息列，再后甘特列 */
   var ci = { type:0 }; keys.forEach(function(k, i){ ci[k] = i + 1; });
   var g0 = keys.length + 1, nCols = g0 + cols.length, last = colL(nCols - 1);
-  var S = colL(ci.start), E = colL(ci.end), G0 = colL(g0);
+  var S = colL(ci.start), E = colL(ci.end), G0 = colL(g0), DC = colL(ci.dur);
+  /* 工期联动（用户 2026-10-16：在 Excel 里改工期，结束日期和甘特条要跟着变）：
+     隐藏工作表 WD 列出项目日历的全部工作日（含中国节假日/调休），结束 = INDEX(WD, 开始前工作日数 + 工期)；
+     前置 FS/SS 的开始也写成公式。每个公式先在 JS 里按同样算法验算，与当前计划一致才写公式，否则保留固定值 */
+  var useF = !HM(), wd = [], wdFrom = addDays(min, -400), wdTo = addDays(tail, 1500);
+  if(useF) for(var dd = new Date(wdFrom); dd <= wdTo; dd = addDays(dd, 1)) if(isWorkday(dd)) wd.push(serial(dd));
+  function cntLT(v){ var lo = 0, hi = wd.length; while(lo < hi){ var m = (lo + hi) >> 1; if(wd[m] < v) lo = m + 1; else hi = m; } return lo; }
+  function wdAt(i){ return i >= 1 && i <= wd.length ? wd[i - 1] : null; }
+  var rowOf = {}, rv = {};
+  vis.forEach(function(t, ri){ rowOf[t.id] = ri; });
+  var DUF = { d:1, w:5, mo:20 };
   var firstRow = 4, lastRow = Math.max(firstRow, firstRow + vis.length - 1);
   var rows = [];
   rows.push('<row r="1" ht="24" customHeight="1">' + sc("A1", "", 5) + sc("B1", planProjectName(), 5) + '</row>');
@@ -4118,24 +4128,48 @@ function exportXLS(){
     if(isG){ var sp = spanOf(t.id); s = sp.s; e = sp.e; }
     else { s = parseD(t.start); e = parseD(taskEnd(t)); }
     var cells = [sc("A" + r, isG ? "G" : (isMs ? "M" : "T"), 1)];
+    var sSer = s ? serial(s) : null, eSer = e ? serial(e) : null, fS = null, fE = null, fD = null;
+    var u = DUF[t.durUnit] ? t.durUnit : "d", f = DUF[u];
+    if(useF && !isG && sSer != null && !t.manual){
+      /* 开始：所有前置都是 FS/SS 且在导出行内 → MAX(各前置推出的日期) */
+      var ds = normDeps(t.deps);
+      if(ds.length && ds.every(function(d){ return (d.type === "FS" || d.type === "SS") && rowOf[d.id] != null && rowOf[d.id] < ri && rv[d.id]; })){
+        var parts = [], best = null, ok = true;
+        ds.forEach(function(d){ var pr = firstRow + rowOf[d.id], lag = Math.round(+d.lag || 0), pv = rv[d.id], v;
+          if(d.type === "FS"){ v = pv.e == null ? null : wdAt(cntLT(pv.e + 1) + 1 + lag); parts.push('INDEX(WD,COUNTIF(WD,"<="&$' + E + pr + ')+' + (1 + lag) + ')'); }
+          else { v = pv.s == null ? null : wdAt(cntLT(pv.s) + 1 + lag); parts.push('INDEX(WD,COUNTIF(WD,"<"&$' + S + pr + ')+' + (1 + lag) + ')'); }
+          if(v == null) ok = false; else if(best == null || v > best) best = v; });
+        if(ok && best === sSer) fS = parts.length > 1 ? 'MAX(' + parts.join(",") + ')' : parts[0];
+      }
+      var sRef = '$' + S + r, dRef = '$' + DC + r;
+      if(isMs){ fE = 'IF(ISNUMBER(' + sRef + '),' + sRef + ',"")'; }
+      else if(t.dur != null && eSer != null){
+        var n = Math.ceil(+t.dur - 1e-9), chk = n <= 0 ? sSer : wdAt(cntLT(sSer) + n);
+        if(chk === eSer) fE = 'IF(OR(NOT(ISNUMBER(' + sRef + ')),NOT(ISNUMBER(' + dRef + '))),"",IF(' + dRef + '<=0,' + sRef + ',INDEX(WD,COUNTIF(WD,"<"&' + sRef + ')+ROUNDUP(' + dRef + (f !== 1 ? '*' + f : '') + ',0))))';
+      }
+    }
+    if(useF && isG && kidRows(ri)) fD = 'IF(OR(NOT(ISNUMBER($' + S + r + ')),NOT(ISNUMBER($' + E + r + '))),"",COUNTIFS(WD,">="&$' + S + r + ',WD,"<="&$' + E + r + '))';
+    rv[t.id] = { s:sSer, e:eSer };
+    function fc(ref, form, val, st){ return '<c r="' + ref + '" s="' + st + '"><f>' + x(form) + '</f>' + (val != null ? '<v>' + val + '</v>' : '') + '</c>'; }
     keys.forEach(function(k){
       var ref = colL(ci[k]) + r, txt = isG ? 7 : 1, cen = isG ? 8 : 2, dt = isG ? 9 : 6;
       if(k === "id") cells.push(sc(ref, isG ? "" : rowNo(t.id), cen));
       else if(k === "name") cells.push(sc(ref, isG ? (state.collapsed[t.id] ? "▶ " : "▼ ") + t.name : (isMs ? "◆ " : "") + t.name, isG ? 13 : 12)); /* 名称自动换行 */
       else if(k === "owner") cells.push(sc(ref, isG ? "" : (t.owner || ""), txt));
       else if(k === "dur"){
-        if(isG) cells.push(sc(ref, "", cen));
-        else if(isMs) cells.push(nc(ref, 0, cen));
+        if(isG) cells.push(fD ? fc(ref, fD, (sSer != null && eSer != null) ? (cntLT(eSer + 1) - cntLT(sSer)) : null, 17) : sc(ref, "", cen));
+        else if(isMs) cells.push(nc(ref, 0, HM() ? cen : 14));
         else if(t.dur == null) cells.push(sc(ref, "", cen));
-        else cells.push(nc(ref, +t.dur, cen));
+        else if(HM()) cells.push(nc(ref, +t.dur, cen));
+        else cells.push(nc(ref, Math.round(+t.dur / f * 100) / 100, { d:14, w:15, mo:16 }[u]));
       }
       else if((k === "start" || k === "end") && isG && kidRows(ri)){
         /* 分组起止写成公式，改子任务日期后分组条也跟着变 */
         var kr = kidRows(ri), col = colL(ci[k]), v = k === "start" ? s : e, rg = col + (r + 1) + ':' + col + (r + kr);
         cells.push('<c r="' + ref + '" s="' + dt + '"><f>' + x('IF(COUNT(' + rg + ')=0,"",' + (k === "start" ? "MIN" : "MAX") + '(' + rg + '))') + '</f>' + (v ? '<v>' + serial(v) + '</v>' : '') + '</c>');
       }
-      else if(k === "start") cells.push(s ? nc(ref, serial(s), dt) : sc(ref, "", dt));
-      else if(k === "end") cells.push(e ? nc(ref, serial(e), dt) : sc(ref, "", dt));
+      else if(k === "start") cells.push(fS ? fc(ref, fS, sSer, dt) : s ? nc(ref, serial(s), dt) : sc(ref, "", dt));
+      else if(k === "end") cells.push(fE ? fc(ref, fE, eSer, dt) : e ? nc(ref, serial(e), dt) : sc(ref, "", dt));
       else if(k === "pred") cells.push(sc(ref, isG ? "" : depsToText(t.deps), cen));
       else if(k === "cons") cells.push(sc(ref, isG ? "" : (t.manual ? tr("manualSched") : tr("cons" + (t.cons || "ASAP")) + (consNeedsDate(t.cons) && t.consDate ? " " + t.consDate : "")), cen));
       else if(k === "float") cells.push(sc(ref, isG ? "" : (floatMap[t.id] === undefined ? "—" : String(floatMap[t.id])), cen));
@@ -4151,7 +4185,7 @@ function exportXLS(){
             + cf('AND(' + rT + '="G",' + span + ')', 1, 2, true)
             + cf('AND(' + rT + '="T",' + span + ')', 2, 3, true)
             + (weekly ? '' : cf('WEEKDAY(' + a + ',2)>5', 3, 4, false));
-  var widths = { id:5, name:38, owner:10, dur:7, start:11, end:11, pred:13, cons:14, float:6 };
+  var widths = { id:5, name:38, owner:10, dur:9, start:11, end:11, pred:13, cons:14, float:6 };
   var colXml = '<col min="1" max="1" width="4" hidden="1" customWidth="1"/>';
   keys.forEach(function(kk){ colXml += '<col min="' + (ci[kk] + 1) + '" max="' + (ci[kk] + 1) + '" width="' + widths[kk] + '" customWidth="1"/>'; });
   colXml += '<col min="' + (g0 + 1) + '" max="' + nCols + '" width="' + (weekly ? 5.5 : 4.2) + '" customWidth="1"/>';
@@ -4165,12 +4199,13 @@ function exportXLS(){
     + '<pageSetup orientation="landscape" paperSize="9"/></worksheet>';
   var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
     + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-    + '<numFmts count="3"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="m/d"/><numFmt numFmtId="166" formatCode="d"/></numFmts>'
+    + '<numFmts count="6"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="m/d"/><numFmt numFmtId="166" formatCode="d"/>'
+    + ["d","w","mo"].map(function(uu, i){ return '<numFmt numFmtId="' + (167 + i) + '" formatCode="' + x('General" ' + durUnitTxt(2, uu) + '"') + '"/>'; }).join("") + '</numFmts>'
     + '<fonts count="4"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FF1E3A52"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>'
     + '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1E3A52"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF5"/></patternFill></fill></fills>'
     + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC8CDD3"/></left><right style="thin"><color rgb="FFC8CDD3"/></right><top style="thin"><color rgb="FFC8CDD3"/></top><bottom style="thin"><color rgb="FFC8CDD3"/></bottom><diagonal/></border></borders>'
     + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    + '<cellXfs count="14">'
+    + '<cellXfs count="18">'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
@@ -4185,6 +4220,10 @@ function exportXLS(){
     + '<xf numFmtId="166" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'
     + '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'
+    + '<xf numFmtId="167" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="168" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="169" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+    + '<xf numFmtId="167" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
     + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     + '<dxfs count="4">'
     + '<dxf><fill><patternFill patternType="solid"><fgColor rgb="FFDC2626"/><bgColor rgb="FFDC2626"/></patternFill></fill></dxf>'
@@ -4194,12 +4233,13 @@ function exportXLS(){
     + '</dxfs></styleSheet>';
   var sheetName = x(planProjectName().replace(/[\[\]:*?\/\\]/g, "-").slice(0, 31) || "Plan");
   var files = [
-    ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
     ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
-    ["xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + sheetName + '" sheetId="1" r:id="rId1"/></sheets></workbook>'],
-    ["xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ["xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + sheetName + '" sheetId="1" r:id="rId1"/><sheet name="WD" sheetId="2" state="hidden" r:id="rId3"/></sheets><definedNames><definedName name="WD">WD!$A$1:$A$' + Math.max(1, wd.length) + '</definedName></definedNames><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>'],
+    ["xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>'],
     ["xl/styles.xml", styles],
-    ["xl/worksheets/sheet1.xml", sheet]
+    ["xl/worksheets/sheet1.xml", sheet],
+    ["xl/worksheets/sheet2.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + (wd.length ? wd : [0]).map(function(v, i){ return '<row r="' + (i + 1) + '"><c r="A' + (i + 1) + '" s="6"><v>' + v + '</v></c></row>'; }).join("") + '</sheetData></worksheet>']
   ];
   var blob = new Blob([zipStore(files)], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   dlURL(URL.createObjectURL(blob), exportFileBase() + ".xlsx");
