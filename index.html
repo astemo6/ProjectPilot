@@ -599,7 +599,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.11</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.12</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -8307,18 +8307,17 @@ else init();
 /* ===== 功能区 1.1 重排（用户 2026-10-15）：任务页减负、文件/格式/项目页平铺常用功能、视图页去重；可在「文件 › 帮助」切回旧版布局 ===== */
 (function(){
   var TX = {
-    zh:{ gProjF:"项目", nw:"新建", op:"打开", sv:"保存", more:"更多 ▾", gImp:"导入", gExp:"导出", gPrint:"打印", gHelp:"帮助", classic:"旧版功能区", modern:"新版功能区", classicTip:"切换回 1.0 版功能区布局（随时可切回）",
+    zh:{ gProjF:"项目", nw:"新建", op:"打开", sv:"保存", more:"更多 ▾", gImp:"导入", gExp:"导出", gPrint:"打印", gHelp:"帮助", 
       gIns:"插入", gSched:"日程", gPlan:"计划", gProp:"属性", gFont:"字体", gTxt:"格式", gCols:"列", gShow:"显示", gCal:"属性", gLevel:"排程", gBase:"基线", gRV:"视图", gRS:"显示", gRep:"报表与分析",
       gViews:"任务视图", gData:"数据", gZoom:"缩放", gPane:"显示", other:"其他视图…", ot:"按日程", inact:"停用", tl:"日程表", fill:"填充", link:"链接", unlink:"取消链接" },
-    en:{ gProjF:"Project", nw:"New", op:"Open", sv:"Save", more:"More ▾", gImp:"Import", gExp:"Export", gPrint:"Print", gHelp:"Help", classic:"Classic ribbon", modern:"New ribbon", classicTip:"Switch back to the 1.0 ribbon layout (switch again anytime)",
+    en:{ gProjF:"Project", nw:"New", op:"Open", sv:"Save", more:"More ▾", gImp:"Import", gExp:"Export", gPrint:"Print", gHelp:"Help", 
       gIns:"Insert", gSched:"Schedule", gPlan:"Tasks", gProp:"Properties", gFont:"Font", gTxt:"Format", gCols:"Columns", gShow:"Show/Hide", gCal:"Properties", gLevel:"Scheduling", gBase:"Baseline", gRV:"Views", gRS:"Show", gRep:"Reports & analysis",
       gViews:"Task views", gData:"Data", gZoom:"Zoom", gPane:"Show", other:"Other views…", ot:"On track", inact:"Inactivate", tl:"Timeline", fill:"Fill", link:"Link", unlink:"Unlink" },
-    de:{ gProjF:"Projekt", nw:"Neu", op:"Öffnen", sv:"Speichern", more:"Mehr ▾", gImp:"Import", gExp:"Export", gPrint:"Drucken", gHelp:"Hilfe", classic:"Klassisch", modern:"Neues Menüband", classicTip:"Zum Menüband-Layout 1.0 zurückwechseln (jederzeit umkehrbar)",
+    de:{ gProjF:"Projekt", nw:"Neu", op:"Öffnen", sv:"Speichern", more:"Mehr ▾", gImp:"Import", gExp:"Export", gPrint:"Drucken", gHelp:"Hilfe", 
       gIns:"Einfügen", gSched:"Terminplan", gPlan:"Vorgänge", gProp:"Eigenschaften", gFont:"Schriftart", gTxt:"Format", gCols:"Spalten", gShow:"Anzeigen", gCal:"Eigenschaften", gLevel:"Planung", gBase:"Basisplan", gRV:"Ansichten", gRS:"Anzeigen", gRep:"Berichte & Analyse",
       gViews:"Vorgangsansichten", gData:"Daten", gZoom:"Zoom", gPane:"Anzeigen", other:"Weitere Ansichten…", ot:"Planmäßig", inact:"Inaktiv", tl:"Zeitachse", fill:"Füllen", link:"Verknüpfen", unlink:"Lösen" } };
   function L(k){ var lg = lang; var t = TX[lg] || TX.zh; return t[k] != null ? t[k] : TX.zh[k]; }
-  var CK = "pp-ribbon-classic";
-  function classic(){ try { return localStorage.getItem(CK) === "1"; } catch(e){ return false; } }
+  try { localStorage.removeItem("pp-ribbon-classic"); } catch(e){} /* 旧版功能区已删除（用户 2026-10-16） */
   function $(s){ return document.querySelector(s); }
   function byId(id){ return document.getElementById(id); }
   function lab(id){ var e = byId(id); return e && e.closest("label"); }
@@ -8327,7 +8326,6 @@ else init();
   function addTxt(el, t){ if(!el || el.querySelector(".rb-t")) return; var s = document.createElement("span"); s.className = "rb-t"; s.textContent = t; el.appendChild(s); }
   function moreDd(items){ var d = document.createElement("div"), b = document.createElement("button"), m = document.createElement("div"); d.className = "dd"; b.className = "dd-b"; b.type = "button"; b.textContent = L("more"); m.className = "dd-m";
     items.forEach(function(x){ if(x) m.appendChild(x); }); d.appendChild(b); d.appendChild(m); return m.children.length ? d : null; }
-  function toggleBtn(){ var c = classic(); var b = btn(c ? L("modern") : L("classic"), function(){ try { localStorage.setItem(CK, c ? "0" : "1"); } catch(e){} location.reload(); }, c ? "" : L("classicTip")); b.id = "btnRbClassic"; return b; }
   function run(){
     var tb = $(".toolbar.ribbon"); if(!tb || tb.dataset.rb11) return; tb.dataset.rb11 = "1";
     var stash = tb.querySelector(".rb-stash");
@@ -8335,7 +8333,6 @@ else init();
     var placed = [];
     function G(tab, key, els, cls){ var p = panes[tab]; if(!p) return; var grp = document.createElement("div"), box = document.createElement("div"), lb = document.createElement("div"); grp.className = "rb-grp"; box.className = "rb-box" + (cls ? " " + cls : ""); lb.className = "rb-lab"; lb.textContent = L(key);
       els.forEach(function(e){ if(Array.isArray(e)){ var r = document.createElement("div"); r.className = "rb-row"; e.forEach(function(x){ if(!x) return; placed.push(x); r.appendChild(x); }); if(r.children.length) box.appendChild(r); return; } if(!e) return; placed.push(e); box.appendChild(e); }); if(!box.children.length) return; grp.appendChild(box); grp.appendChild(lb); p.appendChild(grp); }
-    if(classic()){ G("file", "gHelp", [toggleBtn()]); return; }
     tb.classList.add("rb11");
     var orig = []; tb.querySelectorAll(".rb-pane").forEach(function(p){ p.querySelectorAll(".rb-box > *").forEach(function(e){ orig.push([p.dataset.tab, e]); }); });
     var m2 = byId("msp2Bar"), msp = byId("mspView");
@@ -8364,7 +8361,7 @@ else init();
     G("file", "gImp", [byId("btnImport"), byId("btnImpXls"), byId("btnMPP"), moreDd([byId("btnImpXML"), byId("btnSubProj"), byId("btnImpGan"), byId("btnImpCsv")])]);
     G("file", "gExp", [byId("btnExport"), byId("btnPDF"), byId("btnJPG"), byId("btnXls"), moreDd([byId("btnExpXML"), byId("btnCSV"), byId("btnExpGan"), byId("btnExpInfo")])]);
     G("file", "gPrint", [byId("btnPreview")]);
-    G("file", "gHelp", [byId("btnKeys"), toggleBtn()]);
+    G("file", "gHelp", [byId("btnKeys")]);
     G("task", "gIns", [[byId("btnAdd"), byId("btnAddGroup"), byId("btnAddMs")], [byId("btnOemMs"), byId("btnDelSel")]], "rb-rows");
     G("task", "gSched", [[pct, byId("btnOutdent"), byId("btnIndent")], [lk, ulk]], "rb-rows");
     G("task", "gPlan", [[byId("modeBtns")], [ot, ina, mv]], "rb-rows");
