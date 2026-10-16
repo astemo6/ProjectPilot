@@ -598,7 +598,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.3</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.4</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -7879,9 +7879,9 @@ function v4ExpPlan(){
 /* ===== v4.9：对标 GanttProject —— 导入/导出 .gan（GanttProject 原生格式）、导入 CSV 任务（GanttProject / 本工具 CSV） ===== */
 (function(){
   var TX = {
-    zh:{ impGan:"导入 GanttProject (.gan)", expGan:"导出 GanttProject (.gan)", impCsv:"导入 CSV 任务", bad:"无法识别的文件", noTask:"文件里没有任务", noName:"CSV 缺少「名称 / Name」列" },
-    en:{ impGan:"Import GanttProject (.gan)", expGan:"Export GanttProject (.gan)", impCsv:"Import CSV tasks", bad:"Unrecognized file", noTask:"No tasks in file", noName:"CSV has no Name column" },
-    de:{ impGan:"GanttProject importieren (.gan)", expGan:"GanttProject exportieren (.gan)", impCsv:"CSV-Vorgänge importieren", bad:"Unbekannte Datei", noTask:"Keine Vorgänge in der Datei", noName:"CSV ohne Spalte Name" } };
+    zh:{ impGan:"导入 GanttProject (.gan)", expGan:"导出 GanttProject (.gan)", impCsv:"导入 CSV 任务",impXls:"导入 Excel",impXlsTip:"只读取 任务名称、开始日期、结束日期 三列；没有日期的行作为分组",xlsOld:"请另存为 .xlsx 后再导入（不支持旧版 .xls）",xlsNoHdr:"没找到表头：需要「任务名称」和「开始/结束日期」列", bad:"无法识别的文件", noTask:"文件里没有任务", noName:"CSV 缺少「名称 / Name」列" },
+    en:{ impGan:"Import GanttProject (.gan)", expGan:"Export GanttProject (.gan)", impCsv:"Import CSV tasks",impXls:"Import Excel",impXlsTip:"Reads only Task name, Start and Finish; rows without dates become groups",xlsOld:"Please save as .xlsx first (old .xls not supported)",xlsNoHdr:"No header found: need a Name column and a Start/Finish column", bad:"Unrecognized file", noTask:"No tasks in file", noName:"CSV has no Name column" },
+    de:{ impGan:"GanttProject importieren (.gan)", expGan:"GanttProject exportieren (.gan)", impCsv:"CSV-Vorgänge importieren",impXls:"Excel importieren",impXlsTip:"Liest nur Vorgangsname, Anfang und Ende; Zeilen ohne Datum werden Gruppen",xlsOld:"Bitte zuerst als .xlsx speichern (altes .xls nicht unterstützt)",xlsNoHdr:"Keine Kopfzeile gefunden: Name- und Anfang/Ende-Spalte nötig", bad:"Unbekannte Datei", noTask:"Keine Vorgänge in der Datei", noName:"CSV ohne Spalte Name" } };
   function L(k){ var v = (TX[lang] || TX.zh)[k]; return v == null ? TX.zh[k] : v; }
   function X(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   /* 统一中间结构 → MSPDI XML，交给现有 XML 导入（分组、依赖、资源、分配全部复用） */
@@ -7976,6 +7976,96 @@ function v4ExpPlan(){
   function importCsvText(text){ var tab = parseCsv(text); if(tab.length < 2){ toast(L("noTask")); return; } var rows = csvToRows(tab); if(!rows){ toast(L("noName")); return; } if(!rows.length){ toast(L("noTask")); return; }
     importXMLText(toMspdi((state.info && state.info.title) || "", rows), false); }
 
+  /* —— Excel (.xlsx) 导入（用户 2026-10-16）：只识别 任务名称 / 开始日期 / 结束日期，其余列忽略；
+     无日期的行视为分组（摘要），其后的任务归入该组 —— */
+  function unzipEntries(buf){
+    var u = new Uint8Array(buf), dv = new DataView(buf), eocd = -1;
+    for(var i = u.length - 22; i >= Math.max(0, u.length - 70000); i--){ if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; } }
+    if(eocd < 0) throw new Error("zip");
+    var n = dv.getUint16(eocd + 10, true), p = dv.getUint32(eocd + 16, true), ents = {};
+    for(var k = 0; k < n; k++){
+      if(dv.getUint32(p, true) !== 0x02014b50) break;
+      var meth = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
+      var name = new TextDecoder().decode(u.subarray(p + 46, p + 46 + nl));
+      var ds = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true);
+      ents[name] = { meth:meth, data:u.subarray(ds, ds + csz) };
+      p += 46 + nl + el + cl;
+    }
+    return ents;
+  }
+  function unzipText(ent){
+    if(!ent) return Promise.resolve("");
+    if(ent.meth === 0) return Promise.resolve(new TextDecoder().decode(ent.data));
+    return new Response(new Blob([ent.data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+  }
+  function xlsxToTable(buf){
+    var ents = unzipEntries(buf);
+    return Promise.all([unzipText(ents["xl/workbook.xml"]), unzipText(ents["xl/_rels/workbook.xml.rels"]), unzipText(ents["xl/sharedStrings.xml"])]).then(function(r){
+      var dp = new DOMParser(), wb = dp.parseFromString(r[0], "application/xml"), rels = dp.parseFromString(r[1] || "<r/>", "application/xml");
+      var sh = wb.getElementsByTagName("sheet")[0], path = "xl/worksheets/sheet1.xml";
+      if(sh){ var rid = sh.getAttribute("r:id") || sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+        Array.prototype.forEach.call(rels.getElementsByTagName("Relationship"), function(x){ if(x.getAttribute("Id") === rid){ var t = x.getAttribute("Target"); path = t.charAt(0) === "/" ? t.slice(1) : "xl/" + t.replace(/^\.\//, ""); } }); }
+      if(!ents[path]){ var ks = Object.keys(ents).filter(function(k){ return /^xl\/worksheets\/[^\/]+\.xml$/.test(k); }).sort(); path = ks[0]; }
+      var ss = [];
+      if(r[2]){ var sd = dp.parseFromString(r[2], "application/xml"); Array.prototype.forEach.call(sd.getElementsByTagName("si"), function(si){ var t = ""; Array.prototype.forEach.call(si.getElementsByTagName("t"), function(x){ var par = x.parentNode; if(par && par.nodeName === "rPh") return; t += x.textContent; }); ss.push(t); }); }
+      return unzipText(ents[path]).then(function(xml){
+        var doc = dp.parseFromString(xml, "application/xml"), tab = [];
+        Array.prototype.forEach.call(doc.getElementsByTagName("row"), function(row){
+          var cells = [], seq = 0;
+          Array.prototype.forEach.call(row.getElementsByTagName("c"), function(c){
+            var ref = c.getAttribute("r"), ci = seq;
+            if(ref){ var L = ref.match(/^[A-Z]+/)[0]; ci = 0; for(var q = 0; q < L.length; q++) ci = ci * 26 + L.charCodeAt(q) - 64; ci--; }
+            seq = ci + 1;
+            var t = c.getAttribute("t"), v = c.getElementsByTagName("v")[0], val = "";
+            if(t === "s") val = v ? (ss[+v.textContent] || "") : "";
+            else if(t === "inlineStr"){ var is = c.getElementsByTagName("t"); val = Array.prototype.map.call(is, function(x){ return x.textContent; }).join(""); }
+            else if(v) val = { num:t == null || t === "n", text:v.textContent };
+            cells[ci] = val;
+          });
+          tab.push(cells);
+        });
+        return tab;
+      });
+    });
+  }
+  function xlsTableToRows(tab){
+    function norm(x){ return String(x == null ? "" : (typeof x === "object" ? x.text : x)).replace(/\s+/g, "").toLowerCase(); }
+    var KN = ["任务名称","任务名","名称","任务","taskname","name","task","vorgangsname","vorgang","aufgabe","活动","工作项"],
+        KS = ["开始日期","开始时间","开始","计划开始","start","startdate","begin","begindate","anfang","beginn"],
+        KE = ["结束日期","结束时间","完成日期","完成时间","计划完成","结束","完成","finish","end","enddate","finishdate","ende"];
+    function find(row, keys){ for(var a = 0; a < keys.length; a++) for(var i = 0; i < row.length; i++){ var h = norm(row[i]); if(!h || /%|百分比|比例|进度|complete/.test(h)) continue; if(h === keys[a]) return i; }
+      for(var b = 0; b < keys.length; b++) for(var j = 0; j < row.length; j++){ var h2 = norm(row[j]); if(!h2 || /%|百分比|比例|进度|complete/.test(h2) || h2.length > 12) continue; if(h2.indexOf(keys[b]) >= 0) return j; } return -1; }
+    var hr = -1, C = null;
+    for(var r = 0; r < Math.min(tab.length, 15); r++){ var row = tab[r] || [], cn = find(row, KN), cs = find(row, KS), ce = find(row, KE);
+      if(cn >= 0 && (cs >= 0 || ce >= 0) && cn !== cs && cn !== ce){ hr = r; C = { n:cn, s:cs, e:ce }; break; } }
+    if(hr < 0) return null;
+    function dateOf(x){ if(x == null || x === "") return null;
+      if(typeof x === "object"){ var f = parseFloat(x.text); if(x.num && !isNaN(f) && f > 20000 && f < 80000){ var d = new Date(1899, 11, 30); d.setDate(d.getDate() + Math.floor(f)); return d; } x = x.text; }
+      return anyDate(String(x)); }
+    var out = [], grp = "";
+    tab.slice(hr + 1).forEach(function(row){ row = row || [];
+      var name = String(row[C.n] == null ? "" : (typeof row[C.n] === "object" ? row[C.n].text : row[C.n])).trim(); if(!name) return;
+      /* 本工具 / 常见导出的前缀符号：▼▶ = 分组，◆◇ = 里程碑 */
+      var mk = name.match(/^([▼▽▶►▸◆◇♦])\s*/), isG = mk && /[▼▽▶►▸]/.test(mk[1]), isM = mk && /[◆◇♦]/.test(mk[1]);
+      if(mk) name = name.slice(mk[0].length).trim(); if(!name) return;
+      var s = C.s >= 0 ? dateOf(row[C.s]) : null, e = C.e >= 0 ? dateOf(row[C.e]) : null;
+      if(isG || (!s && !e && !isM)){ grp = name; out.push([name, "", "", "group", ""]); return; }
+      if(!s && !e) return;
+      if(!s) s = e; if(!e || e < s) e = s;
+      out.push([name, fmtD(s), fmtD(e), isM ? "milestone" : "task", grp]);
+    });
+    return out;
+  }
+  function importXlsxBuf(buf){
+    var u = new Uint8Array(buf);
+    if(u[0] !== 0x50 || u[1] !== 0x4b){ toast(L("xlsOld")); return; }
+    xlsxToTable(buf).then(function(tab){
+      var rows = xlsTableToRows(tab); if(!rows){ toast(L("xlsNoHdr")); return; } if(!rows.length){ toast(L("noTask")); return; }
+      var csvRows = csvToRows([["name", "start", "end", "type", "group"]].concat(rows));
+      if(!csvRows || !csvRows.length){ toast(L("noTask")); return; }
+      importXMLText(toMspdi((state.info && state.info.title) || "", csvRows), false);
+    }).catch(function(e){ console.error(e); toast(L("bad")); });
+  }
   /* —— .gan 导出 —— */
   function exportGan(){
     var idn = {}, n = 0; state.tasks.forEach(function(t){ idn[t.id] = n++; });
@@ -8013,6 +8103,9 @@ function v4ExpPlan(){
       var b = document.createElement("button"); b.type = "button"; b.id = id; b.textContent = label; b.onclick = function(){ inp.click(); var dd = b.closest(".dd"); if(dd) dd.classList.remove("open"); }; im.appendChild(b); }
     fileBtn("btnImpGan", L("impGan"), ".gan,.xml", importGanText);
     fileBtn("btnImpCsv", L("impCsv"), ".csv,.txt", importCsvText);
+    (function(){ var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xlsm,.xls"; inp.style.display = "none"; document.body.appendChild(inp);
+      inp.onchange = function(){ var f = inp.files[0]; inp.value = ""; if(!f) return; var r = new FileReader(); r.onload = function(){ try { importXlsxBuf(r.result); } catch(e){ console.error(e); toast(L("bad")); } }; r.readAsArrayBuffer(f); };
+      var b = document.createElement("button"); b.type = "button"; b.id = "btnImpXls"; b.textContent = L("impXls"); b.title = L("impXlsTip"); b.onclick = function(){ inp.click(); var dd = b.closest(".dd"); if(dd) dd.classList.remove("open"); }; im.appendChild(b); })();
     var eb = document.createElement("button"); eb.type = "button"; eb.id = "btnExpGan"; eb.textContent = L("expGan"); eb.onclick = function(){ exportGan(); var dd = eb.closest(".dd"); if(dd) dd.classList.remove("open"); }; ex.appendChild(eb);
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
@@ -8147,7 +8240,7 @@ else init();
     var late = gi >= 0 ? showLabs[gi + 1] : null, slack = gi >= 0 ? showLabs[gi + 2] : null, tline = gi >= 0 ? showLabs[gi + 3] : null;
     var hold = document.createElement("div"); hold.style.display = "none"; tb.appendChild(hold); tb.querySelectorAll(".rb-pane").forEach(function(p){ while(p.firstChild) hold.appendChild(p.firstChild); });
     G("file", "gProjF", [btn("＋ " + L("nw"), function(){ if(window.__v4NewProj) window.__v4NewProj(); }), btn(L("op"), clickId("btnImport")), btn(L("sv"), clickId("btnExport"))]);
-    G("file", "gImp", [byId("btnImport"), byId("btnMPP"), moreDd([byId("btnImpXML"), byId("btnSubProj"), byId("btnImpGan"), byId("btnImpCsv")])]);
+    G("file", "gImp", [byId("btnImport"), byId("btnImpXls"), byId("btnMPP"), moreDd([byId("btnImpXML"), byId("btnSubProj"), byId("btnImpGan"), byId("btnImpCsv")])]);
     G("file", "gExp", [byId("btnExport"), byId("btnPDF"), byId("btnJPG"), byId("btnXls"), moreDd([byId("btnExpXML"), byId("btnCSV"), byId("btnExpGan"), byId("btnExpInfo")])]);
     G("file", "gPrint", [byId("btnPreview")]);
     G("file", "gHelp", [byId("btnKeys"), toggleBtn()]);
