@@ -20,15 +20,15 @@
 - **默认模板**：客户里程碑占位 + APQP 五大过程（计划和确定项目 / 产品设计和开发 / 过程设计和开发 / 产品和过程确认 / 反馈、评定和纠正措施）
 - **导入**：MS Project XML、MPP（Project 2007–2024 的 .mpp 在浏览器内离线解析；更早版本经转换服务）、GanttProject .gan / CSV、JSON
 - **导出**：PDF / JPG（MS Project 打印样式）、XML、GanttProject .gan、CSV、Excel（.xlsx，甘特色块随日期自动变化）、JSON
-- **操作**：Ribbon 功能区（可切回旧版布局）、快速访问工具栏、右键菜单、撤销/重做、快捷键（F1 查看）
+- **操作**：Ribbon 功能区、快速访问工具栏、右键菜单、撤销/重做、快捷键（F1 查看）
 
 ### 最近更新
 
+- 2026-10-16（1.2.12）：删除旧版功能区（含 1.0 在线版和旧离线包）
 - 2026-10-16（1.2.11）：修复旧浏览器数据里工期列仍隐藏的问题，升级后自动显示
 - 2026-10-16（1.2.10）：导出 Excel 改为公式联动：改工期，结束日期、后续任务（FS/SS）、分组和甘特条自动更新，按中国工作日和调休计算
 - 2026-10-16（1.2.9）：工期按输入单位显示（28 天 / 1 周 / 2 月，英文 days / wk / mons），摘要和里程碑也显示工期；MPP/XML 导入导出保留单位
 - 2026-10-16（1.2.8）：中国日历内置 2023–2026 年法定节假日与调休补班，工期自动跳过放假、计入补班；已保存的日历自动补入新年份
-- 2026-10-16（1.2.7）：「工期」列默认显示，可输入天/周/月（如 5、2周、1个月、3w、1mo，1 月按 20 个工作日），结束日期自动推算；导入 Excel 也识别「周期/工期」列
 
 数据只保存在本机浏览器，与 OEM-Gantt 互不影响。
 
@@ -47,7 +47,7 @@ A project scheduling tool (tasks, resources, progress tracking) modelled on MS P
 - **Default template**: customer-milestone placeholders + APQP 5 phases (Plan & Define / Product Design / Process Design / Validation / Feedback & Corrective Action)
 - **Import**: MS Project XML, MPP (Project 2007–2024 .mpp files are parsed offline in the browser; older versions via conversion service), GanttProject .gan / CSV, JSON
 - **Export**: PDF / JPG (MS Project print style), XML, GanttProject .gan, CSV, Excel (.xlsx, Gantt bars update automatically when dates change), JSON
-- **Usability**: ribbon (classic layout switchable), Quick Access Toolbar, context menu, undo/redo, keyboard shortcuts (press F1)
+- **Usability**: ribbon, Quick Access Toolbar, context menu, undo/redo, keyboard shortcuts (press F1)
 
 Data is stored only in your browser and is separate from OEM-Gantt.
 
@@ -66,6 +66,6 @@ Ein Projektplanungswerkzeug (Vorgänge, Ressourcen, Fortschrittsverfolgung) nach
 - **Standardvorlage**: Platzhalter für Kundenmeilensteine + APQP mit 5 Phasen (Planung / Produktentwicklung / Prozessentwicklung / Validierung / Rückmeldung)
 - **Import**: MS Project XML, MPP (.mpp aus Project 2007–2024 wird offline im Browser gelesen; ältere Versionen über Konvertierungsdienst), GanttProject .gan / CSV, JSON
 - **Export**: PDF / JPG (MS-Project-Druckstil), XML, GanttProject .gan, CSV, Excel (.xlsx, Balken passen sich bei Datumsänderung automatisch an), JSON
-- **Bedienung**: Menüband (klassisches Layout umschaltbar), Symbolleiste für den Schnellzugriff, Kontextmenü, Rückgängig/Wiederholen, Tastenkürzel (F1)
+- **Bedienung**: Menüband, Symbolleiste für den Schnellzugriff, Kontextmenü, Rückgängig/Wiederholen, Tastenkürzel (F1)
 
 Daten werden nur im Browser gespeichert und sind von OEM-Gantt getrennt.
