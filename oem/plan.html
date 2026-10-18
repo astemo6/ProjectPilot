@@ -2165,11 +2165,11 @@ function init(){
   $('btnJSON').addEventListener('click', exportJSON);
   $('btnImport').addEventListener('click', function(){ $('fileJSON').click(); });
   $('btnExec').addEventListener('click', function(){
-    /* 跳转执行页：exec.html?oem=<slug>&lang=<lang>；未选 OEM 时不带 oem 参数 */
+    /* 跳转执行页：../index.html?oem=<slug>&lang=<lang>；未选 OEM 时不带 oem 参数（2026-10-18 修复：原 exec.html 相对路径解析为 oem/exec.html 导致 404） */
     var p = [];
     if(state.oem) p.push('oem=' + oemSlug(state.oem));
     if(lang) p.push('lang=' + lang);
-    location.href = 'exec.html' + (p.length ? '?' + p.join('&') : '');
+    location.href = '../index.html' + (p.length ? '?' + p.join('&') : '');
   });
   $('fileJSON').addEventListener('change', function(){
     if(this.files && this.files[0]) importJSON(this.files[0]);
