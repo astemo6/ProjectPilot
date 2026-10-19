@@ -1,14 +1,20 @@
-import json,os,re
-W='/workspace/work'; O=W+'/offline/ProjectPilot-离线版'; os.makedirs(O,exist_ok=True)
+import json,os,re,sys
+# 路径不再硬编码作者本机 /workspace/work：默认取仓库根目录，可用环境变量 OFFLINE_SRC 覆盖
+# （作者本地 gt4/=主程序目录、gt3/=OEM 页目录；仓库根目录结构与之一致）
+W=os.environ.get("OFFLINE_SRC") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def p(*a): return os.path.join(W,*a)
+for f in [p('gt4','workcal.js'),p('gt4','index.html'),p('gt3','workcal.js'),p('gt3','plan.html'),p('gt3','index.html')]:
+    if not os.path.exists(f): sys.exit(f"找不到 {f}：请确认 OFFLINE_SRC 指向含 gt4/、gt3/ 的工作目录，或直接在仓库根目录运行")
+O=p('offline','ProjectPilot-离线版'); os.makedirs(O,exist_ok=True)
 def inl(html,wc): return html.replace('<script src="workcal.js"></script>','<script>'+wc+'</script>')
-wc4=open(W+'/gt4/workcal.js').read(); wc3=open(W+'/gt3/workcal.js').read()
-pp=inl(open(W+'/gt4/index.html').read(),wc4)
+wc4=open(p('gt4','workcal.js')).read(); wc3=open(p('gt3','workcal.js')).read()
+pp=inl(open(p('gt4','index.html')).read(),wc4)
 assert '<script src="workcal.js">' not in pp
 pp=pp.replace('id="lnkOem" href="oem/"','id="lnkOem" href="OEM-Gantt.html"')
 open(O+'/ProjectPilot.html','w').write(pp)
-plan=inl(open(W+'/gt3/plan.html').read(),wc3)
+plan=inl(open(p('gt3','plan.html')).read(),wc3)
 plan=plan.replace('new URL(location.href)','new URL(window.__OFFLINE_URL || location.href)').replace("history.replaceState(null, '', u.toString());","if(!window.__OFFLINE_URL) history.replaceState(null, '', u.toString());")
-sh=open(W+'/gt3/index.html').read()
+sh=open(p('gt3','index.html')).read()
 sh=sh.replace('href="../" data-t="toV4"','href="ProjectPilot.html" data-t="toV4"')
 inj='<script>window.__OFFLINE_PLAN__='+json.dumps(plan).replace('</','<\\/')+';</script>\n'
 k=sh.index('<script>'); sh=sh[:k]+inj+sh[k:]
