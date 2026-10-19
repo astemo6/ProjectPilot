@@ -663,6 +663,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
     <button id="btnImport" data-i18n="importJSON">导入 JSON</button>
     <button id="btnImpXML" data-i18n="impXml">导入 XML</button>
     <button id="btnMPP" data-i18n="mppBtn">导入 MPP</button>
+    <div style="padding:4px 10px;border-top:1px solid var(--bd)"><label data-i18n="mppSrv" style="font-size:11px;opacity:.7">MPP 转换服务地址</label><input id="inpMppUrl" style="width:100%;box-sizing:border-box;margin-top:2px" placeholder="https://…/convert"></div>
     <button id="btnSubProj" data-i18n="subBtn">插入子项目</button>
   </div></div>
   <button id="btnPreview" data-i18n="preview">预览</button>
@@ -5372,6 +5373,10 @@ function init(){
   document.getElementById("btnImpXML").addEventListener("click", function(){ document.getElementById("fileXML").click(); });
   document.getElementById("btnMPP").addEventListener("click", function(){ document.getElementById("fileMPP").click(); });
   document.getElementById("fileMPP").addEventListener("change", function(){ var f = this.files[0]; this.value = ""; importMPPFile(f); });
+  (function(){ var iu = document.getElementById("inpMppUrl"); if(!iu) return;
+    try{ var sv = localStorage.getItem("pp-mpp-url"); if(sv) iu.value = sv; else iu.placeholder = MPP_URL; }catch(e){ iu.placeholder = MPP_URL; }
+    iu.addEventListener("change", function(){ try{ localStorage.setItem("pp-mpp-url", iu.value.trim()); toast(tr("mppSrvOk")); }catch(e){} });
+  })();
   document.getElementById("btnSubProj").addEventListener("click", function(){ document.getElementById("fileSub").click(); });
   document.getElementById("fileSub").addEventListener("change", function(){ var f = this.files[0]; this.value = ""; insertSubproject(f); });
   document.getElementById("ckProgLine").addEventListener("change", function(){ state.progLine = this.checked; render(); });
@@ -5496,7 +5501,8 @@ function init(){
 /* ================= ⑥ ProjectLibre 补齐：任务类型/投入比导向、资源日历、实际工时与实际成本、
    分时费率与成本累算、优先级、筛选/排序/搜索、自定义字段、任务分配状况、资源图表、WBS 图、报表与项目信息、
    进度线、网络图拖拽链接、MPP 在线导入 ================= */
-var MPP_URL = "https://mpp.45-92-159-155.sslip.io:8443/convert";
+var MPP_URL = "https://mpp.45-92-159-155.sslip.io:8443/convert"; /* 默认转换服务；用户可在「导入 ▾」菜单里修改，存 localStorage "pp-mpp-url" */
+function mppUrl(){ try{ var v = localStorage.getItem("pp-mpp-url"); if(v) return v; }catch(e){} return state.mppUrl || MPP_URL; }
 var P6T = {
 zh:{ttype:"任务类型",ttFU:"固定单位",ttFW:"固定工时",ttFD:"固定工期",effort:"投入比导向",priority:"优先级",text1:"文本1",text2:"文本2",text3:"文本3",num1:"数字1",num2:"数字2",num3:"数字3",
  fltAll:"全部任务",fltCrit:"关键任务",fltMs:"里程碑",fltInc:"未完成",fltDone:"已完成",fltLate:"进度落后",fltPro:"进行中",fltUn:"未分配资源",fltOver:"资源过度分配",fltSearch:"搜索名称/资源",
@@ -5509,7 +5515,7 @@ zh:{ttype:"任务类型",ttFU:"固定单位",ttFW:"固定工时",ttFD:"固定工
  repInfo:"项目信息",repTitle:"项目名称",repMgr:"项目经理",repCo:"公司",repNotes:"备注",repPrint:"打印报表",
  repOverview:"项目概览",repStart:"开始",repFinish:"完成",repDur:"工期（工作日）",repWork:"总工时",repCost:"总成本",repBaseCost:"基线成本",repBaseFin:"基线完成",repVarFin:"完成差异",
  repTasks:"任务数",repDone:"已完成",repPro:"进行中",repNot:"未开始",repLate:"落后",repMs:"里程碑",repCrit:"关键任务",repLateT:"落后任务",repRes:"资源概况",repGrp:"成本按阶段",
- repNone:"无",mppBtn:"导入 MPP",mppBusy:"正在服务器上解析 MPP…",mppFail:"MPP 解析失败：",mppXmlHint:"\n\n可在 MS Project 中「文件 → 另存为 → XML 格式 (*.xml)」，再导入该 XML 文件。",mppPwd:"该 .mpp 文件受密码保护，无法读取。",mppLocalErr:"本地解析：",mppSrvErr:"转换服务：",subBtn:"插入子项目",subOk:"已插入子项目",
+ repNone:"无",mppSrv:"MPP 转换服务地址",mppSrvOk:"已保存",mppBtn:"导入 MPP",mppBusy:"正在服务器上解析 MPP…",mppFail:"MPP 解析失败：",mppXmlHint:"\n\n可在 MS Project 中「文件 → 另存为 → XML 格式 (*.xml)」，再导入该 XML 文件。",mppPwd:"该 .mpp 文件受密码保护，无法读取。",mppLocalErr:"本地解析：",mppSrvErr:"转换服务：",subBtn:"插入子项目",subOk:"已插入子项目",
  netLinkHint:"按住 Shift 从一个方框拖到另一个方框可建立完成-开始链接。",netLinked:"已建立链接",nameCol:"名称",typeCol:"类型",
  noRes:"没有工时资源",days:"天"},
 en:{ttype:"Task type",ttFU:"Fixed units",ttFW:"Fixed work",ttFD:"Fixed duration",effort:"Effort driven",priority:"Priority",text1:"Text1",text2:"Text2",text3:"Text3",num1:"Number1",num2:"Number2",num3:"Number3",
@@ -5523,7 +5529,7 @@ en:{ttype:"Task type",ttFU:"Fixed units",ttFW:"Fixed work",ttFD:"Fixed duration"
  repInfo:"Project information",repTitle:"Title",repMgr:"Manager",repCo:"Company",repNotes:"Notes",repPrint:"Print report",
  repOverview:"Project overview",repStart:"Start",repFinish:"Finish",repDur:"Duration (workdays)",repWork:"Work",repCost:"Cost",repBaseCost:"Baseline cost",repBaseFin:"Baseline finish",repVarFin:"Finish variance",
  repTasks:"Tasks",repDone:"Completed",repPro:"In progress",repNot:"Not started",repLate:"Late",repMs:"Milestones",repCrit:"Critical tasks",repLateT:"Late tasks",repRes:"Resources",repGrp:"Cost by phase",
- repNone:"None",mppBtn:"Import MPP",mppBusy:"Parsing MPP on server…",mppFail:"MPP import failed: ",mppXmlHint:"\n\nIn MS Project use File → Save As → XML Format (*.xml), then import that XML file.",mppPwd:"This .mpp file is password protected and cannot be read.",mppLocalErr:"Local parser: ",mppSrvErr:"Conversion service: ",subBtn:"Insert subproject",subOk:"Subproject inserted",
+ repNone:"None",mppSrv:"MPP conversion service URL",mppSrvOk:"Saved",mppBtn:"Import MPP",mppBusy:"Parsing MPP on server…",mppFail:"MPP import failed: ",mppXmlHint:"\n\nIn MS Project use File → Save As → XML Format (*.xml), then import that XML file.",mppPwd:"This .mpp file is password protected and cannot be read.",mppLocalErr:"Local parser: ",mppSrvErr:"Conversion service: ",subBtn:"Insert subproject",subOk:"Subproject inserted",
  netLinkHint:"Shift-drag from one box to another to create a finish-to-start link.",netLinked:"Link created",nameCol:"Name",typeCol:"Type",
  noRes:"No work resources",days:"d"},
 de:{ttype:"Vorgangsart",ttFU:"Feste Einheiten",ttFW:"Feste Arbeit",ttFD:"Feste Dauer",effort:"Leistungsgesteuert",priority:"Priorität",text1:"Text1",text2:"Text2",text3:"Text3",num1:"Zahl1",num2:"Zahl2",num3:"Zahl3",
@@ -5537,7 +5543,7 @@ de:{ttype:"Vorgangsart",ttFU:"Feste Einheiten",ttFW:"Feste Arbeit",ttFD:"Feste D
  repInfo:"Projektinfo",repTitle:"Titel",repMgr:"Projektleiter",repCo:"Firma",repNotes:"Notizen",repPrint:"Bericht drucken",
  repOverview:"Projektübersicht",repStart:"Anfang",repFinish:"Ende",repDur:"Dauer (AT)",repWork:"Arbeit",repCost:"Kosten",repBaseCost:"Basiskosten",repBaseFin:"Basisende",repVarFin:"Endabweichung",
  repTasks:"Vorgänge",repDone:"Abgeschlossen",repPro:"In Arbeit",repNot:"Nicht begonnen",repLate:"Verzögert",repMs:"Meilensteine",repCrit:"Kritische Vorgänge",repLateT:"Verzögerte Vorgänge",repRes:"Ressourcen",repGrp:"Kosten je Phase",
- repNone:"Keine",mppBtn:"MPP importieren",mppBusy:"MPP wird auf dem Server gelesen…",mppFail:"MPP-Import fehlgeschlagen: ",mppXmlHint:"\n\nIn MS Project: Datei → Speichern unter → XML-Format (*.xml), dann diese XML-Datei importieren.",mppPwd:"Diese .mpp-Datei ist kennwortgeschützt und kann nicht gelesen werden.",mppLocalErr:"Lokaler Parser: ",mppSrvErr:"Konvertierungsdienst: ",subBtn:"Teilprojekt einfügen",subOk:"Teilprojekt eingefügt",
+ repNone:"Keine",mppSrv:"MPP-Konvertierungsdienst-URL",mppSrvOk:"Gespeichert",mppBtn:"MPP importieren",mppBusy:"MPP wird auf dem Server gelesen…",mppFail:"MPP-Import fehlgeschlagen: ",mppXmlHint:"\n\nIn MS Project: Datei → Speichern unter → XML-Format (*.xml), dann diese XML-Datei importieren.",mppPwd:"Diese .mpp-Datei ist kennwortgeschützt und kann nicht gelesen werden.",mppLocalErr:"Lokaler Parser: ",mppSrvErr:"Konvertierungsdienst: ",subBtn:"Teilprojekt einfügen",subOk:"Teilprojekt eingefügt",
  netLinkHint:"Mit Umschalt von einem Kasten zum anderen ziehen = EA-Verknüpfung.",netLinked:"Verknüpft",nameCol:"Name",typeCol:"Art",
  noRes:"Keine Arbeitsressourcen",days:"T"}};
 Object.keys(P6T).forEach(function(l){ if(I18N[l]) Object.assign(I18N[l], P6T[l]); });
@@ -5854,7 +5860,7 @@ function mppLocalXML(f){
 function mppServerXML(f){
   toast(tr("mppBusy"));
   var fd = new FormData(); fd.append("file", f, f.name || "project.mpp");
-  return fetch(state.mppUrl || MPP_URL, { method:"POST", body:fd }).then(function(r){
+  return fetch(mppUrl(), { method:"POST", body:fd }).then(function(r){
     return r.text().then(function(tx){ if(!r.ok){ var m = tx; try{ var j = JSON.parse(tx); m = j.error + (j.detail ? " · " + j.detail : ""); }catch(e){} throw new Error(m || ("HTTP " + r.status)); } return tx; });
   });
 }
