@@ -3136,7 +3136,17 @@ function addRecurring(o){
   });
   return ds.length;
 }
+var _resWarnSig = null;
 function computeResWarn(){ /* 过度分配：同一资源在同一工作日的单位合计 > 最大单位 → 相关任务资源格标⚠，资源表标红 */
+  /* 性能：输入没变时跳过逐天展开（千任务×数百天）；签名覆盖任务日期/工期/负责人、日历、资源 */
+  var sig = (state.unit || "") + "|" + (state.resWarn ? "1" : "0") + "|" + cal.mode + "|"
+    + Object.keys(cal.holidays).sort().join(",") + "|" + Object.keys(cal.makeup).sort().join(",") + "|";
+  var ts = state.tasks;
+  for(var i = 0; i < ts.length; i++){ var t0 = ts[i]; sig += t0.id + "," + (t0.start || "") + "," + (t0.dur || 0) + "," + (t0.owner || "") + "," + (t0.type || "") + ";"; }
+  var rs = resList();
+  for(var j = 0; j < rs.length; j++){ var r0 = rs[j]; sig += r0.name + "," + r0.maxUnits + "," + r0.type + ";"; }
+  if(sig === _resWarnSig) return;
+  _resWarnSig = sig;
   resWarnMap = {}; resOverMap = {};
   ensureResources();
   var load = {};
