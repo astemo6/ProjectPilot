@@ -1,5 +1,5 @@
 """MPP → MSPDI XML 转换服务（MPXJ）。POST /convert ，请求体为文件原始字节（或 multipart 字段 file）。"""
-import os, tempfile, time, threading, cgi, io, json
+import os, re, tempfile, time, threading, io, json
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import jpype, jpype.imports, mpxj  # noqa: F401  (mpxj 把 jar 加入 classpath)
 jpype.startJVM("-Xmx512m", "-Djava.awt.headless=true")
@@ -15,8 +15,30 @@ def allowed(ip):
     now = time.time()
     with lock:
         q = [t for t in hits.get(ip, []) if now - t < 60]
-        if len(q) >= RATE: hits[ip] = q; return False
-        q.append(now); hits[ip] = q; return True
+        if len(q) >= RATE:
+            if q: hits[ip] = q
+            elif ip in hits: del hits[ip]
+            return False
+        q.append(now); hits[ip] = q
+        # 内存泄漏修复：表过大时顺手清理 60 秒无请求的 IP，避免 hits 无限增长
+        if len(hits) > 1000:
+            for k in list(hits.keys()):
+                if k != ip and all(t <= now - 60 for t in hits[k]):
+                    del hits[k]
+        return True
+
+def extract_upload(data, content_type):
+    """极简 multipart 解析（替代 Python 3.13 已移除的 cgi 模块）：提取字段 file 的字节，失败返回 None"""
+    m = re.search(r'boundary=([^;]+)', content_type or "")
+    if not m: return None
+    b = m.group(1).strip().strip('"').encode()
+    for part in data.split(b'--' + b):
+        if b'Content-Disposition' not in part: continue
+        head, sep, body = part.partition(b'\r\n\r\n')
+        if not sep: continue
+        if b'name="file"' in head or b"name='file'" in head:
+            return body[:-2] if body.endswith(b'\r\n') else body
+    return None
 
 def _d(v):
     return str(v)[:19] if v is not None else ""
@@ -74,9 +96,9 @@ class H(BaseHTTPRequestHandler):
         data = self.rfile.read(n)
         ct = self.headers.get("Content-Type", "")
         if ct.startswith("multipart/form-data"):
-            fs = cgi.FieldStorage(fp=io.BytesIO(data), headers=self.headers, environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": ct, "CONTENT_LENGTH": str(n)})
-            if "file" not in fs: return self.reply(400, json.dumps({"error": "missing file field"}))
-            data = fs["file"].file.read()
+            up = extract_upload(data, ct)
+            if up is None: return self.reply(400, json.dumps({"error": "missing file field"}))
+            data = up
         fd, src = tempfile.mkstemp(suffix=".mpp"); os.write(fd, data); os.close(fd)
         out = src + ".xml"
         try:
