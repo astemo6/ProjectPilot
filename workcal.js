@@ -79,6 +79,11 @@
   }
   function load() {
     try { var s = root.localStorage.getItem(KEY); if (s) return norm(JSON.parse(s)); } catch (e) {}
+    /* 一次性迁移：oem 页旧 key "gantt-workcal-v1" 的用户自定义 → 新 key，避免统一 key 后丢失 */
+    try {
+      var old = root.localStorage.getItem("gantt-workcal-v1");
+      if (old) { root.localStorage.setItem(KEY, old); root.localStorage.removeItem("gantt-workcal-v1"); return norm(JSON.parse(old)); }
+    } catch (e2) {}
     return defaults("CN");
   }
   function save(c) { try { root.localStorage.setItem(KEY, JSON.stringify({ mode: c.mode, holidays: c.holidays, makeup: Object.keys(c.makeup || {}), years: c.years || Object.keys(CN).map(String) })); return true; } catch (e) { return false; } }

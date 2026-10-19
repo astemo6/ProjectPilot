@@ -4,7 +4,7 @@
    holidays / makeup 是可编辑层：CN 模式默认预填国务院公布的节假日；任何模式下都可追加自定义放假/补班。 */
 (function (root) {
   "use strict";
-  var KEY = "gantt-workcal-v1";
+  var KEY = "gantt-workcal-v4";
   var CN = {
     2023: {
       hol: [["2022-12-31", "2023-01-02", "元旦"], ["2023-01-21", "2023-01-27", "春节"], ["2023-04-05", "2023-04-05", "清明"], ["2023-04-29", "2023-05-03", "劳动节"],
@@ -79,6 +79,11 @@
   }
   function load() {
     try { var s = root.localStorage.getItem(KEY); if (s) return norm(JSON.parse(s)); } catch (e) {}
+    /* 一次性迁移：oem 页旧 key "gantt-workcal-v1" 的用户自定义 → 新 key，避免统一 key 后丢失 */
+    try {
+      var old = root.localStorage.getItem("gantt-workcal-v1");
+      if (old) { root.localStorage.setItem(KEY, old); root.localStorage.removeItem("gantt-workcal-v1"); return norm(JSON.parse(old)); }
+    } catch (e2) {}
     return defaults("CN");
   }
   function save(c) { try { root.localStorage.setItem(KEY, JSON.stringify({ mode: c.mode, holidays: c.holidays, makeup: Object.keys(c.makeup || {}), years: c.years || Object.keys(CN).map(String) })); return true; } catch (e) { return false; } }
