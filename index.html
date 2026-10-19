@@ -5364,7 +5364,13 @@ function mergeFromPlan(p){
   return n;
 }
 /* 执行页里拖动/编辑了客户节点里程碑 → 自动写回节点日期（只在有变化时写，避免来回触发） */
+var _syncBackSig = null;
 function autoSyncBack(){
+  /* 性能：里程碑日期没变时跳过 localStorage 读+JSON.parse（每 render 都调） */
+  var sig = "", ts = state.tasks;
+  for(var i = 0; i < ts.length; i++){ var t0 = ts[i]; if(t0.type === "milestone") sig += t0.id + ":" + (t0.start || "") + ";"; }
+  if(sig === _syncBackSig) return;
+  _syncBackSig = sig;
   var plan = null;
   try{ plan = JSON.parse(localStorage.getItem("gantt-plan-v4-unused")); }catch(e){}
   if(!plan || !plan.dates) return;
