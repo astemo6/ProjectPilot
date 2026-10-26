@@ -25,6 +25,14 @@
       hol: [["2026-01-01", "2026-01-03", "元旦"], ["2026-02-15", "2026-02-23", "春节"], ["2026-04-04", "2026-04-06", "清明"], ["2026-05-01", "2026-05-05", "劳动节"],
             ["2026-06-19", "2026-06-21", "端午"], ["2026-09-25", "2026-09-27", "中秋"], ["2026-10-01", "2026-10-07", "国庆"]],
       mk: ["2026-01-04", "2026-02-14", "2026-02-28", "2026-05-09", "2026-09-20", "2026-10-10"]
+    },
+    /* 2027 暂定（用户 2026-10-26）：国务院 2027 年放假通知未发布（往年 11 月），先按《全国年节及纪念日放假办法》法定假日 +
+       第六条「适逢周六、周日应当在工作日补假」排出；无调休补班。正式通知发布后加入 CN[2027]，norm() 会自动删掉这些「暂定」日期。 */
+    "2027p": {
+      hol: [["2027-01-01", "2027-01-01", "元旦（暂定）"], ["2027-02-05", "2027-02-10", "春节（暂定）"], ["2027-04-05", "2027-04-05", "清明（暂定）"],
+            ["2027-05-01", "2027-05-04", "劳动节（暂定）"], ["2027-06-09", "2027-06-09", "端午（暂定）"], ["2027-09-15", "2027-09-15", "中秋（暂定）"],
+            ["2027-10-01", "2027-10-05", "国庆（暂定）"]],
+      mk: []
     }
   };
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -71,6 +79,8 @@
     if (!out.years) out.years = Object.keys(out.holidays).some(function (k) { return k.slice(0, 4) === "2026"; }) ? ["2026"] : [];
     if (mode === "CN") Object.keys(CN).forEach(function (y) {
       if (out.years.indexOf(String(y)) >= 0) return;
+      /* 正式年份到来时，先删掉该年的「暂定」假日 */
+      if (!/p$/.test(y)) Object.keys(out.holidays).forEach(function (k) { if (k.slice(0, 4) === String(y) && /暂定/.test(out.holidays[k])) delete out.holidays[k]; });
       CN[y].hol.forEach(function (r) { var d = parse(r[0]), e = parse(r[1]); while (d <= e) { var k = iso(d); if (!(k in out.holidays) && !out.makeup[k]) out.holidays[k] = r[2]; d.setDate(d.getDate() + 1); } });
       CN[y].mk.forEach(function (s) { if (!(s in out.holidays)) out.makeup[s] = 1; });
       out.years.push(String(y));
@@ -112,9 +122,9 @@
     return { s: iso(s), e: iso(e) };
   }
   var NOTE = {
-    zh: { CN: "内置 2023–2026 年国务院节假日安排（含调休补班）；其他年份仅剔除周末，可自行补充", DE: "德国全国性法定假日（自动计算复活节相关假日，不含各州假日）", WE: "仅剔除周六周日", OFF: "关闭：工期按自然日计算" },
-    en: { CN: "Built-in 2023–2026 China holiday schedule (incl. make-up workdays); other years exclude weekends only", DE: "German nationwide public holidays (state holidays not included)", WE: "Saturdays and Sundays only", OFF: "Off: durations count calendar days" },
-    de: { CN: "Chinesischer Feiertagsplan 2023–2026 integriert (inkl. Nachholarbeitstage); andere Jahre nur Wochenenden", DE: "Bundesweite Feiertage (ohne Landesfeiertage)", WE: "Nur Samstage und Sonntage", OFF: "Aus: Dauer in Kalendertagen" }
+    zh: { CN: "内置 2023–2026 年国务院节假日安排（含调休补班），2027 年暂按法定假日排（正式通知发布后更新）；其他年份仅剔除周末，可自行补充", DE: "德国全国性法定假日（自动计算复活节相关假日，不含各州假日）", WE: "仅剔除周六周日", OFF: "关闭：工期按自然日计算" },
+    en: { CN: "Built-in 2023–2026 China holiday schedule (incl. make-up workdays), 2027 provisional (statutory days until the official notice); other years exclude weekends only", DE: "German nationwide public holidays (state holidays not included)", WE: "Saturdays and Sundays only", OFF: "Off: durations count calendar days" },
+    de: { CN: "Chinesischer Feiertagsplan 2023–2026 integriert (inkl. Nachholarbeitstage), 2027 vorläufig (gesetzliche Feiertage); andere Jahre nur Wochenenden", DE: "Bundesweite Feiertage (ohne Landesfeiertage)", WE: "Nur Samstage und Sonntage", OFF: "Aus: Dauer in Kalendertagen" }
   };
   var LABEL = {
     zh: { CN: "中国（法定节假日+调休）", DE: "德国（全国性假日）", WE: "仅周末", OFF: "关闭（自然日）" },
