@@ -109,6 +109,7 @@ aside select,aside input.date,aside input[type=text]{font-size:13px;padding:6px 
 .rec-row.off{opacity:.45}
 .rec-row .nname{flex:1;min-width:0}
 .rmeta{display:block;font-size:11px;color:#9ca3af}
+.rdate{display:block;font-size:11px;color:var(--tx2,#4b5563);white-space:normal;line-height:1.35}.rec-shift s{opacity:.6}.rec-shift b{color:#d97706;font-weight:600}
 .offs{display:flex;align-items:center;gap:3px;font-size:11px;color:#9ca3af;flex-shrink:0}
 .offs input{width:46px;font-size:12px;padding:3px 4px;border:1px solid #d1d5db;border-radius:6px}
 .hint{font-size:12px;color:#9ca3af;margin:6px 0}
@@ -589,7 +590,7 @@ zh: {
   projectNamePh:'项目名称（例如：XX车型项目）',
   btnSample:'载入示例日期', btnPDF:'导出 PDF', btnJSON:'导出 JSON', btnImport:'导入 JSON', btnClearCache:'清空缓存', btnExec:'执行计划 →', confirmClearCache:'确定要清空所有缓存数据吗？页面将恢复到初始空白状态。', toastLogoTooBig:'Logo 图片太大无法缓存，刷新后需重新上传',
   tabForm:'填写数据', tabChart:'查看甘特图',
-  ckUseCal:'考虑节假日', toastCalFix:'已按节假日把 {0} 个日期调整到工作日', legendHol:'节假日', calWeekend:'周末', calHol:'假日', calOffTip:'非工作日：{0}', calOnInfo:'按 ProjectPilot 工作日历「{0}」：级联与拖动的日期顺延到工作日，自定义任务和供应商节点强制落在工作日，推荐任务避开节假日，节假日在甘特图中标出；客户节点日期不改，落在非工作日时标黄。在 ProjectPilot「项目 → 工作日历」中修改。', calOffInfo:'按自然日计算，不考虑周末和节假日。', secOem:'主机厂', oemPlaceholder:'请选择主机厂', oemHint:'切换主机厂后，客户节点清单自动更换；同名节点的日期会保留。',
+  ckUseCal:'考虑节假日', recShiftTip:'因节假日顺延，原为 {0}', toastCalOn:'已考虑节假日：{0} 项推荐任务日期顺延（列表中橙色为新日期）', toastCalOff:'已改回自然日：{0} 项推荐任务恢复原日期', toastCalFix:'已按节假日把 {0} 个日期调整到工作日', legendHol:'节假日', calWeekend:'周末', calHol:'假日', calOffTip:'非工作日：{0}', calOnInfo:'按 ProjectPilot 工作日历「{0}」：级联与拖动的日期顺延到工作日，自定义任务和供应商节点强制落在工作日，推荐任务避开节假日，节假日在甘特图中标出；客户节点日期不改，落在非工作日时标黄。在 ProjectPilot「项目 → 工作日历」中修改。', calOffInfo:'按自然日计算，不考虑周末和节假日。', secOem:'主机厂', oemPlaceholder:'请选择主机厂', oemHint:'切换主机厂后，客户节点清单自动更换；同名节点的日期会保留。',
   secNodes:'客户节点日期', secCollapse:'收起', secExpand:'展开', nodeHint:'勾选参与本项目的节点，未勾选的不进入甘特图；日期倒置（后一节点早于前一节点）会标红提醒。',
   secRec:'推荐任务（模板）', recHint:'推荐的内部任务模板，日期按锚点节点自动推算；偏移周数可改；不勾选的不进入甘特图。',
   secTasks:'自定义任务', taskNamePh:'任务名称（例如：模具T1试模）', btnAddTask:'添加任务', delTask:'删除',
@@ -622,7 +623,7 @@ en: {
   projectNamePh:'Project name (e.g. XX model project)',
   btnSample:'Load Sample Dates', btnPDF:'Export PDF', btnJSON:'Export JSON', btnImport:'Import JSON', btnClearCache:'Clear Cache', btnExec:'Execution Plan →', confirmClearCache:'Clear all cached data? The page will reset to its initial blank state.', toastLogoTooBig:'Logo too large to cache; re-upload needed after refresh',
   tabForm:'Input Data', tabChart:'View Gantt',
-  ckUseCal:'Consider holidays', toastCalFix:'{0} dates moved to working days (holidays considered)', legendHol:'Holidays', calWeekend:'Weekend', calHol:'Holiday', calOffTip:'Non-working day: {0}', calOnInfo:'Uses the ProjectPilot work calendar "{0}": cascaded and dragged dates move to the next working day, custom tasks and supplier nodes are forced onto working days, recommended tasks skip holidays, and holidays are shaded in the chart; customer dates are not changed, only highlighted in amber when they fall on a day off. Change it in ProjectPilot under Project → Work Calendar.', calOffInfo:'Calendar days: weekends and holidays are ignored.', secOem:'OEM', oemPlaceholder:'Select OEM', oemHint:'Switching OEM reloads the milestone list; dates of same-named milestones are kept.',
+  ckUseCal:'Consider holidays', recShiftTip:'Shifted by holidays, was {0}', toastCalOn:'Holidays considered: {0} recommended tasks shifted (new dates in orange)', toastCalOff:'Calendar days restored: {0} recommended tasks back to original dates', toastCalFix:'{0} dates moved to working days (holidays considered)', legendHol:'Holidays', calWeekend:'Weekend', calHol:'Holiday', calOffTip:'Non-working day: {0}', calOnInfo:'Uses the ProjectPilot work calendar "{0}": cascaded and dragged dates move to the next working day, custom tasks and supplier nodes are forced onto working days, recommended tasks skip holidays, and holidays are shaded in the chart; customer dates are not changed, only highlighted in amber when they fall on a day off. Change it in ProjectPilot under Project → Work Calendar.', calOffInfo:'Calendar days: weekends and holidays are ignored.', secOem:'OEM', oemPlaceholder:'Select OEM', oemHint:'Switching OEM reloads the milestone list; dates of same-named milestones are kept.',
   secNodes:'Customer Milestone Dates', secCollapse:'Collapse', secExpand:'Expand', nodeHint:'Tick milestones included in this project; unticked ones are excluded from the chart. Inverted dates (a later milestone earlier than the previous one) are flagged red.',
   secRec:'Recommended Tasks (Template)', recHint:'Recommended internal task template; dates auto-derived from anchor milestones, week offsets editable; unticked tasks are excluded.',
   secTasks:'Custom Tasks', taskNamePh:'Task name (e.g. tooling T1 tryout)', btnAddTask:'Add Task', delTask:'Delete',
@@ -655,7 +656,7 @@ de: {
   projectNamePh:'Projektname (z. B. Projekt Modell XX)',
   btnSample:'Beispieldaten', btnPDF:'PDF-Export', btnJSON:'JSON-Export', btnImport:'JSON-Import', btnClearCache:'Cache leeren', btnExec:'Ausführungsplan →', confirmClearCache:'Alle zwischengespeicherten Daten löschen? Die Seite wird auf den Ausgangszustand zurückgesetzt.', toastLogoTooBig:'Logo zu groß für Cache; nach Aktualisierung erneut hochladen',
   tabForm:'Daten eingeben', tabChart:'Gantt ansehen',
-  ckUseCal:'Feiertage berücksichtigen', toastCalFix:'{0} Termine auf Arbeitstage verschoben (Feiertage berücksichtigt)', legendHol:'Feiertage', calWeekend:'Wochenende', calHol:'Feiertag', calOffTip:'Arbeitsfreier Tag: {0}', calOnInfo:'Nutzt den ProjectPilot-Arbeitskalender „{0}“: kaskadierte und gezogene Termine rücken auf den nächsten Arbeitstag, eigene Aufgaben und Lieferantenknoten werden auf Arbeitstage gelegt, empfohlene Aufgaben meiden Feiertage, Feiertage sind im Diagramm markiert; Kundentermine bleiben unverändert und werden an freien Tagen gelb markiert. Änderbar in ProjectPilot unter Projekt → Arbeitskalender.', calOffInfo:'Kalendertage: Wochenenden und Feiertage werden ignoriert.', secOem:'OEM', oemPlaceholder:'OEM wählen', oemHint:'Beim OEM-Wechsel wird die Meilensteinliste neu geladen; Daten gleichnamiger Meilensteine bleiben erhalten.',
+  ckUseCal:'Feiertage berücksichtigen', recShiftTip:'Wegen Feiertagen verschoben, vorher {0}', toastCalOn:'Feiertage berücksichtigt: {0} empfohlene Aufgaben verschoben (neue Termine orange)', toastCalOff:'Kalendertage wiederhergestellt: {0} empfohlene Aufgaben auf ursprüngliche Termine', toastCalFix:'{0} Termine auf Arbeitstage verschoben (Feiertage berücksichtigt)', legendHol:'Feiertage', calWeekend:'Wochenende', calHol:'Feiertag', calOffTip:'Arbeitsfreier Tag: {0}', calOnInfo:'Nutzt den ProjectPilot-Arbeitskalender „{0}“: kaskadierte und gezogene Termine rücken auf den nächsten Arbeitstag, eigene Aufgaben und Lieferantenknoten werden auf Arbeitstage gelegt, empfohlene Aufgaben meiden Feiertage, Feiertage sind im Diagramm markiert; Kundentermine bleiben unverändert und werden an freien Tagen gelb markiert. Änderbar in ProjectPilot unter Projekt → Arbeitskalender.', calOffInfo:'Kalendertage: Wochenenden und Feiertage werden ignoriert.', secOem:'OEM', oemPlaceholder:'OEM wählen', oemHint:'Beim OEM-Wechsel wird die Meilensteinliste neu geladen; Daten gleichnamiger Meilensteine bleiben erhalten.',
   secNodes:'Termine der Kundenmeilensteine', secCollapse:'Einklappen', secExpand:'Ausklappen', nodeHint:'Meilensteine dieses Projekts anhaken; nicht angehakte erscheinen nicht im Diagramm. Verdrehte Daten (späterer Meilenstein vor früherem) werden rot markiert.',
   secRec:'Empfohlene Aufgaben (Vorlage)', recHint:'Empfohlene interne Aufgabenvorlage; Termine werden automatisch von Anker-Meilensteinen abgeleitet, Wochen-Offsets änderbar; nicht angehakte Aufgaben erscheinen nicht.',
   secTasks:'Eigene Aufgaben', taskNamePh:'Aufgabenname (z. B. T1-Werkzeugerprobung)', btnAddTask:'Aufgabe hinzufügen', delTask:'Löschen',
@@ -982,6 +983,9 @@ function recAnchorDate(t){
   if(!anchor || state.excluded[anchor]) return null;
   return parseD(state.dates[anchor]);
 }
+/* 不考虑节假日时的自然区间，用于显示「原 → 新」（用户 2026-10-26：要看到日期变化） */
+function recRangeNat(t){ var o = state.useCal; state.useCal = false; try{ return recRange(t); } finally { state.useCal = o; } }
+function recShiftCount(){ var n = 0; REC_TASKS.forEach(function(t){ var c = recCfg(t.id); if(!c || c.on === false) return; var a = recRange(t), b = recRangeNat(t); if(a && b && a.ok && b.ok && (fmtD(a.s) !== fmtD(b.s) || fmtD(a.e) !== fmtD(b.e))) n++; }); return n; }
 function recRange(t){
   var cfg = recCfg(t.id), ad = recAnchorDate(t);
   if(!ad) return null;
@@ -1033,11 +1037,12 @@ function renderRecTasks(){
     var cfg = recCfg(t.id);
     if(cfg.on) onCount++;
     var r = recRange(t);
-    var rangeHtml = r ? (r.ok ? fmtD(r.s) + ' ~ ' + fmtD(r.e) : '<span style="color:#ef4444">' + tr('recInvert') + '</span>') : '<span style="color:#9ca3af">' + tr('recWait') + '</span>';
-    var meta = tr('anchor') + ' ' + pick(phaseName(taskPhaseKey(t))) + ' · ' + esc(trunc(abbr(anchor), 14)) + ' ｜ ' + (cfg.so>=0?'+':'') + cfg.so + ' ~ ' + (cfg.eo>=0?'+':'') + cfg.eo + tr('week') + ' ｜ ' + rangeHtml;
+    var rn = recRangeNat(t), shifted = r && r.ok && rn && rn.ok && (fmtD(rn.s) !== fmtD(r.s) || fmtD(rn.e) !== fmtD(r.e));
+    var rangeHtml = r ? (r.ok ? (shifted ? '<span class="rec-shift" title="' + esc(tr('recShiftTip').replace('{0}', fmtD(rn.s) + ' ~ ' + fmtD(rn.e))) + '"><s>' + fmtD(rn.s) + ' ~ ' + fmtD(rn.e) + '</s> → <b>' + fmtD(r.s) + ' ~ ' + fmtD(r.e) + '</b></span>' : fmtD(r.s) + ' ~ ' + fmtD(r.e)) : '<span style="color:#ef4444">' + tr('recInvert') + '</span>') : '<span style="color:#9ca3af">' + tr('recWait') + '</span>';
+    var meta = tr('anchor') + ' ' + pick(phaseName(taskPhaseKey(t))) + ' · ' + esc(trunc(abbr(anchor), 14)) + ' ｜ ' + (cfg.so>=0?'+':'') + cfg.so + ' ~ ' + (cfg.eo>=0?'+':'') + cfg.eo + tr('week');
     html += '<div class="rec-row' + (cfg.on ? '' : ' off') + '" title="' + esc(pick(t.desc) || '') + '">'
       + '<input type="checkbox" class="recc" data-id="' + t.id + '"' + (cfg.on ? ' checked' : '') + '>'
-      + '<span class="nname">' + esc(pick(t.name)) + '<span class="rmeta">' + meta + '</span></span>'
+      + '<span class="nname">' + esc(pick(t.name)) + '<span class="rdate">' + rangeHtml + '</span><span class="rmeta">' + meta + '</span></span>'
       + '<span class="offs"><input type="number" data-id="' + t.id + '" data-k="so" value="' + cfg.so + '" title="' + esc(tr('offStartTitle')) + '">~<input type="number" data-id="' + t.id + '" data-k="eo" value="' + cfg.eo + '" title="' + esc(tr('offEndTitle')) + '">' + tr('week') + '</span>'
       + '</div>';
   });
@@ -2192,6 +2197,10 @@ function init(){
   syncCalUi();
   $('ckUseCal').addEventListener('change', function(){
     state.useCal = this.checked; ppCalReset(); syncCalUi(); save(); renderAll();
+    /* 用户 2026-10-26：切换后要看到日期变化——提示改了几项，并展开推荐任务列表显示「原 → 新」 */
+    var _n = 0; state.useCal = true; try{ _n = recShiftCount(); } finally { state.useCal = this.checked; }
+    if(_n){ var _sr = $('secRec'); if(_sr && this.checked){ _sr.classList.remove('collapsed'); refreshSecToggles(); } }
+    toast(tr(this.checked ? 'toastCalOn' : 'toastCalOff').replace('{0}', _n));
   });
   $('ckPhase').addEventListener('change', function(){
     state.showPhase = this.checked;
