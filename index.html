@@ -599,7 +599,7 @@ html[data-theme=dark] ::-webkit-scrollbar-thumb{background-color:rgba(255,255,25
 </head>
 <body>
 <header>
-  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.14</span>
+  <h1>ProjectPilot</h1><span class="sub" id="appVer" title="版本 / Version" style="display:none">1.2.15</span>
   <input id="projName" placeholder="填写项目名称" title="项目名称：用于导出标题和文件名" autocomplete="off">
   <span class="sp"></span>
   <a id="lnkOem" href="oem/" target="_blank" rel="noopener" style="text-decoration:none;margin-right:4px">OEM-Gantt ↗</a>
@@ -8162,7 +8162,7 @@ else init();
     var late = gi >= 0 ? showLabs[gi + 1] : null, slack = gi >= 0 ? showLabs[gi + 2] : null, tline = gi >= 0 ? showLabs[gi + 3] : null;
     var hold = document.createElement("div"); hold.style.display = "none"; tb.appendChild(hold); tb.querySelectorAll(".rb-pane").forEach(function(p){ while(p.firstChild) hold.appendChild(p.firstChild); });
     G("file", "gProjF", [btn("＋ " + L("nw"), function(){ if(window.__v4NewProj) window.__v4NewProj(); }), btn(L("op"), clickId("btnImport")), btn(L("sv"), clickId("btnExport"))]);
-    G("file", "gImp", [byId("btnImport"), byId("btnImpXls"), byId("btnMPP"), moreDd([byId("btnImpXML"), byId("btnSubProj"), byId("btnImpGan"), byId("btnImpCsv")])]);
+    G("file", "gImp", [byId("btnImport"), byId("btnImpXls"), byId("btnMPP"), moreDd([byId("btnImpXML"), byId("btnSubProj"), byId("btnImpGan"), byId("btnImpCsv"), byId("inpMppUrl") && byId("inpMppUrl").parentNode])]);
     G("file", "gExp", [byId("btnExport"), byId("btnPDF"), byId("btnJPG"), byId("btnXls"), moreDd([byId("btnExpXML"), byId("btnCSV"), byId("btnExpGan"), byId("btnExpInfo")])]);
     G("file", "gPrint", [byId("btnPreview")]);
     G("file", "gHelp", [byId("btnKeys")]);
