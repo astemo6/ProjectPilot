@@ -29,11 +29,11 @@ Customer milestone planner: pick an OEM, enter its milestone dates, and get a mi
 
 ### 最近更新
 
+- 2026-10-26：勾选「考虑节假日」后，推荐任务按工作日计工期，区间内遇法定假日结束日自动往后顺延
 - 2026-10-26：OEM 页可选「考虑节假日」，关联 ProjectPilot 工作日历；勾选后自定义任务和供应商节点强制落在工作日，节假日在甘特图中标出；README 改为英文、中文、德文顺序
 - 2026-10-16：Tesla 节点顺序调整为 DFM1 → DFM2 → Nomination
 - 2026-10-16：新增主机厂 Tesla(特斯拉)：DFM1、Nomination、DFM2、Tool Kick Off、RC1、RC2、TQP、Pilot、SOP、SOP+3，输入首个日期自动按参考项目间隔级联
 - 2026-10-15：手动调里程碑行高时，名字倾角随行高自动变化（10°–75°），名字始终完整显示，不盖到年份/月份、不伸出图表；行高低于所需最小值时自动抬高
-- 2026-10-15：甘特图上可左右拖动菱形（客户节点、供应商节点）直接改日期；导出前弹出确认框，可选择保存位置
 
 ## Deutsch
 
