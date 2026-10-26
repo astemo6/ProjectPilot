@@ -43,11 +43,11 @@ Data is stored only in your browser and is separate from OEM-Gantt.
 
 ### 最近更新
 
+- 2026-10-26：从 OEM-Gantt 带入的推荐任务按工作日计工期，遇法定假日顺延（与 OEM 页一致）
 - 2026-10-26：「文件 → 导入 → 更多」里可填写 MPP 转换服务地址（留空用默认服务器）
 - 2026-10-26：OEM-Gantt 可选「考虑节假日」，使用 ProjectPilot 的工作日历；README 改为英文、中文、德文顺序
 - 2026-10-16（1.2.14）：Tesla 节点顺序调整为 DFM1 → DFM2 → Nomination
 - 2026-10-16（1.2.13）：新增主机厂 Tesla(特斯拉) 客户里程碑（DFM1 → SOP+3 共 10 个节点）
-- 2026-10-16（1.2.12）：删除旧版功能区（含 1.0 在线版和旧离线包）
 
 数据只保存在本机浏览器，与 OEM-Gantt 互不影响。
 
