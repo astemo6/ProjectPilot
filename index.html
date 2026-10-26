@@ -5039,10 +5039,13 @@ function planWanted(p){
     var ad = parseD(p.dates[anchor]); if(!ad) return;
     var sd = addDays(ad, cfg.so * 7), ed = addDays(ad, cfg.eo * 7);
     if(ed < sd) return;
+    /* 与 OEM-Gantt 一致（用户 2026-10-26）：工期 = 模板区间内周一至周五的天数，起点顺延到工作日，按项目日历数工作日，假日把结束日往后推 */
+    var need = 0, x = new Date(sd.getTime()), g;
+    for(g = 0; g < 4000 && x <= ed; g++){ var wd = x.getDay(); if(wd !== 0 && wd !== 6) need++; x = addDays(x, 1); }
     var sn = WORKCAL.snapRange(fmtD(sd), fmtD(ed), cal);
-    sd = parseD(sn.s); ed = parseD(sn.e);
+    sd = parseD(sn.s);
     out.push({ key:"rec:" + rt.id, grp:"grp:rec", gname:tr("planGroupRec"), name:planPickName(rt.name), type:"task",
-      start:fmtD(sd), dur:Math.max(workdaysBetween(sd, ed) + 1, 1), color:"#2563eb" });
+      start:fmtD(sd), dur:Math.max(need, 1), color:"#2563eb" });
   });
   (p.customMs || []).forEach(function(row){
     if(!row || !row.dates || !row.dates.length) return;
