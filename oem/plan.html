@@ -987,9 +987,15 @@ function recRange(t){
   if(!ad) return null;
   var s = addDays(ad, cfg.so*7), e = addDays(ad, cfg.eo*7);
   if(e < s) return { s:s, e:e, ok:false };
-  /* 考虑节假日时：起点顺延、终点提前到工作日（ProjectPilot 工作日历） */
-  var sn = snapRangeD(s, e);
-  return { s:sn.s, e:sn.e, ok:true };
+  /* 考虑节假日时（用户 2026-10-26：已排好的时间要随假期变化、结束日只能顺延不能提前）：
+     模板区间按「周一至周五」算出应有的工作日数，起点顺延到工作日后按 ProjectPilot 工作日历数够这些工作日，
+     区间内的法定假日会把结束日往后推；调休补班日照常算工作日。 */
+  if(!useCal()) return { s:s, e:e, ok:true };
+  var need = 0, x = new Date(s.getTime()), g;
+  for(g = 0; g < 4000 && x <= e; g++){ var wd = x.getDay(); if(wd !== 0 && wd !== 6) need++; x = addDays(x, 1); }
+  var a = snapWork(s), b = new Date(a.getTime()), cnt = 1;
+  for(g = 0; g < 4000 && cnt < need; g++){ b = addDays(b, 1); if(ppKeyWork('', b)) cnt++; }
+  return { s:a, e:b, ok:true };
 }
 var VDA_EN = { 'ML0–ML2':'', ML0:'Innovation Release', ML1:'Requirements Management for Contract Award', ML2:'Determination of Supply Chain / Placing of Orders', ML3:'Release of Technical Specifications', ML4:'Production Planning Completed', ML5:'Production-Level Parts & Tools Available', ML6:'Product & Process Approval', ML7:'Handover to Production' };
 var VDA_COL = ['#dbeafe', '#e0e7ff', '#ebe5fb', '#f3e4f8', '#fae4f1', '#fde4ea', '#fde8e4'];
