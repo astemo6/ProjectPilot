@@ -369,7 +369,9 @@ html[data-theme=dark] #chart rect[fill="#dbeafe"]{fill:#1e3350}html[data-theme=d
       <h3><span data-i18n="secOem">主机厂</span></h3>
       <select id="oemSelect"></select>
       <p class="hint" data-i18n="oemHint">切换主机厂后，客户节点清单自动更换；同名节点的日期会保留。</p>
-      <label class="ck cal-ck"><input type="checkbox" id="ckUseCal" checked> <span data-i18n="ckUseCal">考虑节假日</span></label>
+    </section>
+    <section id="secCal"><!-- 单独一节：嵌入 OEM 外壳时第一节（主机厂）被隐藏，开关不能放在里面（用户 2026-10-26 找不到） -->
+      <label class="ck cal-ck" style="margin-top:0;font-weight:600"><input type="checkbox" id="ckUseCal" checked> <span data-i18n="ckUseCal">考虑节假日</span></label>
       <p class="hint" id="calInfo"></p>
     </section>
     <section id="secNodes">
