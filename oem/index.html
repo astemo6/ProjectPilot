@@ -178,6 +178,16 @@ html[data-theme=dark] #stage iframe{background:#1c1c1e}
 html[data-theme=dark] #hint{background:rgba(10,132,255,.14);color:#64b5ff;border-bottom-color:rgba(10,132,255,.25)}
 #top .tb:disabled{opacity:.4;cursor:default}
 </style>
+<style id="zoomCss">
+/* 用户 2026-10-27：浏览器放大（125%–200%）后布局不乱：顶栏放不下时自动换行，下方区域用 flex 填满剩余高度 */
+body{display:flex;flex-direction:column}
+#top{flex:0 0 auto;flex-wrap:wrap;height:auto!important;min-height:48px;row-gap:6px;padding-top:8px;padding-bottom:8px;white-space:nowrap}
+#hint{flex:0 0 auto}
+#stage{flex:1 1 auto;height:auto!important;min-height:0}
+#projName{flex:0 1 220px;min-width:110px}
+#top .sp{flex:1 1 0;min-width:0}
+@media (max-width:1280px){#btnUndo [data-t],#btnRedo [data-t]{display:none}#btnUndo,#btnRedo{padding:0 9px}.oemwrap select{max-width:170px}}
+</style>
 </head>
 <body>
 <div id="top">
