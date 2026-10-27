@@ -6431,7 +6431,12 @@ I18N.zh.netLinkDup = "这两个任务已经有链接了"; I18N.en.netLinkDup = "
   document.addEventListener("click", function(e){
     var b = e.target.closest && e.target.closest(".toolbar .dd-b");
     if(b){ var d = b.parentNode; closeAll(d); d.classList.toggle("open");
-      var m = d.querySelector(".dd-m"); if(m){ m.style.left = ""; m.style.right = ""; /* 菜单靠左展开，超出右边缘时改为右对齐，避免被裁 */
+      var m = d.querySelector(".dd-m"); if(m){ m.style.left = ""; m.style.right = ""; m.style.top = "";
+        /* 功能区可横向滚动时菜单用 fixed 定位（避免被裁）：按按钮位置放，再按实际偏差校正（祖先 backdrop-filter 会改变 fixed 参照） */
+        if(d.classList.contains("open") && d.closest(".rb-pane")){ var br = b.getBoundingClientRect(); m.style.left = br.left + "px"; m.style.top = (br.bottom + 4) + "px"; m.style.right = "auto";
+          var mr = m.getBoundingClientRect(), dx = mr.left - br.left, dy = mr.top - (br.bottom + 4); var L = br.left - dx, T = br.bottom + 4 - dy;
+          if(mr.width && br.left + mr.width > window.innerWidth - 4) L = Math.max(4, window.innerWidth - 4 - mr.width) - dx;
+          m.style.left = L + "px"; m.style.top = T + "px"; e.preventDefault(); return; } /* 菜单靠左展开，超出右边缘时改为右对齐，避免被裁 */
         if(d.classList.contains("open")){ var r = m.getBoundingClientRect(); if(r.right > window.innerWidth - 4){ m.style.left = "auto"; m.style.right = "0"; } if(m.getBoundingClientRect().left < 4){ m.style.left = "0"; m.style.right = "auto"; } } }
       e.preventDefault(); return; }
     var m = e.target.closest && e.target.closest(".toolbar .dd-m");
@@ -8229,5 +8234,21 @@ else init();
 .ribbon.rb11 .ms-pct button{padding:4px 7px!important;min-width:0}
 @media (max-width:1600px){.ribbon.rb11 .rb-t{display:none}}
 </style>
+<style id="zoomCss">
+/* 用户 2026-10-27：浏览器放大后功能区不再折成多行把表格挤乱：放不下时横向滚动（滚轮可横滚），下拉菜单浮在最上层 */
+.ribbon .rb-pane.on{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.ribbon .rb-pane.on::-webkit-scrollbar{height:6px}.ribbon .rb-pane.on::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:3px}
+.ribbon .rb-grp{flex:0 0 auto}
+.ribbon .rb-pane .dd.open>.dd-m{position:fixed;margin-top:0;z-index:2000}
+</style>
+<script id="zoomJs">
+/* 功能区放不下时：滚轮横向滚动；滚动/窗口变化时关闭浮动菜单 */
+(function(){
+  function closeDd(){ document.querySelectorAll(".ribbon .rb-pane .dd.open").forEach(function(d){ d.classList.remove("open"); }); }
+  document.addEventListener("wheel", function(e){ var p = e.target.closest && e.target.closest(".ribbon .rb-pane.on"); if(!p || e.target.closest(".dd-m") || p.scrollWidth <= p.clientWidth + 1 || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; p.scrollLeft += e.deltaY; e.preventDefault(); closeDd(); }, { passive:false });
+  document.addEventListener("scroll", function(e){ if(e.target && e.target.classList && e.target.classList.contains("rb-pane")) closeDd(); }, true);
+  window.addEventListener("resize", closeDd);
+}());
+</script>
 </body>
 </html>
