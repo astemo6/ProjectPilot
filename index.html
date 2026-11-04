@@ -6318,6 +6318,12 @@ function oemCustomMs(bg, close){
     close(); save(); render(); toast(X.done.replace("{0}", rows.length));
   };
 }
+I18N.zh.oemMsNewPh = "新增客户节点名称（例如：PPAP 提交）"; I18N.en.oemMsNewPh = "New customer milestone (e.g. PPAP submission)"; I18N.de.oemMsNewPh = "Neuer Kundenmeilenstein (z. B. PPAP-Einreichung)";
+I18N.zh.oemMsNewBtn = "＋ 添加客户节点"; I18N.en.oemMsNewBtn = "+ Add milestone"; I18N.de.oemMsNewBtn = "+ Meilenstein hinzufügen";
+I18N.zh.oemMsDelN = "删除"; I18N.en.oemMsDelN = "Delete"; I18N.de.oemMsDelN = "Löschen";
+I18N.zh.oemMsNeedN = "请填写客户节点名称"; I18N.en.oemMsNeedN = "Please enter a milestone name"; I18N.de.oemMsNeedN = "Bitte Meilensteinnamen eingeben";
+I18N.zh.oemMsNeedD = "请填写节点日期"; I18N.en.oemMsNeedD = "Please enter the milestone date"; I18N.de.oemMsNeedD = "Bitte Meilensteindatum eingeben";
+I18N.zh.oemMsDupN = "已有同名客户节点"; I18N.en.oemMsDupN = "A milestone with this name already exists"; I18N.de.oemMsDupN = "Ein Meilenstein mit diesem Namen existiert bereits";
 function openOemMs(oem, explicit){
   var old = document.getElementById("oemMsBg"); if(old) old.remove();
   oem = explicit ? (oem || "") : (oem || state.planOem || "");
@@ -6333,7 +6339,8 @@ function openOemMs(oem, explicit){
       + '<div style="max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:6px"><table class="rs" style="width:100%"><thead><tr><th></th><th>' + esc(tr("oemMsNode")) + "</th><th>" + esc(tr("oemMsDate")) + "</th></tr></thead><tbody>"
       + OEM_NODES[oem].map(function(n, i){ var t = have[oemMsKey(oem, n[0])];
           return '<tr><td style="text-align:center"><input type="checkbox" class="omCk" data-i="' + i + '"' + (t || (fresh && (OEM_DEF_OFF[oem] || []).indexOf(i + 1) < 0) ? " checked" : "") + ' style="width:auto"></td><td title="' + esc(n[0] + " — " + (n[L] || n[2] || "")) + '">' + esc(oemShort(n[0])) + '</td><td><input type="date" class="omD" data-i="' + i + '" value="' + esc(t ? t.start : "") + '"></td></tr>'; }).join("")
-      + "</tbody></table></div>";
+      + "</tbody></table></div>"
+      + '<div class="omAddN" style="display:flex;gap:6px;margin-top:8px"><input type="text" id="omNN" placeholder="' + esc(tr("oemMsNewPh")) + '" style="flex:1;min-width:0"><input type="date" id="omND" style="width:150px"><button type="button" id="omNAdd" style="white-space:nowrap">' + esc(tr("oemMsNewBtn")) + '</button></div>';
   }
   h += '<div class="hint" style="font-size:12px;color:#64748b;margin-top:6px">' + esc(tr("oemMsHint")) + "</div>"
     + '</div><div class="modal-f"><button id="omCancel">' + esc(tr("cancel")) + "</button>" + (oem ? '<button id="omOk" class="primary" style="background:var(--accent);color:#fff">' + esc(tr("ok")) + "</button>" : "") + "</div></div>";
@@ -6342,8 +6349,37 @@ function openOemMs(oem, explicit){
   bg.querySelector("#omX").onclick = close; bg.querySelector("#omCancel").onclick = close;
   bg.querySelector("#omOem").onchange = function(){ openOemMs(this.value, true); };
   if(!oem){ oemCustomMs(bg, close); return; }
-  bg.querySelector("#omAll").onclick = function(){ bg.querySelectorAll(".omCk").forEach(function(c){ c.checked = true; }); };
-  bg.querySelector("#omNone").onclick = function(){ bg.querySelectorAll(".omCk").forEach(function(c){ c.checked = false; }); };
+  bg.querySelector("#omAll").onclick = function(){ bg.querySelectorAll(".omCk,.omCC").forEach(function(c){ c.checked = true; }); };
+  bg.querySelector("#omNone").onclick = function(){ bg.querySelectorAll(".omCk,.omCC").forEach(function(c){ c.checked = false; }); };
+  /* 用户 2026-11-04：可添加客户节点，逻辑同 OEM 页 / 自定义任务：按日期插到合适位置，改日期后自动重新排位 */
+  var omTb = bg.querySelector("table.rs tbody");
+  function rowDate(r){ var i = r.querySelector(".omD,.omCD"); return i ? parseD(i.value) : null; }
+  function placeRow(r){
+    var d = rowDate(r); if(r.parentNode) r.parentNode.removeChild(r);
+    var rs = [].slice.call(omTb.querySelectorAll("tr")), before = null;
+    if(d) for(var k = 0; k < rs.length; k++){ var od = rowDate(rs[k]); if(od && od > d){ before = rs[k]; break; } }
+    omTb.insertBefore(r, before);
+  }
+  function cRow(nm, d, src, on){
+    var r = document.createElement("tr"); r.className = "omCRow"; r.dataset.nm = nm; r.dataset.src = src;
+    r.innerHTML = '<td style="text-align:center"><input type="checkbox" class="omCC" style="width:auto"' + (on ? " checked" : "") + '></td><td title="' + esc(nm) + '"><span style="color:#0f766e">' + esc(nm) + '</span> <button type="button" class="omCX" title="' + esc(tr("oemMsDelN")) + '" style="padding:0 6px;margin-left:4px">×</button></td><td><input type="date" class="omCD" value="' + esc(d || "") + '"></td>';
+    r.querySelector(".omCX").onclick = function(){ r.remove(); };
+    r.querySelector(".omCD").onchange = function(){ placeRow(r); };
+    placeRow(r); return r;
+  }
+  var stdNames = {}; OEM_NODES[oem].forEach(function(n){ stdNames[oemMsKey(oem, n[0])] = 1; });
+  oemMsTasks(oem).forEach(function(t){ if(!stdNames[t.source]) cRow(t.name, t.start, t.source, true); });
+  bg.querySelector("#omNAdd").onclick = function(){
+    var nm = bg.querySelector("#omNN").value.trim(), dv = bg.querySelector("#omND").value;
+    if(!nm){ toast(tr("oemMsNeedN")); bg.querySelector("#omNN").focus(); return; }
+    if(!parseD(dv)){ toast(tr("oemMsNeedD")); bg.querySelector("#omND").focus(); return; }
+    var dup = OEM_NODES[oem].some(function(n){ return n[0] === nm || oemShort(n[0]) === nm; }) || [].some.call(bg.querySelectorAll(".omCRow"), function(r){ return r.dataset.nm === nm; });
+    if(dup){ toast(tr("oemMsDupN")); return; }
+    var r = cRow(nm, fmtD(parseD(dv)), "oem:" + oem + "|+" + Date.now().toString(36), true);
+    bg.querySelector("#omNN").value = ""; bg.querySelector("#omND").value = "";
+    if(r.scrollIntoView) r.scrollIntoView({ block:"nearest" });
+  };
+  bg.querySelector("#omNN").addEventListener("keydown", function(e){ if(e.key === "Enter") bg.querySelector("#omNAdd").click(); });
   function fillDates(){
     var ds = bg.querySelectorAll(".omD"), gaps = CASCADE_GAPS[oem] || CASCADE_GAPS.DEFAULT, first = -1, i, cur;
     function g(k){ return typeof gaps[k] === "number" ? gaps[k] : 30; }
@@ -6360,8 +6396,13 @@ function openOemMs(oem, explicit){
   };
   bg.querySelector("#omOk").onclick = function(){
     var pick = [];
-    bg.querySelectorAll(".omCk").forEach(function(c){ var i = +c.dataset.i, d = bg.querySelector('.omD[data-i="' + i + '"]').value; if(c.checked && parseD(d)) pick.push({ n:OEM_NODES[oem][i], d:fmtD(snapWorkday(parseD(d))) }); });
-    var keep = {}; pick.forEach(function(p){ keep[oemMsKey(oem, p.n[0])] = p; });
+    omTb.querySelectorAll("tr").forEach(function(r){
+      var c = r.querySelector(".omCk");
+      if(c){ var i = +c.dataset.i, d = r.querySelector(".omD").value; if(c.checked && parseD(d)) pick.push({ n:OEM_NODES[oem][i], d:fmtD(snapWorkday(parseD(d))) }); return; }
+      var cc = r.querySelector(".omCC"), d2 = r.querySelector(".omCD");
+      if(cc && cc.checked && d2 && parseD(d2.value)) pick.push({ n:[r.dataset.nm, "", "", ""], key:r.dataset.src, custom:true, d:fmtD(snapWorkday(parseD(d2.value))) });
+    });
+    var keep = {}; pick.forEach(function(p){ keep[p.key || oemMsKey(oem, p.n[0])] = p; });
     if(!pick.length && !oemMsTasks(oem).length){
       /* 一个日期都没填：以今天为第一个节点自动排出示例日期，让用户确认后再点确定 */
       var d0 = bg.querySelectorAll(".omD")[0]; d0.value = fmtD(snapWorkday(new Date())); fillDates();
@@ -6389,10 +6430,11 @@ function openOemMs(oem, explicit){
     var existing = {}; oemMsTasks(oem).forEach(function(t){ existing[t.source] = t; });
     var insertAt = state.tasks.indexOf(grp) + 1;
     pick.forEach(function(p){
-      var key = oemMsKey(oem, p.n[0]), t = existing[key];
-      if(t){ if(t.name === p.n[0]) t.name = oemShort(t.name); t.start = p.d; t.cons = "MSO"; t.consDate = p.d; t.group = grp.id; }
+      var key = p.key || oemMsKey(oem, p.n[0]), t = existing[key];
+      if(t){ if(!p.custom && t.name === p.n[0]) t.name = oemShort(t.name); t.start = p.d; t.cons = "MSO"; t.consDate = p.d; t.group = grp.id;
+        if(p.custom){ var i1 = state.tasks.indexOf(t); state.tasks.splice(i1, 1); if(i1 < insertAt) insertAt--; state.tasks.splice(insertAt, 0, t); } }
       else {
-        t = mkTask({ name:oemShort(p.n[0]), type:"milestone", group:grp.id, start:p.d, dur:0 });
+        t = mkTask({ name:p.custom ? p.n[0] : oemShort(p.n[0]), type:"milestone", group:grp.id, start:p.d, dur:0 });
         t.source = key; t.cons = "MSO"; t.consDate = p.d; t.remarks = (lang === "zh" ? p.n[2] : p.n[3]) || p.n[2] || "";
         state.tasks.splice(insertAt, 0, t);
       }
