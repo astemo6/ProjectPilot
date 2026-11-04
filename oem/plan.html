@@ -102,6 +102,10 @@ aside select,aside input.date,aside input[type=text]{font-size:13px;padding:6px 
 .nname{flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .node-row input.date{width:126px;flex-shrink:0;font-size:12px;padding:4px 6px}
 .node-row.off{opacity:.45}
+#nodeForm{margin-top:8px}#btnAddNode{width:100%}
+#btnAddNode{background:var(--accent,#007aff);color:#fff;border-color:transparent;font-weight:500}
+.node-row.cnode .seq{background:rgba(20,184,166,.15);color:#0f766e}
+.node-row .del{margin-left:auto}
 .rec-row{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #f3f4f6}
 .rec-row.off{opacity:.45}
 .rec-row .nname{flex:1;min-width:0}
@@ -369,6 +373,11 @@ html[data-theme=dark] #chart rect[fill="#dbeafe"]{fill:#1e3350}html[data-theme=d
     <section id="secNodes">
       <h3><span data-i18n="secNodes">客户节点日期</span> <span id="nodeCount"></span> <button class="mini ghost" id="btnAllNodes"></button> <button class="mini ghost sec-toggle" data-sec="secNodes"></button></h3>
       <div id="nodeList"></div>
+      <div class="task-form" id="nodeForm">
+        <input id="nodeName" type="text" data-i18n-ph="nodeNamePh" placeholder="客户节点名称（例如：PPAP 提交）">
+        <input id="nodeDate" type="text" class="date" placeholder="YYYY-MM-DD" inputmode="numeric" data-i18n-al="nodeDateAl" aria-label="节点日期">
+        <button id="btnAddNode" data-i18n="btnAddNode">添加客户节点</button>
+      </div>
       <p class="hint" data-i18n="nodeHint">勾选参与本项目的节点，未勾选的不进入甘特图；日期倒置（后一节点早于前一节点）会标红提醒。</p>
     </section>
     <section id="secRec" class="collapsed">
@@ -532,7 +541,7 @@ zh: {
   offStartTitle:'开始偏移（周），负数为锚点之前', offEndTitle:'结束偏移（周），负数为锚点之前',
   nodeCount:'（共{total}个，已选{sel}个）', nodeInvert:'日期倒置',
   secNodeRef:'客户节点说明', refAbbr:'缩写', refName:'节点名称', refDesc:'含义及要求',
-  toastNeedName:'请填写任务名称',
+  toastNeedName:'请填写任务名称', nodeNamePh:'客户节点名称（例如：PPAP 提交）', nodeDateAl:'节点日期', btnAddNode:'添加客户节点', toastNeedNodeName:'请填写客户节点名称', toastNeedNodeDate:'请填写节点日期', toastNodeDup:'已有同名客户节点', toastNeedOem:'请先选择主机厂', cnodeDesc:'自定义客户节点',
   toastNeedDates:'请选择开始和结束日期', toastEndBeforeStart:'结束日期不能早于开始日期',
   toastNoChart:'暂无甘特图可导出，请先填写节点日期',
   toastJSONOk:'JSON 数据已导入', toastJSONBad:'JSON 文件无效，导入失败',
@@ -565,7 +574,7 @@ en: {
   offStartTitle:'Start offset (weeks), negative = before anchor', offEndTitle:'End offset (weeks), negative = before anchor',
   nodeCount:'({total} total, {sel} selected)', nodeInvert:'Inverted Dates',
   secNodeRef:'Milestone Reference', refAbbr:'Abbr.', refName:'Milestone Name', refDesc:'Description & requirements',
-  toastNeedName:'Please enter a task name',
+  toastNeedName:'Please enter a task name', nodeNamePh:'Milestone name (e.g. PPAP submission)', nodeDateAl:'Milestone date', btnAddNode:'Add Customer Milestone', toastNeedNodeName:'Please enter a milestone name', toastNeedNodeDate:'Please enter the milestone date', toastNodeDup:'A milestone with this name already exists', toastNeedOem:'Please select an OEM first', cnodeDesc:'Custom customer milestone',
   toastNeedDates:'Please select start and end dates', toastEndBeforeStart:'End date must not be earlier than start date',
   toastNoChart:'No chart to export yet — please fill in milestone dates first',
   toastJSONOk:'JSON data imported', toastJSONBad:'Invalid JSON file',
@@ -598,7 +607,7 @@ de: {
   offStartTitle:'Start-Offset (Wochen), negativ = vor Anker', offEndTitle:'End-Offset (Wochen), negativ = vor Anker',
   nodeCount:'({total} gesamt, {sel} ausgewählt)', nodeInvert:'Verdrehte Daten',
   secNodeRef:'Meilenstein-Referenz', refAbbr:'Abk.', refName:'Meilensteinname', refDesc:'Beschreibung und Anforderungen',
-  toastNeedName:'Bitte Aufgabennamen eingeben',
+  toastNeedName:'Bitte Aufgabennamen eingeben', nodeNamePh:'Meilensteinname (z. B. PPAP-Einreichung)', nodeDateAl:'Meilensteindatum', btnAddNode:'Kundenmeilenstein hinzufügen', toastNeedNodeName:'Bitte Meilensteinnamen eingeben', toastNeedNodeDate:'Bitte Meilensteindatum eingeben', toastNodeDup:'Ein Meilenstein mit diesem Namen existiert bereits', toastNeedOem:'Bitte zuerst OEM wählen', cnodeDesc:'Eigener Kundenmeilenstein',
   toastNeedDates:'Bitte Start- und Enddatum wählen', toastEndBeforeStart:'Enddatum darf nicht vor dem Startdatum liegen',
   toastNoChart:'Kein Diagramm zum Exportieren – bitte zuerst Meilensteintermine eintragen',
   toastJSONOk:'JSON-Daten importiert', toastJSONBad:'Ungültige JSON-Datei',
@@ -676,13 +685,13 @@ function buildOemOptions(){
   sel.value = state.oem || '';
 }
 
-var state = { oem:'', projectName:'', dates:{}, tasks:[], excluded:{}, recTasks:{}, customMs:[], showPhase:true, gutW:0, msRowH:0, logoLeft:'', logoRight:'' };
+var state = { oem:'', projectName:'', dates:{}, tasks:[], excluded:{}, recTasks:{}, customMs:[], addNodes:{}, showPhase:true, gutW:0, msRowH:0, logoLeft:'', logoRight:'' };
 var LS_KEY = 'gantt-tool-v1';
 function save(){
   try{
     var data = { oem:state.oem, projectName:state.projectName, dates:state.dates,
       excluded:state.excluded, recTasks:state.recTasks, tasks:state.tasks,
-      customMs:state.customMs, showPhase:state.showPhase !== false,
+      customMs:state.customMs, addNodes:state.addNodes || {}, showPhase:state.showPhase !== false,
       gutW:state.gutW || 0, msRowH:state.msRowH || 0,
       logoLeft:state.logoLeft || '', logoRight:state.logoRight || '',
       creatorName:$('creatorName') ? $('creatorName').value : '',
@@ -719,6 +728,7 @@ function load(){
     if(d.recTasks && typeof d.recTasks === 'object') state.recTasks = d.recTasks;
     if(Array.isArray(d.tasks)) state.tasks = d.tasks;
     if(Array.isArray(d.customMs)) state.customMs = d.customMs;
+    if(d.addNodes && typeof d.addNodes === 'object') state.addNodes = d.addNodes;
     if(typeof d.showPhase === 'boolean') state.showPhase = d.showPhase;
     state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0;
     if(typeof d.logoLeft === 'string') state.logoLeft = d.logoLeft;
@@ -737,7 +747,19 @@ function toast(msg){
   clearTimeout(t._h);
   t._h = setTimeout(function(){ t.className = ''; }, 2600);
 }
-function nodes(){ return OEM_NODES[state.oem] || []; }
+function nodesStd(){ return OEM_NODES[state.oem] || []; }
+/* 用户 2026-11-04：可添加客户节点。逻辑同自定义任务：按日期插入到合适位置；改日期后自动按日期重新排位 */
+function addedNodes(){ return (state.addNodes && state.addNodes[state.oem]) || []; }
+function nodes(){
+  var out = nodesStd().slice(), add = addedNodes();
+  add.forEach(function(a){
+    var n = [a.name, '', tr('cnodeDesc'), tr('cnodeDesc')]; n.custom = true;
+    var d = parseD(state.dates[a.name] || ''), pos = out.length;
+    if(d){ for(var i = 0; i < out.length; i++){ var od = parseD(state.dates[out[i][0]] || ''); if(od && od > d){ pos = i; break; } } }
+    out.splice(pos, 0, n);
+  });
+  return out;
+}
 
 /* ---------- 左侧：节点列表 ---------- */
 /* 计算每行客户节点的日期倒置标红（与 renderNodes 共用一套逻辑） */
@@ -774,11 +796,12 @@ function renderNodes(){
     var v = state.dates[name] || '';
     var warn = warns[i];
     var label = alias ? name + '（' + alias + '）' : name;
-    html += '<div class="node-row' + (warn ? ' warn' : '') + (inc ? '' : ' off') + '" title="' + esc(desc) + '">'
+    html += '<div class="node-row' + (n.custom ? ' cnode' : '') + (warn ? ' warn' : '') + (inc ? '' : ' off') + '" title="' + esc(desc) + '">'
       + '<input type="checkbox" class="inc" data-node="' + esc(name) + '"' + (inc ? ' checked' : '') + '>'
       + '<span class="seq">' + (i+1) + '</span>'
       + '<span class="nname" title="' + esc(label) + '">' + esc(abbr(name)) + '</span>'
       + '<input type="text" class="date" placeholder="YYYY-MM-DD" inputmode="numeric" data-node="' + esc(name) + '" value="' + esc(v) + '">'
+      + (n.custom ? '<button class="del" data-cnode="' + esc(name) + '">' + tr('delTask') + '</button>' : '')
       + '</div>';
   });
   list.innerHTML = html || '<p class="hint">' + tr('hintNoNodes') + '</p>';
@@ -790,12 +813,22 @@ function renderNodes(){
       if(iso === null) return;
       state.dates[node] = iso;
       _sampleFlag = false; save(); syncUrl();
+      if(isAddedNode(node)){ renderAll(); return; }
       if(iso && isFirstCheckedNode(node)){
         cascadeDates(node);
       } else {
         updateNodeWarns();
         renderChart();
       }
+    });
+  }
+  var cdels = list.querySelectorAll('.del[data-cnode]');
+  for(var q = 0; q < cdels.length; q++){
+    cdels[q].addEventListener('click', function(){
+      var nm = this.dataset.cnode, arr = addedNodes();
+      for(var z = 0; z < arr.length; z++){ if(arr[z].name === nm){ arr.splice(z, 1); break; } }
+      delete state.dates[nm]; delete state.excluded[nm];
+      save(); renderAll();
     });
   }
   var checks = list.querySelectorAll('.inc');
@@ -1898,7 +1931,7 @@ function closePreview(){
 function exportJSON(){
   var data = { app:'gantt-tool', v:1, oem:state.oem, projectName:state.projectName,
     dates:state.dates, excluded:state.excluded, recTasks:state.recTasks,
-    tasks:state.tasks, customMs:state.customMs, showPhase:state.showPhase !== false,
+    tasks:state.tasks, customMs:state.customMs, addNodes:state.addNodes || {}, showPhase:state.showPhase !== false,
     gutW:state.gutW || 0, msRowH:state.msRowH || 0,
     logoLeft:state.logoLeft || '', logoRight:state.logoRight || '',
     creatorName:$('creatorName') ? $('creatorName').value : '',
@@ -1920,6 +1953,7 @@ function importJSON(file){
       state.recTasks = (d.recTasks && typeof d.recTasks === 'object') ? d.recTasks : {};
       state.tasks = Array.isArray(d.tasks) ? d.tasks : [];
       state.customMs = Array.isArray(d.customMs) ? d.customMs : [];
+      state.addNodes = (d.addNodes && typeof d.addNodes === 'object') ? d.addNodes : {};
       state.showPhase = d.showPhase !== false;
       state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0;
       if(window.syncSizeInputs) syncSizeInputs();
@@ -1965,8 +1999,9 @@ var CASCADE_GAPS = {
   "BENZ(奔驰)": [90,45,45,255,172,101,44,14,7,63,77,76],
   "DEFAULT": [180,150,120,100,90,80,70,60,60,50,45,45,40,35,30,30,30,30,30,45,60,90]
 };
+function isAddedNode(name){ return addedNodes().some(function(a){ return a.name === name; }); }
 function isFirstCheckedNode(name){
-  var ns = nodes();
+  var ns = nodesStd();
   for(var i = 0; i < ns.length; i++){
     if(!state.excluded[ns[i][0]]) return ns[i][0] === name;
   }
@@ -1985,7 +2020,7 @@ function normDateInput(input, prevVal){
 function cascadeDates(fromName){
   var d0 = parseD(state.dates[fromName] || '');
   if(!d0) return;
-  var all = nodes(), i0 = -1;
+  var all = nodesStd(), i0 = -1;
   for(var i = 0; i < all.length; i++){ if(all[i][0] === fromName){ i0 = i; break; } }
   if(i0 < 0) return;
   var gaps = CASCADE_GAPS[state.oem] || CASCADE_GAPS.DEFAULT;
@@ -2003,6 +2038,7 @@ function cascadeDates(fromName){
     var nm = inputs[j].dataset.node;
     if(byName[nm] !== undefined) inputs[j].value = byName[nm];
   }
+  if(addedNodes().length){ renderAll(); toast(tr('toastCascade')); return; }
   updateNodeWarns();
   renderChart();
   toast(tr('toastCascade'));
@@ -2010,7 +2046,7 @@ function cascadeDates(fromName){
 
 /* ---------- 操作 ---------- */
 function sampleDates(){
-  var ns = nodes();
+  var ns = nodesStd();
   if(!ns.length) return;
   /* 示例日期按该主机厂的标准节点间隔推算（与级联填充一致），并让"今天"落在项目约 40% 处 */
   var today = new Date(); today.setHours(0,0,0,0);
@@ -2189,6 +2225,21 @@ function init(){
     $('taskName').value = ''; $('taskStart').value = ''; $('taskEnd').value = '';
     save(); renderAll();
   });
+
+  $('btnAddNode').addEventListener('click', function(){
+    if(!state.oem){ toast(tr('toastNeedOem')); return; }
+    var name = $('nodeName').value.trim(), s = $('nodeDate').value.trim();
+    if(!name){ toast(tr('toastNeedNodeName')); return; }
+    var ds = parseD(s);
+    if(!ds){ toast(tr('toastNeedNodeDate')); return; }
+    if(nodes().some(function(n){ return n[0] === name; })){ toast(tr('toastNodeDup')); return; }
+    state.addNodes = state.addNodes || {};
+    (state.addNodes[state.oem] = state.addNodes[state.oem] || []).push({ name:name });
+    state.dates[name] = fmtD(ds); delete state.excluded[name];
+    $('nodeName').value = ''; $('nodeDate').value = '';
+    save(); renderAll();
+  });
+  $('nodeName').addEventListener('keydown', function(e){ if(e.key === 'Enter') $('btnAddNode').click(); });
 
   $('btnAddLane').addEventListener('click', function(){
     var name = $('cmName').value.trim();
