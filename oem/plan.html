@@ -438,7 +438,7 @@ html[data-theme=dark] #chart rect[fill="#dbeafe"]{fill:#1e3350}html[data-theme=d
       <span><span class="dot" style="background:#4ade80;transform:rotate(45deg)"></span><span data-i18n="legendCustomMs">供应商节点</span></span>
       <span><span class="dot" style="background:#ef4444;width:2px;height:12px"></span><span data-i18n="today">今天</span></span>
       <span style="color:#7f1d1d" data-i18n="warnInvert">深红色节点 = 日期倒置</span>
-      <span class="sz-ctl"><label><span data-i18n="szGut">左列宽</span> <input type="number" id="szGut" min="60" max="800" step="10"></label><label><span data-i18n="szMs">里程碑行高</span> <input type="number" id="szMs" min="40" max="400" step="5"></label><button class="mini ghost" id="szAuto" data-i18n="szAuto">自动</button></span>
+      <span class="sz-ctl"><label><span data-i18n="szGut">左列宽</span> <input type="number" id="szGut" min="60" max="800" step="10"></label><label><span data-i18n="szMs">里程碑行高</span> <input type="number" id="szMs" min="40" max="400" step="5"></label><label><span data-i18n="szCm">节点排高</span> <input type="number" id="szCm" min="40" max="300" step="2"></label><button class="mini ghost" id="szAuto" data-i18n="szAuto">自动</button></span>
     </div>
     <div class="chart-wrap">
       <div id="chart"></div>
@@ -534,7 +534,7 @@ zh: {
   toastNeedGenStart:'请先选择开始日期',
   btnSelAll:'全选', btnDeselAll:'取消全选', cmDateNamePh:'名称（如 T0）',
   startDate:'开始日期', endDate:'结束日期',
-  legendMs:'里程碑', szGut:'左列宽', szMs:'里程碑行高', szAuto:'自动', rzGutTip:'拖动调整左列宽度', rzMsTip:'拖动调整里程碑行高度', legendPhase:'阶段区间', legendRec:'推荐任务', legendCustom:'自定义任务', legendTasks:'任务',
+  legendMs:'里程碑', szGut:'左列宽', szMs:'里程碑行高', szCm:'节点排高', rzCmTip:'拖动调整这一排的高度（双击恢复默认）', szAuto:'自动', rzGutTip:'拖动调整左列宽度', rzMsTip:'拖动调整里程碑行高度', legendPhase:'阶段区间', legendRec:'推荐任务', legendCustom:'自定义任务', legendTasks:'任务',
   today:'今天', warnInvert:'深红色节点 = 日期倒置',
   emptyHint:'请先选择主机厂，并在左侧填写各客户节点的日期，甘特图将自动生成。<br>也可以点「载入示例日期」先看效果。',
   hintNoPhase:'该主机厂暂无可锚定的阶段', hintNoTasks:'暂无自定义任务，可在下方添加', hintNoNodes:'请先选择主机厂',
@@ -567,7 +567,7 @@ en: {
   toastNeedGenStart:'Please pick a start date first',
   btnSelAll:'Select All', btnDeselAll:'Deselect All', cmDateNamePh:'Name (e.g. T0)',
   startDate:'Start Date', endDate:'End Date',
-  legendMs:'Milestone', szGut:'Label width', szMs:'Milestone row', szAuto:'Auto', rzGutTip:'Drag to resize label column', rzMsTip:'Drag to resize milestone row', legendPhase:'Phase', legendRec:'Recommended', legendCustom:'Custom', legendTasks:'Tasks',
+  legendMs:'Milestone', szGut:'Label width', szMs:'Milestone row', szCm:'Lane height', rzCmTip:'Drag to resize this lane (double-click to reset)', szAuto:'Auto', rzGutTip:'Drag to resize label column', rzMsTip:'Drag to resize milestone row', legendPhase:'Phase', legendRec:'Recommended', legendCustom:'Custom', legendTasks:'Tasks',
   today:'Today', warnInvert:'Dark red milestone = inverted dates',
   emptyHint:'Please select an OEM and fill in the milestone dates on the left; the Gantt chart generates automatically.<br>You can also click "Load sample dates" for a preview.',
   hintNoPhase:'No mappable phases for this OEM', hintNoTasks:'No custom tasks yet — add below', hintNoNodes:'Please select an OEM first',
@@ -600,7 +600,7 @@ de: {
   toastNeedGenStart:'Bitte zuerst ein Startdatum wählen',
   btnSelAll:'Alle wählen', btnDeselAll:'Alle abwählen', cmDateNamePh:'Name (z. B. T0)',
   startDate:'Startdatum', endDate:'Enddatum',
-  legendMs:'Meilenstein', szGut:'Spaltenbreite', szMs:'Meilensteinzeile', szAuto:'Auto', rzGutTip:'Ziehen, um die Spaltenbreite zu ändern', rzMsTip:'Ziehen, um die Zeilenhöhe zu ändern', legendPhase:'Phase', legendRec:'Empfohlen', legendCustom:'Eigene', legendTasks:'Aufgaben',
+  legendMs:'Meilenstein', szGut:'Spaltenbreite', szMs:'Meilensteinzeile', szCm:'Spurhöhe', rzCmTip:'Ziehen, um die Höhe dieser Spur zu ändern (Doppelklick = zurücksetzen)', szAuto:'Auto', rzGutTip:'Ziehen, um die Spaltenbreite zu ändern', rzMsTip:'Ziehen, um die Zeilenhöhe zu ändern', legendPhase:'Phase', legendRec:'Empfohlen', legendCustom:'Eigene', legendTasks:'Aufgaben',
   today:'Heute', warnInvert:'Dunkelroter Meilenstein = verdrehte Daten',
   emptyHint:'Bitte einen OEM wählen und links die Meilensteintermine eintragen; das Gantt-Diagramm wird automatisch erzeugt.<br>Auch „Beispieldaten laden" zeigt eine Vorschau.',
   hintNoPhase:'Für diesen OEM keine zuordenbaren Phasen', hintNoTasks:'Noch keine eigenen Aufgaben – unten hinzufügen', hintNoNodes:'Bitte zuerst einen OEM wählen',
@@ -686,14 +686,14 @@ function buildOemOptions(){
   sel.value = state.oem || '';
 }
 
-var state = { oem:'', projectName:'', dates:{}, tasks:[], excluded:{}, recTasks:{}, customMs:[], addNodes:{}, showPhase:true, gutW:0, msRowH:0, logoLeft:'', logoRight:'' };
+var state = { oem:'', projectName:'', dates:{}, tasks:[], excluded:{}, recTasks:{}, customMs:[], addNodes:{}, showPhase:true, gutW:0, msRowH:0, cmRowH:0, logoLeft:'', logoRight:'' };
 var LS_KEY = 'gantt-tool-v1';
 function save(){
   try{
     var data = { oem:state.oem, projectName:state.projectName, dates:state.dates,
       excluded:state.excluded, recTasks:state.recTasks, tasks:state.tasks,
       customMs:state.customMs, addNodes:state.addNodes || {}, showPhase:state.showPhase !== false,
-      gutW:state.gutW || 0, msRowH:state.msRowH || 0,
+      gutW:state.gutW || 0, msRowH:state.msRowH || 0, cmRowH:state.cmRowH || 0,
       logoLeft:state.logoLeft || '', logoRight:state.logoRight || '',
       creatorName:$('creatorName') ? $('creatorName').value : '',
       ckShowCreator:$('ckShowCreator') ? $('ckShowCreator').checked : false,
@@ -731,7 +731,7 @@ function load(){
     if(Array.isArray(d.customMs)) state.customMs = d.customMs;
     if(d.addNodes && typeof d.addNodes === 'object') state.addNodes = d.addNodes;
     if(typeof d.showPhase === 'boolean') state.showPhase = d.showPhase;
-    state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0;
+    state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0; state.cmRowH = +d.cmRowH > 0 ? +d.cmRowH : 0;
     if(typeof d.logoLeft === 'string') state.logoLeft = d.logoLeft;
     if(typeof d.logoRight === 'string') state.logoRight = d.logoRight;
     if(typeof d.execSyncAt === 'number') state.execSyncAt = d.execSyncAt;
@@ -1194,7 +1194,8 @@ function initChartLaneDrag(){
       svg: svg,
       y: +svg.getAttribute('data-cm-y'),
       h: +svg.getAttribute('data-cm-h'),
-      n: +svg.getAttribute('data-cm-n')
+      n: +svg.getAttribute('data-cm-n'),
+      ys: String(svg.getAttribute('data-cm-ys') || '').split(',').map(Number)
     };
   }
   function toSvgY(clientY){
@@ -1217,14 +1218,15 @@ function initChartLaneDrag(){
     if(!drag.active) return;
     var p = toSvgY(e.clientY);
     if(!p) return;
-    var to = Math.floor((p.y - p.info.y) / p.info.h);
+    var ys = p.info.ys, to = 0;
+    if(ys.length === p.info.n + 1){ while(to < p.info.n - 1 && p.y >= ys[to + 1]) to++; } else to = Math.floor((p.y - p.info.y) / p.info.h);
     to = Math.max(0, Math.min(p.info.n - 1, to));
     drag.to = to;
     /* 目标位置指示线 */
     var old = chart.querySelector('.cm-drop-line');
     if(old) old.remove();
     var svg = p.info.svg;
-    var lineY = p.info.y + to * p.info.h + (to > drag.from ? p.info.h : 0);
+    var lineY = ys.length === p.info.n + 1 ? ys[to + (to > drag.from ? 1 : 0)] : p.info.y + to * p.info.h + (to > drag.from ? p.info.h : 0);
     var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', 0); line.setAttribute('x2', svg.getAttribute('width'));
     line.setAttribute('y1', lineY); line.setAttribute('y2', lineY);
@@ -1398,13 +1400,13 @@ function _renderChart(_padR, _minAng){
   });
 
   // 自定义节点排：每排多个日期节点（带名称）
-  var cmLanes = (state.customMs || []).map(function(l){
+  var cmLanes = (state.customMs || []).map(function(l, li){
     var ds = (l.dates || []).map(function(x){
       var d = parseD(cmDate(x));
       return d ? { d:d, n:cmName(x) } : null;
     }).filter(function(x){ return !!x; });
     ds.sort(function(a,b){ return a.d - b.d; });
-    return { name:l.name || '', dates:ds, cust:!!l.cust };
+    return { name:l.name || '', dates:ds, cust:!!l.cust, src:li, h:+l.h > 0 ? Math.round(Math.max(40, Math.min(300, +l.h))) : 0 };
   }).filter(function(l){ return l.dates.length; });
 
   if(!ms.length && !tasks.length && !recBars.length && !cmLanes.length){
@@ -1463,8 +1465,10 @@ function _renderChart(_padR, _minAng){
     MS_NEED = Math.ceil(12 / Math.sin(_rad(MS_ANG)));
   }
   var _labTop = MS_H - 52;
-  var CM_Y = MS_Y + MS_H, CM_H = 58;
-  var TK_Y = CM_Y + cmLanes.length * CM_H, TK_H = 36;
+  var CM_Y = MS_Y + MS_H, CM_H = state.cmRowH > 0 ? Math.round(Math.max(40, Math.min(300, state.cmRowH))) : 58;
+  /* 用户 2026-11-05：节点排高度可手动调（整体默认值 + 每排单独拖动） */
+  var CM_YS = [CM_Y]; cmLanes.forEach(function(l, i){ l.hh = l.h || CM_H; CM_YS.push(CM_YS[i] + l.hh); });
+  var TK_Y = CM_YS[cmLanes.length], TK_H = 36;
   var H = TK_Y + laneTasks.length * TK_H + 10;
   var msCY = MS_Y + MS_H - 36;
   var sys = phaseSys();
@@ -1543,9 +1547,9 @@ function _renderChart(_padR, _minAng){
   s += '<text x="' + (GUT/2).toFixed(1) + '" y="' + (MS_Y + MS_H/2 + 4) + '" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">' + esc(tr('legendMs')) + '</text>';
   s += '<line x1="0" y1="' + CM_Y + '" x2="' + W + '" y2="' + CM_Y + '" stroke="#e5e7eb"/>';
   cmLanes.forEach(function(l, i){
-    var ly0 = CM_Y + i * CM_H;
-    s += '<rect x="0" y="' + ly0 + '" width="' + GUT + '" height="' + CM_H + '" fill="transparent" data-laneidx="' + i + '" class="cm-lane-hit" style="cursor:grab"/>';
-    s += '<text x="' + (GUT/2).toFixed(1) + '" y="' + (ly0 + CM_H/2 + 4) + '" class="tlabel" text-anchor="middle" data-laneidx="' + i + '" style="cursor:grab;user-select:none"><title>' + esc(tr('dragTip')) + '</title>' + esc(l.name) + '</text>';
+    var ly0 = CM_YS[i];
+    s += '<rect x="0" y="' + ly0 + '" width="' + GUT + '" height="' + l.hh + '" fill="transparent" data-laneidx="' + i + '" class="cm-lane-hit" style="cursor:grab"/>';
+    s += '<text x="' + (GUT/2).toFixed(1) + '" y="' + (ly0 + l.hh/2 + 4) + '" class="tlabel" text-anchor="middle" data-laneidx="' + i + '" style="cursor:grab;user-select:none"><title>' + esc(tr('dragTip')) + '</title>' + esc(l.name) + '</text>';
     if(i > 0) s += '<line x1="0" y1="' + ly0 + '" x2="' + W + '" y2="' + ly0 + '" stroke="#f3f4f6"/>';
   });
   s += '<line x1="0" y1="' + TK_Y + '" x2="' + W + '" y2="' + TK_Y + '" stroke="#e5e7eb"/>';
@@ -1601,7 +1605,7 @@ function _renderChart(_padR, _minAng){
   });
   // 自定义节点排：基线 + 菱形 + 日期（上方）+ 名称（下方）；标签重叠时自动错开
   cmLanes.forEach(function(l, i){
-    var y0 = CM_Y + i * CM_H, cy = y0 + CM_H/2, r = 6;
+    var y0 = CM_YS[i], cy = y0 + l.hh/2, r = 6;
     if(l.cust){
       if(l.dates.length > 1) s += '<line x1="' + X(l.dates[0].d).toFixed(1) + '" y1="' + cy + '" x2="' + X(l.dates[l.dates.length-1].d).toFixed(1) + '" y2="' + cy + '" stroke="#fcd34d" stroke-width="3"/>';
     } else s += '<line x1="' + GUT + '" y1="' + cy + '" x2="' + W + '" y2="' + cy + '" stroke="#e5e7eb"/>';
@@ -1616,7 +1620,7 @@ function _renderChart(_padR, _minAng){
     l.dates.forEach(function(it, j){
       var d = it.d, cx = X(d);
       var ddx = (dDx[j]||0), dy = cy-13;
-      var ndx = it.n ? (nDx[ni++]||0) : 0, ny = cy+24;
+      var ndx = it.n ? (nDx[ni++]||0) : 0, ny = cy + Math.min(24, Math.max(19, l.hh/2 - 2));
       s += '<g data-clane="' + i + '" data-cj="' + j + '"><title>' + esc((l.name ? l.name + '\n' : '') + (it.n ? it.n + '\n' : '') + fmtD(d)) + '</title>'
         + '<rect x="' + (cx-rr).toFixed(1) + '" y="' + (cy-rr).toFixed(1) + '" width="' + (rr*2) + '" height="' + (rr*2)
         + '" transform="rotate(45 ' + cx.toFixed(1) + ' ' + cy + ')" fill="' + dFill + '" stroke="' + dStroke + '" stroke-width="1.5"/>'
@@ -1670,9 +1674,10 @@ function _renderChart(_padR, _minAng){
 
   /* 手动调整：左列宽（竖线）与里程碑行高（横线）拖动手柄；导出时移除 */
   s += '<rect class="rz-h rz-ms" data-noexp="1" x="0" y="' + (MS_Y + MS_H - 4) + '" width="' + W + '" height="8" fill="transparent" style="cursor:row-resize"><title>' + esc(tr('rzMsTip')) + '</title></rect>';
+  cmLanes.forEach(function(l, i){ s += '<rect class="rz-h rz-cm" data-noexp="1" data-lane="' + l.src + '" data-h="' + l.hh + '" x="' + GUT + '" y="' + (CM_YS[i + 1] - 3) + '" width="' + (W - GUT) + '" height="6" fill="transparent" style="cursor:row-resize"><title>' + esc(tr('rzCmTip')) + '</title></rect>'; });
   s += '<rect class="rz-h rz-gut" data-noexp="1" x="' + (GUT - 4) + '" y="0" width="8" height="' + H + '" fill="transparent" style="cursor:col-resize"><title>' + esc(tr('rzGutTip')) + '</title></rect>';
-  window._curGut = GUT; window._curMsH = MS_H; window._chartMap = { min:min, pxDay:pxDay };
-  chart.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" data-cm-y="' + CM_Y + '" data-cm-h="' + CM_H + '" data-cm-n="' + cmLanes.length + '">' + s + '</svg>';
+  window._curGut = GUT; window._curMsH = MS_H; window._curCmH = CM_H; window._chartMap = { min:min, pxDay:pxDay };
+  chart.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" data-cm-y="' + CM_Y + '" data-cm-h="' + CM_H + '" data-cm-n="' + cmLanes.length + '" data-cm-ys="' + CM_YS.join(',') + '">' + s + '</svg>';
   if(window.syncSizeInputs) syncSizeInputs();
   return _labOver;
 }
@@ -1941,7 +1946,7 @@ function exportJSON(){
   var data = { app:'gantt-tool', v:1, oem:state.oem, projectName:state.projectName,
     dates:state.dates, excluded:state.excluded, recTasks:state.recTasks,
     tasks:state.tasks, customMs:state.customMs, addNodes:state.addNodes || {}, showPhase:state.showPhase !== false,
-    gutW:state.gutW || 0, msRowH:state.msRowH || 0,
+    gutW:state.gutW || 0, msRowH:state.msRowH || 0, cmRowH:state.cmRowH || 0,
     logoLeft:state.logoLeft || '', logoRight:state.logoRight || '',
     creatorName:$('creatorName') ? $('creatorName').value : '',
     ckShowCreator:$('ckShowCreator') ? $('ckShowCreator').checked : false,
@@ -1964,7 +1969,7 @@ function importJSON(file){
       state.customMs = Array.isArray(d.customMs) ? d.customMs : [];
       state.addNodes = (d.addNodes && typeof d.addNodes === 'object') ? d.addNodes : {};
       state.showPhase = d.showPhase !== false;
-      state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0;
+      state.gutW = +d.gutW > 0 ? +d.gutW : 0; state.msRowH = +d.msRowH > 0 ? +d.msRowH : 0; state.cmRowH = +d.cmRowH > 0 ? +d.cmRowH : 0;
       if(window.syncSizeInputs) syncSizeInputs();
       state.logoLeft = (typeof d.logoLeft === 'string') ? d.logoLeft : '';
       state.logoRight = (typeof d.logoRight === 'string') ? d.logoRight : '';
@@ -2106,23 +2111,29 @@ function init(){
   });
   /* 左列宽 / 里程碑行高：输入数值或在图上拖动；留空或「自动」= 自适应 */
   window.syncSizeInputs = function(){
-    var g = $('szGut'), m = $('szMs'); if(!g) return;
+    var g = $('szGut'), m = $('szMs'), c = $('szCm'); if(!g) return;
+    if(c){ c.value = state.cmRowH > 0 ? Math.round(state.cmRowH) : ''; c.placeholder = '58'; }
     g.value = state.gutW > 0 ? Math.round(state.gutW) : ''; m.value = state.msRowH > 0 ? Math.round(state.msRowH) : '';
     g.placeholder = window._autoGut ? String(window._autoGut) : ''; m.placeholder = window._autoMsH ? String(window._autoMsH) : '';
   };
   function szApply(){ save(); renderChart(); syncSizeInputs(); }
   $('szGut').addEventListener('change', function(){ var v = parseFloat(this.value); state.gutW = v > 0 ? Math.max(60, Math.min(800, v)) : 0; szApply(); });
   $('szMs').addEventListener('change', function(){ var v = parseFloat(this.value); state.msRowH = v > 0 ? Math.max(40, Math.min(400, v)) : 0; szApply(); });
-  $('szAuto').addEventListener('click', function(){ state.gutW = 0; state.msRowH = 0; szApply(); });
+  $('szCm').addEventListener('change', function(){ var v = parseFloat(this.value); state.cmRowH = v > 0 ? Math.max(40, Math.min(300, v)) : 0; (state.customMs || []).forEach(function(l){ delete l.h; }); szApply(); });
+  $('szAuto').addEventListener('click', function(){ state.gutW = 0; state.msRowH = 0; state.cmRowH = 0; (state.customMs || []).forEach(function(l){ delete l.h; }); szApply(); });
+  /* 双击某排下边线：该排恢复为整体默认高度 */
+  $('chart').addEventListener('dblclick', function(e){ var t = e.target; if(!t.classList || !t.classList.contains('rz-cm')) return; var l = state.customMs[+t.getAttribute('data-lane')]; if(l){ delete l.h; szApply(); } });
   $('chart').addEventListener('mousedown', function(e){
     var t = e.target; if(!t.classList || !t.classList.contains('rz-h')) return;
     e.preventDefault(); e.stopPropagation();
     var isGut = t.classList.contains('rz-gut'), x0 = e.clientX, y0 = e.clientY;
-    var v0 = isGut ? (window._curGut || 150) : (window._curMsH || 80), raf = 0;
+    var isCm = t.classList.contains('rz-cm'), lane = isCm ? state.customMs[+t.getAttribute('data-lane')] : null;
+    var v0 = isGut ? (window._curGut || 150) : isCm ? (+t.getAttribute('data-h') || 58) : (window._curMsH || 80), raf = 0;
     document.body.style.cursor = isGut ? 'col-resize' : 'row-resize'; document.body.style.userSelect = 'none';
     function mv(ev){
       var v = v0 + (isGut ? ev.clientX - x0 : ev.clientY - y0);
-      if(isGut) state.gutW = Math.max(60, Math.min(800, v)); else state.msRowH = Math.max(40, Math.min(400, v));
+      if(isCm){ if(lane) lane.h = Math.round(Math.max(40, Math.min(300, v))); }
+      else if(isGut) state.gutW = Math.max(60, Math.min(800, v)); else state.msRowH = Math.max(40, Math.min(400, v));
       if(!raf) raf = requestAnimationFrame(function(){ raf = 0; renderChart(); syncSizeInputs(); });
     }
     function up(){ document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
