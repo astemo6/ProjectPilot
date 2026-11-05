@@ -1548,8 +1548,10 @@ function _renderChart(_padR, _minAng){
   s += '<line x1="0" y1="' + CM_Y + '" x2="' + W + '" y2="' + CM_Y + '" stroke="#e5e7eb"/>';
   cmLanes.forEach(function(l, i){
     var ly0 = CM_YS[i];
+    /* 用户 2026-11-05：客户节点样式的排，底色与上方里程碑行一致 */
+    if(l.cust) s += '<rect x="0" y="' + ly0 + '" width="' + W + '" height="' + l.hh + '" fill="#a0a0a0"/>';
     s += '<rect x="0" y="' + ly0 + '" width="' + GUT + '" height="' + l.hh + '" fill="transparent" data-laneidx="' + i + '" class="cm-lane-hit" style="cursor:grab"/>';
-    s += '<text x="' + (GUT/2).toFixed(1) + '" y="' + (ly0 + l.hh/2 + 4) + '" class="tlabel" text-anchor="middle" data-laneidx="' + i + '" style="cursor:grab;user-select:none"><title>' + esc(tr('dragTip')) + '</title>' + esc(l.name) + '</text>';
+    s += '<text x="' + (GUT/2).toFixed(1) + '" y="' + (ly0 + l.hh/2 + 4) + '" class="tlabel" text-anchor="middle" data-laneidx="' + i + '" style="cursor:grab;user-select:none' + (l.cust ? ';fill:#ffffff;font-weight:700' : '') + '"><title>' + esc(tr('dragTip')) + '</title>' + esc(l.name) + '</text>';
     if(i > 0) s += '<line x1="0" y1="' + ly0 + '" x2="' + W + '" y2="' + ly0 + '" stroke="#f3f4f6"/>';
   });
   s += '<line x1="0" y1="' + TK_Y + '" x2="' + W + '" y2="' + TK_Y + '" stroke="#e5e7eb"/>';
@@ -1624,7 +1626,7 @@ function _renderChart(_padR, _minAng){
       s += '<g data-clane="' + i + '" data-cj="' + j + '"><title>' + esc((l.name ? l.name + '\n' : '') + (it.n ? it.n + '\n' : '') + fmtD(d)) + '</title>'
         + '<rect x="' + (cx-rr).toFixed(1) + '" y="' + (cy-rr).toFixed(1) + '" width="' + (rr*2) + '" height="' + (rr*2)
         + '" transform="rotate(45 ' + cx.toFixed(1) + ' ' + cy + ')" fill="' + dFill + '" stroke="' + dStroke + '" stroke-width="1.5"/>'
-        + ((Math.abs(ddx) > 40 ? '<line x1="' + (cx+ddx).toFixed(1) + '" y1="' + (dy+4) + '" x2="' + cx.toFixed(1) + '" y2="' + (cy-7) + '" stroke="#9ca3af" stroke-width="1"/>' : '') + '<text x="' + (cx+ddx).toFixed(1) + '" y="' + dy + '" text-anchor="middle" class="mdate">' + (d.getMonth()+1) + '/' + d.getDate() + '</text>')
+        + ((Math.abs(ddx) > 40 ? '<line x1="' + (cx+ddx).toFixed(1) + '" y1="' + (dy+4) + '" x2="' + cx.toFixed(1) + '" y2="' + (cy-7) + '" stroke="#9ca3af" stroke-width="1"/>' : '') + '<text x="' + (cx+ddx).toFixed(1) + '" y="' + dy + '" text-anchor="middle" class="mdate"' + (l.cust ? ' style="fill:#1f2937"' : '') + '>' + (d.getMonth()+1) + '/' + d.getDate() + '</text>')
         + (it.n ? ((Math.abs(ndx) > 40 ? '<line x1="' + (cx+ndx).toFixed(1) + '" y1="' + (ny-9) + '" x2="' + cx.toFixed(1) + '" y2="' + (cy+7) + '" stroke="#9ca3af" stroke-width="1"/>' : '') + '<text x="' + (cx+ndx).toFixed(1) + '" y="' + ny + '" text-anchor="middle" class="mlabel">' + esc(it.n) + '</text>') : '')
         + '</g>';
     });
@@ -2128,16 +2130,22 @@ function init(){
     e.preventDefault(); e.stopPropagation();
     var isGut = t.classList.contains('rz-gut'), x0 = e.clientX, y0 = e.clientY;
     var isCm = t.classList.contains('rz-cm'), lane = isCm ? state.customMs[+t.getAttribute('data-lane')] : null;
+    /* 双击（两次按下 < 400ms，同一排）：该排恢复默认高度。重绘会替换元素，原生 dblclick 不触发，故手动判断 */
+    if(isCm){ var now = Date.now(), key = t.getAttribute('data-lane');
+      if(window._rzLast && window._rzLast.k === key && now - window._rzLast.t < 400){ window._rzLast = null; if(lane){ delete lane.h; } szApply(); return; }
+      window._rzLast = { k:key, t:now }; }
+    var moved = false;
     var v0 = isGut ? (window._curGut || 150) : isCm ? (+t.getAttribute('data-h') || 58) : (window._curMsH || 80), raf = 0;
     document.body.style.cursor = isGut ? 'col-resize' : 'row-resize'; document.body.style.userSelect = 'none';
     function mv(ev){
       var v = v0 + (isGut ? ev.clientX - x0 : ev.clientY - y0);
+      if(Math.abs(ev.clientY - y0) + Math.abs(ev.clientX - x0) > 2) moved = true; else return;
       if(isCm){ if(lane) lane.h = Math.round(Math.max(40, Math.min(300, v))); }
       else if(isGut) state.gutW = Math.max(60, Math.min(800, v)); else state.msRowH = Math.max(40, Math.min(400, v));
       if(!raf) raf = requestAnimationFrame(function(){ raf = 0; renderChart(); syncSizeInputs(); });
     }
     function up(){ document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
-      document.body.style.cursor = ''; document.body.style.userSelect = ''; save(); renderChart(); syncSizeInputs(); }
+      document.body.style.cursor = ''; document.body.style.userSelect = ''; if(!moved) return; save(); renderChart(); syncSizeInputs(); }
     document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
   }, true);
   syncSizeInputs();
